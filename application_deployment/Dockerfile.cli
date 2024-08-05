@@ -1,0 +1,22 @@
+FROM python:3.9-slim-buster
+
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+RUN python -m grpc_tools.protoc -I. --python_out=. deployment_tp/payload.proto
+
+RUN pip install pyinstaller
+RUN pyinstaller --onefile deployment_client/client.py --name deployment-cli
+
+FROM python:3.9-slim-buster
+COPY --from=0 /app/dist/deployment-cli /usr/local/bin/deployment-cli

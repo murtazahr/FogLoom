@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+message DockerDeploymentPayload {
+  enum Action {
+    DEPLOY = 0;
+    UNDEPLOY = 1;
+  }
+  Action action = 1;
+  string image = 2;
+}
