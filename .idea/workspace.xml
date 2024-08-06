@@ -5,24 +5,34 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="027c86cc-f129-4523-9859-9dfb3a20cd6e" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/Fogbusv3-Transaction-Processors.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/Dockerfile" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/Dockerfile.cli" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/deployment_client/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/deployment_client/client.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/deployment_client/client_logic.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/deployment_tp/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/deployment_tp/__main__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/deployment_tp/handler.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/deployment_tp/payload.proto" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/deployment_tp/state.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/docker-compose.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/application_deployment/requirements.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docker_app_deployment_family/docker-compose.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docker_app_deployment_family/docker_app_client.Dockerfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docker_app_deployment_family/docker_app_tp.Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Fogbusv3-Transaction-Processors.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Fogbusv3-Transaction-Processors.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/Dockerfile" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/Dockerfile.cli" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/Analysis-00.toc" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/EXE-00.toc" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/PKG-00.toc" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/PYZ-00.pyz" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/PYZ-00.toc" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/base_library.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/deployment-cli.pkg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/warn-deployment-cli.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/build/deployment-cli/xref-deployment-cli.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_client/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_client/client.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_client/client_logic.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_tp/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_tp/__main__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_tp/handler.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_tp/payload.proto" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_tp/payload_pb2.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/deployment_tp/state.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/docker-compose.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/application_deployment/requirements.txt" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,6 +42,18 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;murtazahr&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/murtazahr/Fogbusv3-Transaction-Processors.git&quot;,
+    &quot;accountId&quot;: &quot;3b0b6bd3-2674-4039-bd08-42f038f8bc27&quot;
+  }
+}</component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 4
 }</component>
@@ -41,19 +63,21 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python.docker_app_client.executor": "Run",
+    "Python.docker_app_tp.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "main",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/application_deployment" />
@@ -78,11 +102,16 @@
       <workItem from="1722476468196" duration="3201000" />
       <workItem from="1722481368144" duration="11389000" />
       <workItem from="1722510941203" duration="3279000" />
-      <workItem from="1722822563750" duration="1633000" />
+      <workItem from="1722822563750" duration="4002000" />
+      <workItem from="1722904266283" duration="8063000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/Fogbusv3_Transaction_Processors$docker_app_client.coverage" NAME="docker_app_client Coverage Results" MODIFIED="1722905619711" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/docker_app_deployment_family" />
+    <SUITE FILE_PATH="coverage/Fogbusv3_Transaction_Processors$docker_app_tp.coverage" NAME="docker_app_tp Coverage Results" MODIFIED="1722905544173" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/docker_app_deployment_family" />
   </component>
 </project>
