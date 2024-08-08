@@ -20,16 +20,12 @@ volumes:
 
 services:
   shell:
-    build:
-      context: .
-      dockerfile: docker_app_client.Dockerfile
+    image: hyperledger/sawtooth-shell:chime
     container_name: sawtooth-shell-default
-    depends_on:
-      - rest-api-0
     entrypoint: "bash -c \"\
-          sawtooth keygen && \
-          tail -f /dev/null \
-          \""
+        sawtooth keygen && \
+        tail -f /dev/null \
+        \""
 
   validator-0:
     image: hyperledger/sawtooth-validator:chime
@@ -268,56 +264,6 @@ services:
       "
     stop_signal: SIGKILL
 
-  docker-app-tp-0:
-    build:
-      context: .
-      dockerfile: docker_app_tp.Dockerfile
-    container_name: sawtooth-docker-app-tp-0
-    depends_on:
-      - validator-0
-    command: python3 /app/docker_app_tp.py -v -C tcp://validator-0:4004
-    stop_signal: SIGKILL
-
-  docker-app-tp-1:
-    build:
-      context: .
-      dockerfile: docker_app_tp.Dockerfile
-    container_name: sawtooth-docker-app-tp-1
-    depends_on:
-      - validator-1
-    command: python3 /app/docker_app_tp.py -v -C tcp://validator-1:4004
-    stop_signal: SIGKILL
-
-  docker-app-tp-2:
-    build:
-      context: .
-      dockerfile: docker_app_tp.Dockerfile
-    container_name: sawtooth-docker-app-tp-2
-    depends_on:
-      - validator-2
-    command: python3 /app/docker_app_tp.py -v -C tcp://validator-2:4004
-    stop_signal: SIGKILL
-
-  docker-app-tp-3:
-    build:
-      context: .
-      dockerfile: docker_app_tp.Dockerfile
-    container_name: sawtooth-docker-app-tp-3
-    depends_on:
-      - validator-3
-    command: python3 /app/docker_app_tp.py -v -C tcp://validator-3:4004
-    stop_signal: SIGKILL
-
-  docker-app-tp-4:
-    build:
-      context: .
-      dockerfile: docker_app_tp.Dockerfile
-    container_name: sawtooth-docker-app-tp-4
-    depends_on:
-      - validator-4
-    command: python3 /app/docker_app_tp.py -v -C tcp://validator-4:4004
-    stop_signal: SIGKILL
-
   intkey-tp-0:
     image: hyperledger/sawtooth-intkey-tp-python:chime
     container_name: sawtooth-intkey-tp-python-default-0
@@ -398,6 +344,46 @@ services:
     command: xo-tp-python -vv -C tcp://validator-4:4004
     stop_signal: SIGKILL
 
+  auto-deployment-tp-0:
+    image: sawtooth-auto-docker-deployment-tp:latest
+    container_name: sawtooth-auto-docker-deployment-tp-0
+    expose:
+      - 4004
+    command: python /app/handler.py tcp://validator-0:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-tp-1:
+    image: sawtooth-auto-docker-deployment-tp:latest
+    container_name: sawtooth-auto-docker-deployment-tp-1
+    expose:
+      - 4004
+    command: python /app/handler.py tcp://validator-1:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-tp-2:
+    image: sawtooth-auto-docker-deployment-tp:latest
+    container_name: sawtooth-auto-docker-deployment-tp-2
+    expose:
+      - 4004
+    command: python /app/handler.py tcp://validator-2:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-tp-3:
+    image: sawtooth-auto-docker-deployment-tp:latest
+    container_name: sawtooth-auto-docker-deployment-tp-3
+    expose:
+      - 4004
+    command: python /app/handler.py tcp://validator-3:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-tp-4:
+    image: sawtooth-auto-docker-deployment-tp:latest
+    container_name: sawtooth-auto-docker-deployment-tp-4
+    expose:
+      - 4004
+    command: python /app/handler.py tcp://validator-4:4004
+    stop_signal: SIGKILL
+
   settings-tp-0:
     image: hyperledger/sawtooth-settings-tp:chime
     container_name: sawtooth-settings-tp-default-0
@@ -436,6 +422,46 @@ services:
     expose:
       - 4004
     command: settings-tp -v -C tcp://validator-4:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-event-handler-0:
+    image: sawtooth-auto-docker-deployment-event-handler:latest
+    container_name: sawtooth-auto-docker-deployment-event-handler-0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python /app/event_handler.py tcp://validator-0:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-event-handler-1:
+    image: sawtooth-auto-docker-deployment-event-handler:latest
+    container_name: sawtooth-auto-docker-deployment-event-handler-1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python /app/event_handler.py tcp://validator-1:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-event-handler-2:
+    image: sawtooth-auto-docker-deployment-event-handler:latest
+    container_name: sawtooth-auto-docker-deployment-event-handler-2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python /app/event_handler.py tcp://validator-2:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-event-handler-3:
+    image: sawtooth-auto-docker-deployment-event-handler:latest
+    container_name: sawtooth-auto-docker-deployment-event-handler-3
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python /app/event_handler.py tcp://validator-3:4004
+    stop_signal: SIGKILL
+
+  auto-deployment-event-handler-4:
+    image: sawtooth-auto-docker-deployment-event-handler:latest
+    container_name: sawtooth-auto-docker-deployment-event-handler-4
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python /app/event_handler.py tcp://validator-4:4004
     stop_signal: SIGKILL
 
   poet-engine-0:
