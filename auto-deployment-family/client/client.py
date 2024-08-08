@@ -38,32 +38,6 @@ def _hash(data):
     return hashlib.sha512(data).hexdigest()
 
 
-def load_docker_image(file_path):
-    print(f"Attempting to load Docker image from: {file_path}")
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
-
-    if os.path.isdir(file_path):
-        raise IsADirectoryError(f"Expected a file, but {file_path} is a directory")
-
-    try:
-        file_size = os.path.getsize(file_path)
-        print(f"File size: {file_size} bytes")
-
-        with open(file_path, 'rb') as file:
-            chunk_size = 1024 * 1024  # 1 MB chunks
-            data = b''
-            for chunk in iter(lambda: file.read(chunk_size), b''):
-                data += chunk
-                print(f"Read {len(data)} bytes...")
-
-        print(f"Finished reading file. Total size: {len(data)} bytes")
-        return data
-    except IOError as e:
-        print(f"Error reading file: {e}")
-        raise
-
-
 def create_transaction(signer, payload, inputs, outputs):
     txn_header_bytes = TransactionHeader(
         family_name=FAMILY_NAME,
@@ -111,13 +85,23 @@ def submit_batch(batch, url):
         response = requests.post(
             f'{url}/batches',
             headers={'Content-Type': 'application/octet-stream'},
-            data=batch_list_bytes
+            data=batch_list_bytes,
+            timeout=30
         )
         print(f"Received response with status code: {response.status_code}")
         return response
     except requests.exceptions.RequestException as e:
         print(f"Error submitting batch: {e}")
         raise
+
+
+def stream_file(file_path, chunk_size=1024 * 1024):
+    with open(file_path, 'rb') as file:
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
 
 
 def main():
@@ -135,20 +119,26 @@ def main():
         print(f"Error loading private key: {e}")
         sys.exit(1)
 
-    try:
-        image_data = load_docker_image(args.docker_image)
-        image_name = os.path.basename(args.docker_image).split('.')[0]
-        print(f"Successfully loaded Docker image: {image_name}")
-    except Exception as e:
-        print(f"Failed to load Docker image: {e}")
-        sys.exit(1)
+    image_name = os.path.basename(args.docker_image).split('.')[0]
+    print(f"Processing Docker image: {image_name}")
 
     print("Preparing payload...")
     payload = {
-        'image_data': base64.b64encode(image_data).decode('utf-8'),
         'image_name': image_name,
-        'image_tag': 'latest'
+        'image_tag': 'latest',
+        'image_data': ''  # Placeholder for streaming data
     }
+
+    # Stream the file in chunks and update the payload
+    print("Streaming file data...")
+    chunk_size = 1024 * 1024  # 1 MB chunks
+    total_size = 0
+    for chunk in stream_file(args.docker_image, chunk_size):
+        payload['image_data'] += base64.b64encode(chunk).decode('utf-8')
+        total_size += len(chunk)
+        print(f"Processed {total_size} bytes...")
+
+    print("Creating YAML payload...")
     payload_bytes = yaml.dump(payload).encode('utf-8')
     print(f"Payload prepared. Size: {len(payload_bytes)} bytes")
 
