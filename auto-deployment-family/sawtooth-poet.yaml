@@ -22,6 +22,8 @@ services:
   shell:
     image: hyperledger/sawtooth-shell:chime
     container_name: sawtooth-shell-default
+    volumes:
+      - ./:/client
     entrypoint: "bash -c \"\
         sawtooth keygen && \
         tail -f /dev/null \
@@ -578,13 +580,3 @@ services:
     environment:
       PYTHONPATH: /project/sawtooth-core/consensus/poet/common
     stop_signal: SIGKILL
-
-  auto-deployment-client:
-    image: sawtooth-auto-docker-deployment-client:latest
-    container_name: sawtooth-auto-docker-deployment-client
-    volumes:
-      - ./client:/app/client
-    command: python /app/client.py /app/client/temp-anomaly-detection.tar
-    depends_on:
-      - rest-api-0
-    restart: on-failure

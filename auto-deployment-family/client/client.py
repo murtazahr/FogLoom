@@ -1,8 +1,8 @@
+import argparse
 import base64
 import hashlib
 import os
 import sys
-import time
 
 import requests
 import yaml
@@ -11,6 +11,7 @@ from sawtooth_signing import create_context
 from sawtooth_signing import CryptoFactory
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
+from sawtooth_signing.secp256k1 import Secp256k1PrivateKey
 
 # Transaction Family Name
 FAMILY_NAME = 'auto-deployment-docker'
@@ -18,6 +19,20 @@ FAMILY_VERSION = '1.0'
 
 # REST API URL
 REST_API_URL = 'http://sawtooth-rest-api-default-0:8008'
+
+
+def load_private_key(key_file):
+    try:
+        with open(key_file, 'r') as key_file:
+            private_key_str = key_file.read().strip()
+            return Secp256k1PrivateKey.from_hex(private_key_str)
+    except IOError as e:
+        raise Exception(f"Failed to load private key: {str(e)}")
+
+
+def create_signer(private_key):
+    context = create_context('secp256k1')
+    return CryptoFactory(context).new_signer(private_key)
 
 
 def _hash(data):
@@ -80,10 +95,10 @@ def create_batch(transactions, signer):
     return batch
 
 
-def submit_batch(batch):
+def submit_batch(batch, url):
     batch_list_bytes = BatchList(batches=[batch]).SerializeToString()
     response = requests.post(
-        f'{REST_API_URL}/batches',
+        f'{url}/batches',
         headers={'Content-Type': 'application/octet-stream'},
         data=batch_list_bytes
     )
@@ -91,32 +106,22 @@ def submit_batch(batch):
 
 
 def main():
-
-    # Wait for the REST API to be available
-    while True:
-        try:
-            response = requests.get(f'{REST_API_URL}/blocks')
-            if response.status_code == 200:
-                print("REST API is available. Proceeding with transaction submission.")
-                break
-        except requests.exceptions.RequestException:
-            print("Waiting for REST API to be available...")
-            time.sleep(1)
-
-    if len(sys.argv) != 2:
-        print("Usage: python client.py <docker_image_file>")
-        sys.exit(1)
-
-    docker_image_file = sys.argv[1]
-    print(f"Docker image file path: {docker_image_file}")
-    print(f"Current working directory: {os.getcwd()}")
-    print(f"Directory contents:")
-    for item in os.listdir(os.path.dirname(docker_image_file)):
-        print(f" - {item}")
+    parser = argparse.ArgumentParser(description='Sawtooth Docker Deployment Client')
+    parser.add_argument('key_file', help='Path to the private key file')
+    parser.add_argument('docker_image', help='Path to the Docker image tar file')
+    parser.add_argument('--url', default=REST_API_URL, help='URL of the REST API')
+    args = parser.parse_args()
 
     try:
-        image_data = load_docker_image(docker_image_file)
-        image_name = os.path.basename(docker_image_file).split('.')[0]
+        private_key = load_private_key(args.key_file)
+        signer = create_signer(private_key)
+    except Exception as e:
+        print(f"Error loading private key: {e}")
+        sys.exit(1)
+
+    try:
+        image_data = load_docker_image(args.docker_image)
+        image_name = os.path.basename(args.docker_image).split('.')[0]
     except Exception as e:
         print(f"Failed to load Docker image: {e}")
         sys.exit(1)
@@ -128,11 +133,6 @@ def main():
         'image_tag': 'latest'
     }
     payload_bytes = yaml.dump(payload).encode('utf-8')
-
-    # Create a signer
-    context = create_context('secp256k1')
-    private_key = context.new_random_private_key()
-    signer = CryptoFactory(context).new_signer(private_key)
 
     # Define inputs and outputs
     address_prefix = _hash(FAMILY_NAME.encode('utf-8'))[0:6]
@@ -147,10 +147,12 @@ def main():
     batch = create_batch([txn], signer)
 
     # Submit the batch
-    response = submit_batch(batch)
-
-    print(f"Transaction submitted: {response.status_code}")
-    print(f"Response: {response.text}")
+    try:
+        response = submit_batch(batch, args.url)
+        print(f"Transaction submitted: {response.status_code}")
+        print(f"Response: {response.text}")
+    except Exception as e:
+        print(f"Failed to submit transaction: {e}")
 
 
 if __name__ == '__main__':
