@@ -10,12 +10,19 @@
 
 # Main script content starts here
 
+WORK_DIR=$(pwd)
+TEST_APP_DIR=$(pwd)/../sample_application
+
+# Make sure user is in the correct working directory
+cd "$WORK_DIR" || exit
+
+# Bring docker compose down incase it is up
+docker-compose -f sawtooth-poet.yaml down
+
 # Clean up existing docker environment
 docker system prune -a --volumes -f
 
 # Building docker image for test docker application
-WORK_DIR=$(pwd)
-TEST_APP_DIR=$(pwd)/../sample_application
 cd "$TEST_APP_DIR" || exit
 docker build -t temp-anomaly-detection:latest -f Dockerfile .
 
