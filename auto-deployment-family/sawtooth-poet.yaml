@@ -578,3 +578,13 @@ services:
     environment:
       PYTHONPATH: /project/sawtooth-core/consensus/poet/common
     stop_signal: SIGKILL
+
+  auto-deployment-client:
+    image: sawtooth-auto-docker-deployment-client:latest
+    container_name: sawtooth-auto-docker-deployment-client
+    volumes:
+      - ./client/temp-anomaly-detector.tar:/app/temp-anomaly-detector.tar
+    command: python /app/client.py /app/temp-anomaly-detector.tar
+    depends_on:
+      - rest-api-0
+    restart: on-failure
