@@ -25,8 +25,22 @@ def _hash(data):
 
 
 def load_docker_image(file_path):
-    with open(file_path, 'rb') as f:
-        return f.read()
+    print(f"Attempting to load Docker image from: {file_path}")
+    if os.path.isdir(file_path):
+        print(f"Error: {file_path} is a directory. Listing contents:")
+        for item in os.listdir(file_path):
+            print(f" - {item}")
+        raise ValueError(f"{file_path} is a directory, not a file")
+
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+
+    try:
+        with open(file_path, 'rb') as file:
+            return file.read()
+    except IOError as e:
+        print(f"Error reading file: {e}")
+        raise
 
 
 def create_transaction(signer, payload, inputs, outputs):
@@ -97,13 +111,18 @@ def main():
         sys.exit(1)
 
     docker_image_file = sys.argv[1]
-    if not os.path.exists(docker_image_file):
-        print(f"File not found: {docker_image_file}")
-        sys.exit(1)
+    print(f"Docker image file path: {docker_image_file}")
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"Directory contents:")
+    for item in os.listdir(os.path.dirname(docker_image_file)):
+        print(f" - {item}")
 
-    # Load the Docker image
-    image_data = load_docker_image(docker_image_file)
-    image_name = os.path.basename(docker_image_file).split('.')[0]
+    try:
+        image_data = load_docker_image(docker_image_file)
+        image_name = os.path.basename(docker_image_file).split('.')[0]
+    except Exception as e:
+        print(f"Failed to load Docker image: {e}")
+        sys.exit(1)
 
     # Prepare the payload
     payload = {
