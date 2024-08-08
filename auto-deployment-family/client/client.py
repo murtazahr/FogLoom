@@ -26,14 +26,11 @@ def _hash(data):
 
 def load_docker_image(file_path):
     print(f"Attempting to load Docker image from: {file_path}")
-    if os.path.isdir(file_path):
-        print(f"Error: {file_path} is a directory. Listing contents:")
-        for item in os.listdir(file_path):
-            print(f" - {item}")
-        raise ValueError(f"{file_path} is a directory, not a file")
-
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
+
+    if os.path.isdir(file_path):
+        raise IsADirectoryError(f"Expected a file, but {file_path} is a directory")
 
     try:
         with open(file_path, 'rb') as file:

@@ -23,7 +23,7 @@ docker build -t temp-anomaly-detection:latest -f Dockerfile .
 cd "$WORK_DIR" || exit
 
 # Export test docker application
-docker save -o client/temp-anomaly-detector.tar temp-anomaly-detection
+docker save -o client/temp-anomaly-detection.tar temp-anomaly-detection
 
 # Build docker images for tp, event handler and client
 docker build -t sawtooth-auto-docker-deployment-tp:latest -f processor.Dockerfile .
