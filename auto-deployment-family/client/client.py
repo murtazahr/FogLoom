@@ -3,7 +3,6 @@ import base64
 import hashlib
 import os
 import sys
-
 import requests
 import yaml
 
@@ -48,8 +47,18 @@ def load_docker_image(file_path):
         raise IsADirectoryError(f"Expected a file, but {file_path} is a directory")
 
     try:
+        file_size = os.path.getsize(file_path)
+        print(f"File size: {file_size} bytes")
+
         with open(file_path, 'rb') as file:
-            return file.read()
+            chunk_size = 1024 * 1024  # 1 MB chunks
+            data = b''
+            for chunk in iter(lambda: file.read(chunk_size), b''):
+                data += chunk
+                print(f"Read {len(data)} bytes...")
+
+        print(f"Finished reading file. Total size: {len(data)} bytes")
+        return data
     except IOError as e:
         print(f"Error reading file: {e}")
         raise
@@ -97,12 +106,18 @@ def create_batch(transactions, signer):
 
 def submit_batch(batch, url):
     batch_list_bytes = BatchList(batches=[batch]).SerializeToString()
-    response = requests.post(
-        f'{url}/batches',
-        headers={'Content-Type': 'application/octet-stream'},
-        data=batch_list_bytes
-    )
-    return response
+    print(f"Submitting batch to {url}/batches")
+    try:
+        response = requests.post(
+            f'{url}/batches',
+            headers={'Content-Type': 'application/octet-stream'},
+            data=batch_list_bytes
+        )
+        print(f"Received response with status code: {response.status_code}")
+        return response
+    except requests.exceptions.RequestException as e:
+        print(f"Error submitting batch: {e}")
+        raise
 
 
 def main():
@@ -115,6 +130,7 @@ def main():
     try:
         private_key = load_private_key(args.key_file)
         signer = create_signer(private_key)
+        print("Successfully loaded private key and created signer")
     except Exception as e:
         print(f"Error loading private key: {e}")
         sys.exit(1)
@@ -122,31 +138,33 @@ def main():
     try:
         image_data = load_docker_image(args.docker_image)
         image_name = os.path.basename(args.docker_image).split('.')[0]
+        print(f"Successfully loaded Docker image: {image_name}")
     except Exception as e:
         print(f"Failed to load Docker image: {e}")
         sys.exit(1)
 
-    # Prepare the payload
+    print("Preparing payload...")
     payload = {
         'image_data': base64.b64encode(image_data).decode('utf-8'),
         'image_name': image_name,
         'image_tag': 'latest'
     }
     payload_bytes = yaml.dump(payload).encode('utf-8')
+    print(f"Payload prepared. Size: {len(payload_bytes)} bytes")
 
-    # Define inputs and outputs
+    print("Defining inputs and outputs...")
     address_prefix = _hash(FAMILY_NAME.encode('utf-8'))[0:6]
     image_address = address_prefix + _hash(image_name.encode('utf-8'))[0:64]
     inputs = [image_address]
     outputs = [image_address]
 
-    # Create a transaction
+    print("Creating transaction...")
     txn = create_transaction(signer, payload_bytes, inputs, outputs)
 
-    # Create a batch
+    print("Creating batch...")
     batch = create_batch([txn], signer)
 
-    # Submit the batch
+    print("Submitting batch...")
     try:
         response = submit_batch(batch, args.url)
         print(f"Transaction submitted: {response.status_code}")
