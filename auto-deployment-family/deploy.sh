@@ -20,10 +20,8 @@ cd "$WORK_DIR" || exit
 docker-compose -f sawtooth-poet.yaml down
 
 # Clean up existing docker environment
-# shellcheck disable=SC2046
-docker rm -vf $(docker ps -aq)
-# shellcheck disable=SC2046
-docker rmi -f $(docker images -aq)
+docker rm -vf "$(docker ps -aq)"
+docker rmi -f "$(docker images -aq)"
 
 # Building docker image for test docker application
 cd "$TEST_APP_DIR" || exit
