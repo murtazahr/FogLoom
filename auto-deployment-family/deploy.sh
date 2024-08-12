@@ -20,8 +20,10 @@ cd "$WORK_DIR" || exit
 docker-compose -f sawtooth-poet.yaml down
 
 # Clean up existing docker environment
-docker rm -vf "$(docker ps -aq)"
+docker container stop "$(docker container ls -aq)"
 docker rmi -f "$(docker images -aq)"
+docker volume rm auto-deployment-family_poet-shared
+docker network rm auto-deployment-family_default
 
 # Building docker image for test docker application
 cd "$TEST_APP_DIR" || exit
