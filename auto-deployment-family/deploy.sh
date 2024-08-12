@@ -20,7 +20,7 @@ cd "$WORK_DIR" || exit
 docker-compose -f sawtooth-poet.yaml down
 
 # Clean up existing docker environment
-docker container stop "$(docker container ls -aq)"
+docker container rm "$(docker container ls -aq)"
 docker rmi -f "$(docker images -aq)"
 docker volume rm auto-deployment-family_poet-shared
 docker network rm auto-deployment-family_default
