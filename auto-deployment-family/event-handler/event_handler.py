@@ -1,14 +1,33 @@
-import gzip
 import base64
-import json
 import hashlib
+import json
 import sys
-
 import docker
 from docker import errors
 from sawtooth_sdk.messaging.stream import Stream
 from sawtooth_sdk.protobuf.events_pb2 import EventList
 from sawtooth_sdk.protobuf.validator_pb2 import Message
+from sawtooth_sdk.protobuf.client_state_pb2 import ClientStateGetRequest, ClientStateGetResponse
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.exceptions import InvalidSignature
+
+
+def get_state(context, address):
+    request = ClientStateGetRequest(address=address)
+    response = context.send(
+        Message.CLIENT_STATE_GET_REQUEST,
+        request.SerializeToString()
+    ).result()
+
+    state_response = ClientStateGetResponse()
+    state_response.ParseFromString(response.content)
+
+    if state_response.status == ClientStateGetResponse.OK:
+        return state_response.value
+    else:
+        raise Exception(f"Error getting state: {state_response.status}")
 
 
 def get_image_metadata_address(image_id):
@@ -16,34 +35,43 @@ def get_image_metadata_address(image_id):
     return namespace_prefix + hashlib.sha512(f"{image_id}_metadata".encode()).hexdigest()[:64]
 
 
-def get_image_chunk_address(image_id, chunk_index):
-    namespace_prefix = hashlib.sha512('auto-deployment-docker'.encode('utf8')).hexdigest()[:6]
-    return namespace_prefix + hashlib.sha512(f"{image_id}{chunk_index}".encode()).hexdigest()[:64]
-
-
-def get_image_from_state(context, image_id):
-    # Fetch metadata
+def get_image_metadata(context, image_id):
     metadata_address = get_image_metadata_address(image_id)
-    metadata_bytes = context.get_state([metadata_address])[metadata_address]
-    metadata = json.loads(metadata_bytes.decode())
+    metadata_bytes = get_state(context, metadata_address)
+    return json.loads(metadata_bytes.decode())
 
-    # Fetch and reassemble compressed chunks
-    compressed_data = b''
-    for i in range(metadata['chunk_count']):
-        chunk_address = get_image_chunk_address(image_id, i)
-        chunk = base64.b64decode(context.get_state([chunk_address])[chunk_address])
-        compressed_data += chunk
 
-    # Decompress the data
-    image_data = gzip.decompress(compressed_data)
+def verify_image_signature(image, signature, public_key_pem):
+    # Calculate the image hash
+    image_hash = hashlib.sha256()
+    for chunk in image.save():
+        image_hash.update(chunk)
 
-    return image_data
+    # Load the public key
+    public_key = load_pem_public_key(public_key_pem.encode())
+
+    # Verify the signature
+    try:
+        public_key.verify(
+            signature,
+            image_hash.digest(),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return True
+    except InvalidSignature:
+        return False
 
 
 def handle_image_stored_event(event, context):
     image_id = None
     image_name = None
     image_tag = None
+    registry_url = None
+
     for attr in event.attributes:
         if attr.key == 'image_id':
             image_id = attr.value
@@ -51,27 +79,42 @@ def handle_image_stored_event(event, context):
             image_name = attr.value
         elif attr.key == 'image_tag':
             image_tag = attr.value
+        elif attr.key == 'registry_url':
+            registry_url = attr.value
 
-    if not all([image_id, image_name, image_tag]):
-        print(f"Incomplete event data: image_id={image_id}, image_name={image_name}, image_tag={image_tag}")
+    if not all([image_id, image_name, image_tag, registry_url]):
+        print(
+            f"Incomplete event data: image_id={image_id}, image_name={image_name}, "
+            f"image_tag={image_tag}, registry_url={registry_url}")
         return
 
-    print(f"Handling event for image: {image_name}:{image_tag} (ID: {image_id})")
+    print(f"Handling event for image: {image_name}:{image_tag} (ID: {image_id}) from registry: {registry_url}")
 
-    image_data = get_image_from_state(context, image_id)
+    # Retrieve the image metadata from the blockchain
+    metadata = get_image_metadata(context, image_id)
+    signature = base64.b64decode(metadata['signature'])
+    public_key_pem = metadata['public_key']
 
-    # Load image into Docker
+    # Pull image from registry
     client = docker.from_env()
     try:
-        image = client.images.load(image_data)[0]
-        print(f"Loaded image: {image.tags}")
-    except docker.errors.ImageLoadError as e:
-        print(f"Failed to load image: {str(e)}")
+        image = client.images.pull(f"{registry_url}/{image_name}:{image_tag}")
+        print(f"Pulled image: {image.tags}")
+    except docker.errors.APIError as e:
+        print(f"Failed to pull image: {str(e)}")
         return
+
+    # Verify image signature
+    if not verify_image_signature(image, signature, public_key_pem):
+        print(f"Image signature verification failed for {image_name}:{image_tag}")
+        return
+
+    print(f"Image signature verified successfully for {image_name}:{image_tag}")
 
     # Run container
     try:
-        container = client.containers.run(f"{image_name}:{image_tag}", detach=True, name=f"{image_name}-{image_tag}")
+        container = client.containers.run(f"{registry_url}/{image_name}:{image_tag}", detach=True,
+                                          name=f"{image_name}-{image_tag}")
         print(f"Started container: {container.id}")
     except docker.errors.APIError as e:
         print(f"Failed to start container: {str(e)}")
@@ -79,7 +122,6 @@ def handle_image_stored_event(event, context):
 
 def listen_to_events():
     print("Starting event listener...")
-    # Use the URL passed as a command-line argument
     url = sys.argv[1] if len(sys.argv) > 1 else 'tcp://localhost:4004'
     stream = Stream(url=url)
 

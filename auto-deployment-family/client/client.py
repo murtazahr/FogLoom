@@ -3,8 +3,13 @@ import base64
 import hashlib
 import os
 import sys
+
 import requests
 import yaml
+import docker
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from sawtooth_signing import create_context
 from sawtooth_signing import CryptoFactory
@@ -12,11 +17,8 @@ from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing.secp256k1 import Secp256k1PrivateKey
 
-# Transaction Family Name
 FAMILY_NAME = 'auto-deployment-docker'
 FAMILY_VERSION = '1.0'
-
-# REST API URL
 REST_API_URL = 'http://sawtooth-rest-api-default-0:8008'
 
 
@@ -32,6 +34,30 @@ def load_private_key(key_file):
 def create_signer(private_key):
     context = create_context('secp256k1')
     return CryptoFactory(context).new_signer(private_key)
+
+
+def generate_image_key_pair():
+    return rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+
+
+def calculate_image_signature(image_path, private_key):
+    with open(image_path, 'rb') as f:
+        image_hash = hashlib.sha256()
+        for chunk in iter(lambda: f.read(4096), b""):
+            image_hash.update(chunk)
+
+    signature = private_key.sign(
+        image_hash.digest(),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    return base64.b64encode(signature).decode()
 
 
 def _hash(data):
@@ -95,26 +121,28 @@ def submit_batch(batch, url):
         raise
 
 
-def stream_file(file_path, chunk_size=1024 * 1024):
-    with open(file_path, 'rb') as file:
-        while True:
-            chunk = file.read(chunk_size)
-            if not chunk:
-                break
-            yield chunk
+def push_image_to_registry(image_path, registry_url):
+    client = docker.from_env()
+    image = client.images.load(open(image_path, 'rb'))[0]
+    repository = f"{registry_url}/{image.tags[0]}"
+    print(f"Pushing image to registry: {repository}")
+    client.images.push(repository)
+    return repository
 
 
 def main():
     parser = argparse.ArgumentParser(description='Sawtooth Docker Deployment Client')
-    parser.add_argument('key_file', help='Path to the private key file')
+    parser.add_argument('key_file', help='Path to the private key file for transaction signing')
     parser.add_argument('docker_image', help='Path to the Docker image tar file')
+    parser.add_argument('registry_url', help='URL of the Docker registry')
     parser.add_argument('--url', default=REST_API_URL, help='URL of the REST API')
     args = parser.parse_args()
 
+    # Load the private key for transaction signing
     try:
         private_key = load_private_key(args.key_file)
         signer = create_signer(private_key)
-        print("Successfully loaded private key and created signer")
+        print("Successfully loaded private key and created signer for transactions")
     except Exception as e:
         print(f"Error loading private key: {e}")
         sys.exit(1)
@@ -122,29 +150,36 @@ def main():
     image_name = os.path.basename(args.docker_image).split('.')[0]
     print(f"Processing Docker image: {image_name}")
 
+    # Push image to registry
+    repository = push_image_to_registry(args.docker_image, args.registry_url)
+    image_name, image_tag = repository.split('/')[-1].split(':')
+
+    # Generate a new key pair for image signing
+    image_private_key = generate_image_key_pair()
+    image_public_key = image_private_key.public_key()
+
+    # Calculate image signature
+    signature = calculate_image_signature(args.docker_image, image_private_key)
+
     print("Preparing payload...")
     payload = {
         'image_name': image_name,
-        'image_tag': 'latest',
-        'image_data': ''  # Placeholder for streaming data
+        'image_tag': image_tag,
+        'registry_url': args.registry_url,
+        'signature': signature,
+        'public_key': image_public_key.public_bytes(
+            encoding=Encoding.PEM,
+            format=PublicFormat.SubjectPublicKeyInfo
+        ).decode()
     }
-
-    # Stream the file in chunks and update the payload
-    print("Streaming file data...")
-    chunk_size = 1024 * 1024  # 1 MB chunks
-    total_size = 0
-    for chunk in stream_file(args.docker_image, chunk_size):
-        payload['image_data'] += base64.b64encode(chunk).decode('utf-8')
-        total_size += len(chunk)
-        print(f"Processed {total_size} bytes...")
 
     print("Creating YAML payload...")
     payload_bytes = yaml.dump(payload).encode('utf-8')
     print(f"Payload prepared. Size: {len(payload_bytes)} bytes")
 
     print("Defining inputs and outputs...")
-    address_prefix = _hash(FAMILY_NAME.encode('utf-8'))[0:6]
-    image_address = address_prefix + _hash(image_name.encode('utf-8'))[0:64]
+    address_prefix = hashlib.sha512(FAMILY_NAME.encode('utf-8')).hexdigest()[:6]
+    image_address = address_prefix + hashlib.sha512(image_name.encode('utf-8')).hexdigest()[:64]
     inputs = [image_address]
     outputs = [image_address]
 
