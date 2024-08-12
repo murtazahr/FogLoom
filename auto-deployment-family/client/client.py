@@ -7,6 +7,7 @@ import sys
 import requests
 import yaml
 import docker
+from docker import errors
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -121,20 +122,38 @@ def submit_batch(batch, url):
         raise
 
 
-def push_image_to_registry(image_path, registry_url):
+def push_image_to_registry(image_path, docker_hub_username):
     client = docker.from_env()
-    image = client.images.load(open(image_path, 'rb'))[0]
-    repository = f"{registry_url}/{image.tags[0]}"
-    print(f"Pushing image to registry: {repository}")
-    client.images.push(repository)
-    return repository
+
+    # Load the image
+    with open(image_path, 'rb') as f:
+        image = client.images.load(f)[0]
+
+    # Tag the image for Docker Hub
+    image_name = os.path.basename(image_path).split('.')[0]
+    new_tag = f"{docker_hub_username}/{image_name}:latest"
+    image.tag(new_tag)
+
+    # Push the image
+    print(f"Pushing image to Docker Hub: {new_tag}")
+    try:
+        push_output = client.images.push(new_tag)
+        print(f"Push output: {push_output}")
+    except docker.errors.APIError as e:
+        if 'unauthorized' in str(e).lower():
+            print("Authentication required. Please run 'docker login' and try again.")
+            return None
+        else:
+            raise
+
+    return new_tag
 
 
 def main():
     parser = argparse.ArgumentParser(description='Sawtooth Docker Deployment Client')
     parser.add_argument('key_file', help='Path to the private key file for transaction signing')
     parser.add_argument('docker_image', help='Path to the Docker image tar file')
-    parser.add_argument('registry_url', help='URL of the Docker registry')
+    parser.add_argument('docker_hub_username', help='Your Docker Hub username')
     parser.add_argument('--url', default=REST_API_URL, help='URL of the REST API')
     args = parser.parse_args()
 
@@ -151,7 +170,10 @@ def main():
     print(f"Processing Docker image: {image_name}")
 
     # Push image to registry
-    repository = push_image_to_registry(args.docker_image, args.registry_url)
+    repository = push_image_to_registry(args.docker_image, args.docker_hub_username)
+    if repository is None:
+        print("Failed to push image. Exiting.")
+        return
     image_name, image_tag = repository.split('/')[-1].split(':')
 
     # Generate a new key pair for image signing
