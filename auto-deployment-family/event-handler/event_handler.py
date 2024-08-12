@@ -5,8 +5,9 @@ import sys
 import docker
 from docker import errors
 from sawtooth_sdk.messaging.stream import Stream
-from sawtooth_sdk.protobuf.events_pb2 import EventList
+from sawtooth_sdk.protobuf.events_pb2 import EventList, EventSubscription
 from sawtooth_sdk.protobuf.validator_pb2 import Message
+from sawtooth_sdk.protobuf.client_event_pb2 import ClientEventsSubscribeRequest, ClientEventsSubscribeResponse
 from sawtooth_sdk.protobuf.client_state_pb2 import ClientStateGetRequest, ClientStateGetResponse
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -125,19 +126,35 @@ def listen_to_events():
     url = sys.argv[1] if len(sys.argv) > 1 else 'tcp://localhost:4004'
     stream = Stream(url=url)
 
-    subscription = EventList(
-        events=[
-            EventList.Event(event_type="auto-deployment-docker/stored")
-        ]
+    # Create an event subscription
+    subscription = EventSubscription(
+        event_type="auto-deployment-docker/stored",
+        filters=[]
     )
 
+    # Create the subscription request
+    request = ClientEventsSubscribeRequest(
+        subscriptions=[subscription]
+    )
+
+    # Send the subscription request
     stream.send(
-        message_type=Message.CLIENT_EVENTS_SUBSCRIBE_REQUEST,
-        content=subscription.SerializeToString()
-    )
+        Message.CLIENT_EVENTS_SUBSCRIBE_REQUEST,
+        request.SerializeToString()
+    ).result()
 
+    # Process the response
+    msg = stream.receive().result()
+    response = ClientEventsSubscribeResponse()
+    response.ParseFromString(msg.content)
+
+    if response.status != ClientEventsSubscribeResponse.OK:
+        print(f"Subscription failed: {response.response_message}")
+        return
+
+    # Listen for events
     while True:
-        msg = stream.receive()
+        msg = stream.receive().result()
         if msg.message_type == Message.CLIENT_EVENTS:
             event_list = EventList()
             event_list.ParseFromString(msg.content)
