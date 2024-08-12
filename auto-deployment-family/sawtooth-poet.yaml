@@ -23,9 +23,10 @@ services:
     image: hyperledger/sawtooth-shell:chime
     container_name: sawtooth-shell-default
     volumes:
-      - ./:/client
+      - .:/workdir
     entrypoint: "bash -c \"\
         sawtooth keygen && \
+        pip3 install -r /workdir/requirements.txt && \
         tail -f /dev/null \
         \""
 
