@@ -16,12 +16,12 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc libssl-dev curl software-properties-common apt-transport-https && \
+    apt-get install -y --no-install-recommends gcc libssl-dev curl apt-transport-https && \
     rm -rf /var/lib/apt/lists/* \
 
 # Install Sawtooth CLI
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD && \
-    apt-add-repository 'deb [arch=amd64] http://repo.sawtooth.me/ubuntu/chime/stable bionic universe' && \
+    add-apt-repository 'deb [arch=amd64] http://repo.sawtooth.me/ubuntu/chime/stable bionic universe' && \
     apt-get update && apt-get install -y sawtooth
 
 # Install Python dependencies
