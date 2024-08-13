@@ -8,8 +8,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Sawtooth CLI
-RUN curl -s https://packagecloud.io/install/repositories/hyperledger/sawtooth/script.deb.sh | bash && \
-    apt-get install -y sawtooth-cli
+RUN apt-get update && apt-get install -y sawtooth-cli
 
 # Install Python dependencies
 COPY requirements.txt .
