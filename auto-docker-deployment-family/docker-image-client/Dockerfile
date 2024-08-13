@@ -1,18 +1,28 @@
-FROM python:3.8
+FROM ubuntu:18.04
+
+# Install Python 3.8
+RUN apt-get update && apt-get install -y software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y python3.8 python3.8-venv python3.8-dev python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python 3.8 as the default python version
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 \
+    && update-alternatives --set python3 /usr/bin/python3.8 \
+    && ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libssl-dev curl software-properties-common apt-transport-https && \
-    rm -rf /var/lib/apt/lists/*
-
-# Add Sawtooth Repository
-RUN curl -fsSL https://archive.sawtooth.me/gpg.key | apt-key add - \
-    && echo "deb http://archive.sawtooth.me/apt/bionic stable universe" >> /etc/apt/sources.list
+    rm -rf /var/lib/apt/lists/* \
 
 # Install Sawtooth CLI
-RUN apt-get update && apt-get install -y sawtooth
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD && \
+    apt-add-repository 'deb [arch=amd64] http://repo.sawtooth.me/ubuntu/chime/stable bionic universe' && \
+    apt-get update && apt-get install -y sawtooth
 
 # Install Python dependencies
 COPY requirements.txt .
