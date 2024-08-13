@@ -17,38 +17,46 @@ version: "2.1"
 
 volumes:
   poet-shared:
+  registry-data:
 
 services:
   shell:
     image: hyperledger/sawtooth-shell:chime
     container_name: sawtooth-shell-default
-    volumes:
-      - .:/workdir
-      - /var/run/docker.sock:/var/run/docker.sock
-    working_dir: /workdir
     entrypoint: "bash -c \"\
         sawtooth keygen && \
-        apt-get update && \
-        apt-get install -y software-properties-common && \
-        add-apt-repository -y ppa:deadsnakes/ppa && \
-        apt-get update && \
-        apt-get install -y python3.8 python3.8-dev python3.8-distutils && \
-        update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 && \
-        update-alternatives --set python3 /usr/bin/python3.8 && \
-        curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-        python3.8 get-pip.py && \
-        rm get-pip.py && \
-        pip3 install --upgrade pip && \
-        pip3 install pyzmq==22.3.0 && \
-        pip3 install -r /workdir/requirements.txt --no-cache-dir --ignore-installed && \
-        pip3 install --upgrade sawtooth-sdk && \
-        apt-get install -y apt-transport-https ca-certificates curl software-properties-common && \
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
-        add-apt-repository 'deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable' && \
-        apt-get update && \
-        apt-get install -y docker-ce-cli && \
         tail -f /dev/null \
         \""
+
+  registry:
+    image: registry:2
+    container_name: registry
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./registry-data:/var/lib/registry
+    networks:
+      default:
+        aliases:
+          - sawtooth-registry
+
+  docker-image-client:
+    build:
+      context: ./docker-image-client
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-client:latest
+    container_name: sawtooth-docker-image-client
+    environment:
+      - VALIDATOR_URL=tcp://validator-0:4004
+      - REGISTRY_URL=sawtooth-registry:5000
+      - SAWTOOTH_PRIVATE_KEY=/root/.sawtooth/keys/root.priv
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-images:/docker-images
+    depends_on:
+      - validator-0
+      - registry
+    command: tail -f /dev/null
 
   validator-0:
     image: hyperledger/sawtooth-validator:chime
@@ -367,45 +375,155 @@ services:
     command: xo-tp-python -vv -C tcp://validator-4:4004
     stop_signal: SIGKILL
 
-  auto-deployment-tp-0:
-    image: sawtooth-auto-docker-deployment-tp:latest
-    container_name: sawtooth-auto-docker-deployment-tp-0
-    expose:
-      - 4004
-    command: python /app/handler.py tcp://validator-0:4004
+  docker-image-tp-0:
+    build:
+      context: ./docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-0
+    environment:
+      - VALIDATOR_URL=tcp://validator-0:4004
+    depends_on:
+      - validator-0
+      - registry
+    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
-  auto-deployment-tp-1:
-    image: sawtooth-auto-docker-deployment-tp:latest
-    container_name: sawtooth-auto-docker-deployment-tp-1
-    expose:
-      - 4004
-    command: python /app/handler.py tcp://validator-1:4004
+  docker-image-tp-1:
+    build:
+      context: ./docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-1
+    environment:
+      - VALIDATOR_URL=tcp://validator-1:4004
+    depends_on:
+      - validator-1
+      - registry
+    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
-  auto-deployment-tp-2:
-    image: sawtooth-auto-docker-deployment-tp:latest
-    container_name: sawtooth-auto-docker-deployment-tp-2
-    expose:
-      - 4004
-    command: python /app/handler.py tcp://validator-2:4004
+  docker-image-tp-2:
+    build:
+      context: ./docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-2
+    environment:
+      - VALIDATOR_URL=tcp://validator-2:4004
+    depends_on:
+      - validator-2
+      - registry
+    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
-  auto-deployment-tp-3:
-    image: sawtooth-auto-docker-deployment-tp:latest
-    container_name: sawtooth-auto-docker-deployment-tp-3
-    expose:
-      - 4004
-    command: python /app/handler.py tcp://validator-3:4004
+  docker-image-tp-3:
+    build:
+      context: ./docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-3
+    environment:
+      - VALIDATOR_URL=tcp://validator-3:4004
+    depends_on:
+      - validator-3
+      - registry
+    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
-  auto-deployment-tp-4:
-    image: sawtooth-auto-docker-deployment-tp:latest
-    container_name: sawtooth-auto-docker-deployment-tp-4
-    expose:
-      - 4004
-    command: python /app/handler.py tcp://validator-4:4004
+  docker-image-tp-4:
+    build:
+      context: ./docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-4
+    environment:
+      - VALIDATOR_URL=tcp://validator-4:4004
+    depends_on:
+      - validator-4
+      - registry
+    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
+
+  docker-image-event-handler-0:
+    build:
+      context: ./docker-image-event-handler
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-event-handler:latest
+    container_name: sawtooth-docker-image-event-handler-0
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-0:4004
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - validator-0
+      - registry
+    command: python3 docker_image_event_handler.py
+
+  docker-image-event-handler-1:
+    build:
+      context: ./docker-image-event-handler
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-event-handler:latest
+    container_name: sawtooth-docker-image-event-handler-1
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-1:4004
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - validator-1
+      - registry
+    command: python3 docker_image_event_handler.py
+
+  docker-image-event-handler-2:
+    build:
+      context: ./docker-image-event-handler
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-event-handler:latest
+    container_name: sawtooth-docker-image-event-handler-2
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-2:4004
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - validator-2
+      - registry
+    command: python3 docker_image_event_handler.py
+
+  docker-image-event-handler-3:
+    build:
+      context: ./docker-image-event-handler
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-event-handler:latest
+    container_name: sawtooth-docker-image-event-handler-3
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-3:4004
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - validator-3
+      - registry
+    command: python3 docker_image_event_handler.py
+
+  docker-image-event-handler-4:
+    build:
+      context: ./docker-image-event-handler
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-event-handler:latest
+    container_name: sawtooth-docker-image-event-handler-0
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-4:4004
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - validator-4
+      - registry
+    command: python3 docker_image_event_handler.py
 
   settings-tp-0:
     image: hyperledger/sawtooth-settings-tp:chime
@@ -445,46 +563,6 @@ services:
     expose:
       - 4004
     command: settings-tp -v -C tcp://validator-4:4004
-    stop_signal: SIGKILL
-
-  auto-deployment-event-handler-0:
-    image: sawtooth-auto-docker-deployment-event-handler:latest
-    container_name: sawtooth-auto-docker-deployment-event-handler-0
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: python /app/docker-image-event-handler.py tcp://validator-0:4004
-    stop_signal: SIGKILL
-
-  auto-deployment-event-handler-1:
-    image: sawtooth-auto-docker-deployment-event-handler:latest
-    container_name: sawtooth-auto-docker-deployment-event-handler-1
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: python /app/docker-image-event-handler.py tcp://validator-1:4004
-    stop_signal: SIGKILL
-
-  auto-deployment-event-handler-2:
-    image: sawtooth-auto-docker-deployment-event-handler:latest
-    container_name: sawtooth-auto-docker-deployment-event-handler-2
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: python /app/docker-image-event-handler.py tcp://validator-2:4004
-    stop_signal: SIGKILL
-
-  auto-deployment-event-handler-3:
-    image: sawtooth-auto-docker-deployment-event-handler:latest
-    container_name: sawtooth-auto-docker-deployment-event-handler-3
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: python /app/docker-image-event-handler.py tcp://validator-3:4004
-    stop_signal: SIGKILL
-
-  auto-deployment-event-handler-4:
-    image: sawtooth-auto-docker-deployment-event-handler:latest
-    container_name: sawtooth-auto-docker-deployment-event-handler-4
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: python /app/docker-image-event-handler.py tcp://validator-4:4004
     stop_signal: SIGKILL
 
   poet-engine-0:
