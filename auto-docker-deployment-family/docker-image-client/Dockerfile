@@ -1,10 +1,11 @@
 FROM ubuntu:18.04
 
-# Install Python 3.8
-RUN apt-get update && apt-get install -y software-properties-common \
+# Install Python 3.8 and system dependencies
+RUN apt-get update && apt-get install -y software-properties-common python3-apt \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y python3.8 python3.8-venv python3.8-dev python3-pip \
+    gcc libssl-dev curl apt-transport-https \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Python 3.8 as the default python version
@@ -14,15 +15,11 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc libssl-dev curl apt-transport-https && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install Sawtooth CLI
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD && \
     add-apt-repository 'deb [arch=amd64] http://repo.sawtooth.me/ubuntu/chime/stable bionic universe' && \
-    apt-get update && apt-get install -y sawtooth
+    apt-get update && apt-get install -y sawtooth && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
