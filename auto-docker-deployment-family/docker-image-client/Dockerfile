@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc libssl-dev curl && \
+    apt-get install -y --no-install-recommends gcc libssl-dev curl software-properties-common apt-transport-https && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Sawtooth CLI
