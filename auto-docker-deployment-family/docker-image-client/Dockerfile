@@ -5,14 +5,14 @@ RUN apt-get update && apt-get install -y software-properties-common \
     && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD \
     && add-apt-repository 'deb [arch=amd64] http://repo.sawtooth.me/ubuntu/chime/stable bionic universe' \
     && apt-get update  \
-    && apt-get install -y sawtooth \
+    && apt-get install -y sawtooth python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Install Docker CLI
 RUN apt-get update && \
