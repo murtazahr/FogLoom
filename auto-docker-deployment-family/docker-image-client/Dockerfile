@@ -2,7 +2,8 @@ FROM ubuntu:18.04
 
 # Install Sawtooth and system dependencies
 # Add Sawtooth repository and GPG key manually
-RUN curl -fsSL https://raw.githubusercontent.com/hyperledger/sawtooth-core/master/docker/sawtooth-bionic.list > /etc/apt/sources.list.d/sawtooth.list && \
+RUN apt-get update && apt-get install -y curl &&  \
+    curl -fsSL https://raw.githubusercontent.com/hyperledger/sawtooth-core/master/docker/sawtooth-bionic.list > /etc/apt/sources.list.d/sawtooth.list && \
     curl -fsSL https://raw.githubusercontent.com/hyperledger/sawtooth-core/master/docker/sawtooth.pub | gpg --dearmor > /etc/apt/trusted.gpg.d/sawtooth.gpg
 
 RUN apt-get update && apt-get install -y software-properties-common \
