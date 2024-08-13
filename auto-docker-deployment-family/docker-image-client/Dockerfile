@@ -1,16 +1,6 @@
-FROM ubuntu:18.04
+FROM hyperledger/sawtooth-shell:chime
 
-# Install Sawtooth and system dependencies
-# Add Sawtooth repository and GPG key manually
-RUN apt-get update && apt-get install -y curl &&  \
-    curl -fsSL https://raw.githubusercontent.com/hyperledger/sawtooth-core/master/docker/sawtooth-bionic.list > /etc/apt/sources.list.d/sawtooth.list && \
-    curl -fsSL https://raw.githubusercontent.com/hyperledger/sawtooth-core/master/docker/sawtooth.pub | gpg --dearmor > /etc/apt/trusted.gpg.d/sawtooth.gpg
-
-RUN apt-get update && apt-get install -y software-properties-common \
-    && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD \
-    && add-apt-repository 'deb [arch=amd64] http://repo.sawtooth.me/ubuntu/chime/stable bionic universe' \
-    && apt-get update  \
-    && apt-get install -y sawtooth python3-pip \
+RUN apt-get update && apt-get install -y software-properties-common python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
