@@ -1,7 +1,11 @@
 FROM ubuntu:18.04
 
-# Install Python 3.8 and system dependencies
-RUN apt-get update && apt-get install -y software-properties-common python3-apt \
+# Install Python 3.8, Sawtooth and system dependencies
+RUN apt-get update && apt-get install -y software-properties-common \
+    && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD \
+    && add-apt-repository 'deb [arch=amd64] http://repo.sawtooth.me/ubuntu/chime/stable bionic universe' \
+    && apt-get update  \
+    && apt-get install -y sawtooth \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update \
     && apt-get install -y python3.8 python3.8-venv python3.8-dev python3-pip \
@@ -14,12 +18,6 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 
     && ln -s /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
-
-# Install Sawtooth CLI
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 8AA7AF1F1091A5FD && \
-    add-apt-repository 'deb [arch=amd64] http://repo.sawtooth.me/ubuntu/chime/stable bionic universe' && \
-    apt-get update && apt-get install -y sawtooth && \
-    rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
