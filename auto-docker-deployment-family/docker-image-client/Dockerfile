@@ -17,6 +17,11 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1 
     && update-alternatives --set python3 /usr/bin/python3.8 \
     && ln -s /usr/bin/python3 /usr/bin/python
 
+# Upgrade pip and install it for Python 3.8
+RUN python3.8 -m ensurepip \
+    && python3.8 -m pip install --upgrade pip \
+    && ln -s /usr/bin/pip3 /usr/bin/pip
+
 WORKDIR /app
 
 # Install Python dependencies
