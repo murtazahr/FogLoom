@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import docker
+import requests
 
 from docker import errors
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
@@ -28,6 +29,26 @@ def load_private_key(key_file):
             return secp256k1.Secp256k1PrivateKey.from_hex(private_key_str)
     except IOError as e:
         raise IOError(f"Failed to load private key from {key_file}: {str(e)}") from e
+
+
+def verify_image_in_registry(image_name):
+    # Extract repository and tag
+    repo, tag = image_name.split('/')[-1].split(':')
+
+    # Construct the URL to check the image manifest
+    url = f"http://{REGISTRY_URL}/v2/{repo}/manifests/{tag}"
+
+    try:
+        response = requests.head(url)
+        if response.status_code == 200:
+            logger.info(f"Image {image_name} verified in registry")
+            return True
+        else:
+            logger.error(f"Image {image_name} not found in registry. Status code: {response.status_code}")
+            return False
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error verifying image in registry: {e}")
+        return False
 
 
 def hash_and_push_docker_image(tar_path):
@@ -56,6 +77,13 @@ def hash_and_push_docker_image(tar_path):
         push_result = client.images.push(registry_image_name)
         logger.info(f"Push result: {push_result}")
         logger.info("Image pushed successfully")
+
+        # Verify the image is in the registry
+        if verify_image_in_registry(registry_image_name):
+            logger.info("Image verified in registry")
+        else:
+            logger.error("Failed to verify image in registry")
+            raise Exception("Image verification failed")
     except docker.errors.APIError as e:
         logger.error(f"Failed to push image: {e}")
         raise

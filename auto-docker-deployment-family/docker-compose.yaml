@@ -34,15 +34,17 @@ services:
 
   registry:
     image: registry:2
-    container_name: registry
-    ports:
-      - "5000:5000"
+    container_name: sawtooth-registry
+    expose:
+      - 5000
     volumes:
       - ./registry-data:/var/lib/registry
     networks:
       default:
         aliases:
           - sawtooth-registry
+    command: |
+      /entrypoint.sh /etc/docker/registry/config.yml
 
   docker-image-client:
     build:
