@@ -5,7 +5,7 @@ import sys
 import docker
 
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
-from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch
+from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
 from sawtooth_sdk.messaging.stream import Stream
 
@@ -17,7 +17,7 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 REGISTRY_URL = os.getenv('REGISTRY_URL', 'sawtooth-registry:5000')
 
 # Path to the private key file
-PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/etc/sawtooth/keys/user.priv')
+PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/etc/sawtooth/keys/root.priv')
 
 
 def load_private_key(key_file):
@@ -73,7 +73,11 @@ def create_transaction(image_hash, image_name, signer):
 
     signature = signer.sign(header)
 
-    transaction = Transaction(header=header, payload=payload, header_signature=signature)
+    transaction = Transaction(
+        header=header,
+        payload=payload,
+        header_signature=signature
+    )
 
     logger.info(f"Transaction created with signature: {signature}")
     return transaction
@@ -102,9 +106,10 @@ def submit_batch(batch):
     logger.info("Submitting batch to validator")
     stream = Stream(url=os.getenv('VALIDATOR_URL', 'tcp://validator:4004'))
 
+    batch_list = BatchList(batches=[batch])
     future = stream.send(
         message_type='CLIENT_BATCH_SUBMIT_REQUEST',
-        content=batch.SerializeToString()
+        content=batch_list.SerializeToString()
     )
 
     result = future.result()
