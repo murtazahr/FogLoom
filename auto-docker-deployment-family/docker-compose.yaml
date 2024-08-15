@@ -514,7 +514,7 @@ services:
       context: ./docker-image-event-handler
       dockerfile: Dockerfile
     image: sawtooth-registry:5000/docker-image-event-handler:latest
-    container_name: sawtooth-docker-image-event-handler-0
+    container_name: sawtooth-docker-image-event-handler-4
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-4:4004
