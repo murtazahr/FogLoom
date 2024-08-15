@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import socket
 import sys
 import docker
 import requests
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 FAMILY_NAME = 'docker-image'
 FAMILY_VERSION = '1.0'
 NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
-REGISTRY_URL = os.getenv('REGISTRY_URL', 'sawtooth-registry:5000')
+REGISTRY_URL = os.getenv('REGISTRY_URL', 'http://sawtooth-registry:5000')
 
 # Path to the private key file
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
@@ -32,14 +33,23 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(e)}") from e
 
 
+def debug_dns(hostname):
+    try:
+        ip = socket.gethostbyname(hostname)
+        logger.debug(f"DNS resolution for {hostname}: {ip}")
+    except socket.gaierror as e:
+        logger.error(f"DNS resolution failed for {hostname}: {e}")
+
+
 def verify_image_in_registry(image_name):
     # Extract repository and tag
     repo, tag = image_name.split('/')[-1].split(':')
 
     # Construct the URL to check the image manifest
-    url = f"http://{REGISTRY_URL}/v2/{repo}/manifests/{tag}"
+    url = f"{REGISTRY_URL}/v2/{repo}/manifests/{tag}"
 
     try:
+        debug_dns('sawtooth-registry')
         response = requests.head(url, timeout=10)
         logger.debug(f"Registry response headers: {response.headers}")
         if response.status_code == 200:
@@ -71,11 +81,12 @@ def hash_and_push_docker_image(tar_path):
 
     # Tag and push to local registry
     image_name = image.tags[0] if image.tags else f"image-{image_hash[:12]}"
-    registry_image_name = f"{REGISTRY_URL}/{image_name}"
+    registry_image_name = f"{REGISTRY_URL.split('://')[-1]}/{image_name}"
     image.tag(registry_image_name)
     logger.info(f"Pushing Docker image to local registry: {registry_image_name}")
 
     try:
+        debug_dns('sawtooth-registry')
         push_result = client.images.push(registry_image_name, stream=True, decode=True)
         push_success = False
         for line in push_result:
