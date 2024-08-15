@@ -106,10 +106,16 @@ def main():
     logger.info("Subscription successful. Listening for events...")
 
     while True:
-        msg = stream.receive()
-        if msg.message_type == Message.CLIENT_EVENTS:
-            for event in msg.content.events:
-                handle_event(event)
+        try:
+            msg_future = stream.receive()
+            msg = msg_future.result()
+            if msg.message_type == Message.CLIENT_EVENTS:
+                for event in msg.content.events:
+                    handle_event(event)
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            logger.error(f"Error receiving message: {e}")
 
 
 if __name__ == "__main__":
