@@ -19,10 +19,6 @@ cd "$WORK_DIR" || exit
 # Bring docker compose down incase it is up
 docker-compose down -v --rmi all
 
-# Clean up existing docker environment
-docker container rm "$(docker container ls -aq)"
-docker rmi -f "$(docker images -aq)"
-
 # Building docker image for test docker application
 cd "$TEST_APP_DIR" || exit
 docker build -t temp-anomaly-detection:latest -f Dockerfile .
