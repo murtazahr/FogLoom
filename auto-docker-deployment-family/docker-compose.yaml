@@ -19,6 +19,10 @@ volumes:
   poet-shared:
   registry-data:
 
+networks:
+  default:
+    name: sawtooth-network
+
 services:
   shell:
     image: hyperledger/sawtooth-shell:chime

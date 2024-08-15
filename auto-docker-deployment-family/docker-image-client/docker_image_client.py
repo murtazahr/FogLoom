@@ -4,6 +4,7 @@ import os
 import sys
 import docker
 
+from docker import errors
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
@@ -50,8 +51,14 @@ def hash_and_push_docker_image(tar_path):
     registry_image_name = f"{REGISTRY_URL}/{image_name}"
     image.tag(registry_image_name)
     logger.info(f"Pushing Docker image to local registry: {registry_image_name}")
-    client.images.push(registry_image_name)
-    logger.info("Image pushed successfully")
+
+    try:
+        push_result = client.images.push(registry_image_name)
+        logger.info(f"Push result: {push_result}")
+        logger.info("Image pushed successfully")
+    except docker.errors.APIError as e:
+        logger.error(f"Failed to push image: {e}")
+        raise
 
     return image_hash, registry_image_name
 
