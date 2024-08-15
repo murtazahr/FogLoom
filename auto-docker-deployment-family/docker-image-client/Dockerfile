@@ -37,9 +37,10 @@ COPY docker_image_client.py .
 COPY temp-anomaly-detection.tar .
 
 # Generate Sawtooth keys
-RUN sawtooth keygen
+RUN sawtooth keygen # root keys
+RUN sawtooth keygen client # user keys
 
-ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/root.priv
+ENV PRIVATE_KEY_FILE /root/.sawtooth/keys/client.priv
 
 # Set up the environment activation in .bashrc
 RUN echo "source activate myenv" >> ~/.bashrc

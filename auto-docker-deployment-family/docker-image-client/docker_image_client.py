@@ -20,7 +20,7 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 REGISTRY_URL = os.getenv('REGISTRY_URL', 'sawtooth-registry:5000')
 
 # Path to the private key file
-PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/etc/sawtooth/keys/root.priv')
+PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
 
 
 def load_private_key(key_file):
@@ -40,7 +40,7 @@ def verify_image_in_registry(image_name):
     url = f"http://{REGISTRY_URL}/v2/{repo}/manifests/{tag}"
 
     try:
-        response = requests.head(url)
+        response = requests.head(url, timeout=10)
         logger.debug(f"Registry response headers: {response.headers}")
         if response.status_code == 200:
             logger.info(f"Image {image_name} verified in registry")
@@ -77,9 +77,19 @@ def hash_and_push_docker_image(tar_path):
 
     try:
         push_result = client.images.push(registry_image_name, stream=True, decode=True)
+        push_success = False
         for line in push_result:
             logger.debug(json.dumps(line))
-        logger.info("Image push completed")
+            if 'error' in line:
+                logger.error(f"Error during push: {line['error']}")
+            elif 'status' in line and 'Pushed' in line['status']:
+                push_success = True
+
+        if push_success:
+            logger.info("Image push completed successfully")
+        else:
+            logger.error("Image push did not complete successfully")
+            raise Exception("Image push failed")
 
         # Verify the image is in the registry
         if verify_image_in_registry(registry_image_name):
