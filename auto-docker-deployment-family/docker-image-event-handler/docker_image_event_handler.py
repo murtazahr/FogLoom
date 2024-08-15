@@ -75,18 +75,29 @@ def main():
     logger.info(f"Starting Docker Image Event Handler")
     stream = Stream(url=os.getenv('VALIDATOR_URL', 'tcp://validator:4004'))
 
-    event_filter = EventFilter(key="sawtooth/block-commit")
-    block_commit_subscription = EventSubscription(event_type="sawtooth/block-commit", filters=[event_filter])
+    block_commit_subscription = EventSubscription(
+        event_type="sawtooth/block-commit"
+    )
 
-    docker_image_filter = EventFilter(key="docker-image-added")
-    docker_image_subscription = EventSubscription(event_type="docker-image-added", filters=[docker_image_filter])
+    docker_image_subscription = EventSubscription(
+        event_type="docker-image-added",
+        filters=[
+            EventFilter(
+                key="docker-image-added",
+                match_string=".*",
+                filter_type=EventFilter.REGEX_ANY
+            )
+        ]
+    )
 
-    request = ClientEventsSubscribeRequest(subscriptions=[block_commit_subscription, docker_image_subscription])
+    request = ClientEventsSubscribeRequest(
+        subscriptions=[block_commit_subscription, docker_image_subscription]
+    )
 
     logger.info(f"Subscribing request: {request}")
     response_future = stream.send(
         message_type=Message.CLIENT_EVENTS_SUBSCRIBE_REQUEST,
-        content=request.SerializeToString(),
+        content=request.SerializeToString()
     )
     response = ClientEventsSubscribeResponse()
     response.ParseFromString(response_future.result().content)
@@ -102,7 +113,6 @@ def main():
         if msg.message_type == Message.CLIENT_EVENTS:
             for event in msg.content.events:
                 handle_event(event)
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
