@@ -5,7 +5,7 @@ import docker
 from docker import errors
 
 from sawtooth_sdk.messaging.stream import Stream
-from sawtooth_sdk.protobuf.events_pb2 import EventSubscription
+from sawtooth_sdk.protobuf.events_pb2 import EventSubscription, EventList
 from sawtooth_sdk.protobuf.client_event_pb2 import ClientEventsSubscribeRequest, ClientEventsSubscribeResponse
 from sawtooth_sdk.protobuf.validator_pb2 import Message
 
@@ -110,7 +110,9 @@ def main():
             msg_future = stream.receive()
             msg = msg_future.result()
             if msg.message_type == Message.CLIENT_EVENTS:
-                for event in msg.content.events:
+                event_list = EventList()
+                event_list.ParseFromString(msg.content)
+                for event in event_list.events:
                     handle_event(event)
         except KeyboardInterrupt:
             break
