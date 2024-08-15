@@ -5,7 +5,6 @@ import os
 from sawtooth_sdk.processor.handler import TransactionHandler
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.core import TransactionProcessor
-from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +28,12 @@ class DockerImageTransactionHandler(TransactionHandler):
 
     def apply(self, transaction, context):
         logger.info('Applying Docker Image Transaction')
-        header = TransactionHeader()
-        header.ParseFromString(transaction.header)
+
+        # The header is already a TransactionHeader object, no need to parse
+        header = transaction.header
 
         try:
-            image_hash, image_name = transaction.payload.decode().strip(',')
+            image_hash, image_name = transaction.payload.decode().split(',')
             logger.debug(f"Received image hash: {image_hash} for image: {image_name}")
 
             # Store the image hash in the blockchain state
@@ -49,6 +49,8 @@ class DockerImageTransactionHandler(TransactionHandler):
             )
             logger.info(f"Emitted event for image: {image_name} with hash: {image_hash}")
 
+        except ValueError as e:
+            raise InvalidTransaction("Invalid payload format") from e
         except Exception as e:
             logger.error(f"Error processing transaction: {str(e)}")
             raise InvalidTransaction(str(e))
