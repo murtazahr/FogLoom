@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import os
 import sys
@@ -40,6 +41,7 @@ def verify_image_in_registry(image_name):
 
     try:
         response = requests.head(url)
+        logger.debug(f"Registry response headers: {response.headers}")
         if response.status_code == 200:
             logger.info(f"Image {image_name} verified in registry")
             return True
@@ -74,9 +76,10 @@ def hash_and_push_docker_image(tar_path):
     logger.info(f"Pushing Docker image to local registry: {registry_image_name}")
 
     try:
-        push_result = client.images.push(registry_image_name)
-        logger.info(f"Push result: {push_result}")
-        logger.info("Image pushed successfully")
+        push_result = client.images.push(registry_image_name, stream=True, decode=True)
+        for line in push_result:
+            logger.debug(json.dumps(line))
+        logger.info("Image push completed")
 
         # Verify the image is in the registry
         if verify_image_in_registry(registry_image_name):

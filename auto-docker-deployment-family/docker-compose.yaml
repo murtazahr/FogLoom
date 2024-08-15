@@ -39,12 +39,16 @@ services:
       - 5000
     volumes:
       - ./registry-data:/var/lib/registry
+    environment:
+      - REGISTRY_HTTP_ADDR=0.0.0.0:5000
+      - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/lib/registry
+      - REGISTRY_LOG_LEVEL=debug
+      - REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt
+      - REGISTRY_HTTP_TLS_KEY=/certs/domain.key
     networks:
       default:
         aliases:
           - sawtooth-registry
-    command: |
-      /entrypoint.sh /etc/docker/registry/config.yml
 
   docker-image-client:
     build:
