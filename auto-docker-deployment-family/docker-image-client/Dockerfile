@@ -2,7 +2,7 @@ FROM hyperledger/sawtooth-shell:chime
 
 # Install necessary packages
 RUN apt-get update && apt-get install -y \
-    wget \
+    wget curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Miniconda
@@ -25,20 +25,10 @@ COPY requirements.txt .
 RUN conda run -n myenv pip install --no-cache-dir -r requirements.txt
 
 # Install Docker CLI using the official Docker repository
-RUN apt-get update && apt-get install -y \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    gnupg-agent \
-    software-properties-common \
-    && curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - \
-    && add-apt-repository \
-       "deb [arch=amd64] https://download.docker.com/linux/debian \
-       $(lsb_release -cs) \
-       stable" \
-    && apt-get update \
-    && apt-get install -y docker-ce-cli \
-    && rm -rf /var/lib/apt/lists/*
+# Install Docker CLI using the official installation script
+RUN curl -fsSL https://get.docker.com -o get-docker.sh \
+    && sh get-docker.sh \
+    && rm get-docker.sh
 
 # Copy the client script
 COPY docker_image_client.py .

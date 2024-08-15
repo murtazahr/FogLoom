@@ -5,7 +5,7 @@ import docker
 from docker import errors
 
 from sawtooth_sdk.messaging.stream import Stream
-from sawtooth_sdk.protobuf.events_pb2 import EventFilter, EventSubscription
+from sawtooth_sdk.protobuf.events_pb2 import EventSubscription
 from sawtooth_sdk.protobuf.client_event_pb2 import ClientEventsSubscribeRequest, ClientEventsSubscribeResponse
 from sawtooth_sdk.protobuf.validator_pb2 import Message
 
@@ -18,19 +18,23 @@ REGISTRY_URL = os.getenv('REGISTRY_URL', 'sawtooth-registry:5000')
 
 def handle_event(event):
     logger.info(f"Handling event: {event.event_type}")
-    image_hash = None
-    image_name = None
-    for attr in event.attributes:
-        if attr.key == 'image_hash':
-            image_hash = attr.value
-        elif attr.key == 'image_name':
-            image_name = attr.value
-
-    if image_hash and image_name:
-        logger.info(f"Processing image: {image_name} with hash: {image_hash}")
-        verify_and_run_container(image_hash, image_name)
+    if event.event_type == "docker-image-added":
+        image_hash = None
+        image_name = None
+        for attr in event.attributes:
+            if attr.key == "image_hash":
+                image_hash = attr.value
+            elif attr.key == "image_name":
+                image_name = attr.value
+        if image_hash and image_name:
+            logger.info(f"Processing image: {image_name} with hash: {image_hash}")
+            verify_and_run_container(image_hash, image_name)
+        else:
+            logger.warning("Received docker-image-added event with incomplete data")
+    elif event.event_type == "sawtooth/block-commit":
+        logger.info("New block committed")
     else:
-        logger.warning("Incomplete event data")
+        logger.info(f"Received unhandled event type: {event.event_type}")
 
 
 def hash_docker_image(image):
@@ -72,7 +76,7 @@ def verify_and_run_container(stored_hash, image_name):
 
 
 def main():
-    logger.info(f"Starting Docker Image Event Handler")
+    logger.info("Starting Docker Image Event Handler")
     stream = Stream(url=os.getenv('VALIDATOR_URL', 'tcp://validator:4004'))
 
     block_commit_subscription = EventSubscription(
@@ -80,14 +84,7 @@ def main():
     )
 
     docker_image_subscription = EventSubscription(
-        event_type="docker-image-added",
-        filters=[
-            EventFilter(
-                key="docker-image-added",
-                match_string=".*",
-                filter_type=EventFilter.REGEX_ANY
-            )
-        ]
+        event_type="docker-image-added"
     )
 
     request = ClientEventsSubscribeRequest(
@@ -113,6 +110,7 @@ def main():
         if msg.message_type == Message.CLIENT_EVENTS:
             for event in msg.content.events:
                 handle_event(event)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
