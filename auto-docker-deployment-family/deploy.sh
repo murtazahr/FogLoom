@@ -17,7 +17,7 @@ TEST_APP_DIR=$(pwd)/../sample_application
 cd "$WORK_DIR" || exit
 
 # Bring docker compose down incase it is up
-docker-compose down
+docker-compose down -v --rmi all
 
 # Clean up existing docker environment
 docker container rm "$(docker container ls -aq)"
