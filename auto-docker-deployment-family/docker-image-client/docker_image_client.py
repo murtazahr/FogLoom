@@ -6,8 +6,6 @@ import socket
 import sys
 import docker
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 from docker import errors
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
@@ -43,16 +41,6 @@ def debug_dns(hostname):
         logger.error(f"DNS resolution failed for {hostname}: {e}")
 
 
-def create_docker_client():
-    # Create a custom session with retry logic
-    session = requests.Session()
-    retries = Retry(total=5, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504])
-    session.mount('http://', HTTPAdapter(max_retries=retries))
-
-    # Create a Docker client that uses the custom session
-    return docker.DockerClient(base_url='unix://var/run/docker.sock', use_ssh_client=True, session=session)
-
-
 def verify_image_in_registry(image_name):
     # Extract repository and tag
     repo, tag = image_name.split('/')[-1].split(':')
@@ -77,7 +65,7 @@ def verify_image_in_registry(image_name):
 
 def hash_and_push_docker_image(tar_path):
     logger.info(f"Processing Docker image from tar: {tar_path}")
-    client = create_docker_client()
+    client = docker.from_env()
 
     # Calculate hash
     sha256_hash = hashlib.sha256()
@@ -105,7 +93,6 @@ def hash_and_push_docker_image(tar_path):
             logger.debug(json.dumps(line))
             if 'error' in line:
                 logger.error(f"Error during push: {line['error']}")
-                raise Exception(f"Push error: {line['error']}")
             elif 'status' in line and 'Pushed' in line['status']:
                 push_success = True
 
@@ -208,14 +195,10 @@ def main():
     context = create_context('secp256k1')
     signer = CryptoFactory(context).new_signer(private_key)
 
-    try:
-        image_hash, registry_image_name = hash_and_push_docker_image(tar_path)
-        transaction = create_transaction(image_hash, registry_image_name, signer)
-        batch = create_batch([transaction], signer)
-        submit_batch(batch)
-    except Exception as e:
-        logger.error(f"An error occurred: {str(e)}")
-        sys.exit(1)
+    image_hash, registry_image_name = hash_and_push_docker_image(tar_path)
+    transaction = create_transaction(image_hash, registry_image_name, signer)
+    batch = create_batch([transaction], signer)
+    submit_batch(batch)
 
 
 if __name__ == '__main__':
