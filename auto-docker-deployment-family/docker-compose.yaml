@@ -19,10 +19,6 @@ volumes:
   poet-shared:
   registry-data:
 
-networks:
-  default:
-    name: sawtooth-network
-
 services:
   shell:
     image: hyperledger/sawtooth-shell:chime
@@ -32,26 +28,13 @@ services:
         tail -f /dev/null \
         \""
 
-  registry:
+  sawtooth-registry:
     image: registry:2
     container_name: sawtooth-registry
     ports:
       - "5000:5000"
     volumes:
       - ./registry-data:/var/lib/registry
-    environment:
-      - REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY=/var/lib/registry
-      - REGISTRY_HTTP_ADDR=0.0.0.0:5000
-      - REGISTRY_LOG_LEVEL=debug
-      - REGISTRY_HTTP_TLS_CERTIFICATE=
-      - REGISTRY_HTTP_TLS_KEY=
-      - REGISTRY_HTTP_HOST=http://sawtooth-registry:5000
-    networks:
-      default:
-        aliases:
-          - sawtooth-registry
-    command: |
-      /bin/sh -c "/usr/local/bin/registry serve /etc/docker/registry/config.yml"
 
   docker-image-client:
     build:
