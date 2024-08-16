@@ -51,7 +51,7 @@ services:
       - ./docker-images:/docker-images
     depends_on:
       - validator-0
-      - registry
+      - sawtooth-registry
     command: tail -f /dev/null
 
   validator-0:
@@ -381,7 +381,7 @@ services:
       - VALIDATOR_URL=tcp://validator-0:4004
     depends_on:
       - validator-0
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
@@ -395,7 +395,7 @@ services:
       - VALIDATOR_URL=tcp://validator-1:4004
     depends_on:
       - validator-1
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
@@ -409,7 +409,7 @@ services:
       - VALIDATOR_URL=tcp://validator-2:4004
     depends_on:
       - validator-2
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
@@ -423,7 +423,7 @@ services:
       - VALIDATOR_URL=tcp://validator-3:4004
     depends_on:
       - validator-3
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
@@ -437,7 +437,7 @@ services:
       - VALIDATOR_URL=tcp://validator-4:4004
     depends_on:
       - validator-4
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
@@ -454,7 +454,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-0
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_event_handler.py
 
   docker-image-event-handler-1:
@@ -470,7 +470,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-1
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_event_handler.py
 
   docker-image-event-handler-2:
@@ -486,7 +486,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-2
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_event_handler.py
 
   docker-image-event-handler-3:
@@ -502,7 +502,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-3
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_event_handler.py
 
   docker-image-event-handler-4:
@@ -518,7 +518,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-4
-      - registry
+      - sawtooth-registry
     command: python3 docker_image_event_handler.py
 
   settings-tp-0:
