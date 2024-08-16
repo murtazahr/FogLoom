@@ -33,6 +33,8 @@ services:
     container_name: sawtooth-registry
     ports:
       - "5000:5000"
+    environment:
+      - REGISTRY_HTTP_SECRET=Y74bs7QpaHmI1NKDGO8I3JdquvVxL+5K15NupwxhSbc=
     volumes:
       - ./registry-data:/var/lib/registry
 
