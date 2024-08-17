@@ -39,5 +39,15 @@ ENV PRIVATE_KEY_FILE /root/.sawtooth/keys/client.priv
 # Set up the environment activation in .bashrc
 RUN echo "source activate myenv" >> ~/.bashrc
 
+# Install Docker CLI 24.0.7
+RUN apt-get update && \
+    apt-get install -y apt-transport-https ca-certificates curl software-properties-common && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
+    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
+    apt-get update && \
+    apt-get install -y docker-ce-cli=5:24.0.7-1~ubuntu.18.04~bionic && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Use a simple entrypoint that keeps the container running
 CMD ["tail", "-f", "/dev/null"]
