@@ -17,7 +17,7 @@ TEST_APP_DIR=$(pwd)/../sample_application
 cd "$WORK_DIR" || exit
 
 # Bring docker compose down incase it is up
-docker compose down -v --rmi all
+docker-compose down -v --rmi all
 
 # Building docker image for test docker application
 cd "$TEST_APP_DIR" || exit
@@ -30,5 +30,5 @@ cd "$WORK_DIR" || exit
 docker save -o docker-image-client/temp-anomaly-detection.tar temp-anomaly-detection
 
 # Run docker compose
-docker compose build
-docker compose up
+docker-compose build
+docker-compose up
