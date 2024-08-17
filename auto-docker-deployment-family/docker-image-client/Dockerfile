@@ -1,8 +1,17 @@
+# Start with the Docker-in-Docker image
+FROM docker:dind AS dind-base
+
+# Now, use the Sawtooth shell image as the main base
 FROM hyperledger/sawtooth-shell:chime
+
+# Copy Docker binaries from dind-base
+COPY --from=dind-base /usr/local/bin/docker /usr/local/bin/
+COPY --from=dind-base /usr/local/bin/dockerd /usr/local/bin/
 
 # Install necessary packages
 RUN apt-get update && apt-get install -y \
     wget curl \
+    iptables \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Miniconda
@@ -39,15 +48,12 @@ ENV PRIVATE_KEY_FILE /root/.sawtooth/keys/client.priv
 # Set up the environment activation in .bashrc
 RUN echo "source activate myenv" >> ~/.bashrc
 
-# Install Docker CLI 24.0.7
-RUN apt-get update && \
-    apt-get install -y apt-transport-https ca-certificates curl software-properties-common && \
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add - && \
-    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" && \
-    apt-get update && \
-    apt-get install -y docker-ce-cli && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Copy the entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Use a simple entrypoint that keeps the container running
+# Use the entrypoint script
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# Keep the container running
 CMD ["tail", "-f", "/dev/null"]

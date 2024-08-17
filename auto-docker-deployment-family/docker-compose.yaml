@@ -44,12 +44,11 @@ services:
       dockerfile: Dockerfile
     image: sawtooth-registry:5000/docker-image-client:latest
     container_name: sawtooth-docker-image-client
+    privileged: true
     environment:
       - VALIDATOR_URL=tcp://validator-0:4004
       - REGISTRY_URL=sawtooth-registry:5000
-      - SAWTOOTH_PRIVATE_KEY=/root/.sawtooth/keys/root.priv
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./docker-images:/docker-images
     depends_on:
       - validator-0
