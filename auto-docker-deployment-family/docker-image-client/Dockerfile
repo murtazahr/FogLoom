@@ -11,45 +11,31 @@ FROM docker:dind
 # Copy Docker binaries from dind-base
 COPY --from=sawtooth-shell /root/.sawtooth /root/.sawtooth
 
+# Install necessary packages
+RUN apk add --no-cache bash wget ca-certificates
+
 # Install dependencies
-RUN apk add --no-cache \
-    build-base \
-    libffi-dev \
-    openssl-dev \
-    bzip2-dev \
-    zlib-dev \
-    xz-dev \
-    readline-dev \
-    sqlite-dev \
-    tk-dev \
-    wget
+# Install Miniforge
+RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniforge.sh && \
+    bash miniforge.sh -b -p /opt/conda && \
+    rm miniforge.sh
 
-# Download and install Python 3.8
-RUN wget https://www.python.org/ftp/python/3.8.16/Python-3.8.16.tgz \
-    && tar xzf Python-3.8.16.tgz \
-    && cd Python-3.8.16 \
-    && ./configure --enable-optimizations \
-    && make altinstall \
-    && cd .. \
-    && rm -rf Python-3.8.16 Python-3.8.16.tgz
+# Add conda to path
+ENV PATH /opt/conda/bin:$PATH
 
-# Set up symbolic links
-RUN ln -s /usr/local/bin/python3.8 /usr/local/bin/python3 \
-    && ln -s /usr/local/bin/pip3.8 /usr/local/bin/pip3
-
-# Verify installation
-RUN python3 --version && pip3 --version
-
-# Clean up
-RUN apk del build-base
+# Create a new conda environment with Python 3.8
+RUN conda create -n myenv python=3.8 -y && \
+    conda clean -afy
 
 WORKDIR /app
 
 # Copy the requirements file
 COPY requirements.txt .
 
-# Install Python dependencies in the Conda environment
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Install packages from requirements.txt
+RUN /bin/bash -c "source activate myenv && \
+    pip install -r requirements.txt && \
+    conda clean -afy"
 
 # Copy the client script
 COPY docker_image_client.py .
