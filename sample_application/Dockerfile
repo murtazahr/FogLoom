@@ -13,4 +13,4 @@ COPY temp_anomaly_model.joblib .
 EXPOSE 8080
 
 # Run the application
-CMD ["python", "anomaly_detector_server.py"]
+CMD ["python", "-u", "anomaly_detector_server.py"]

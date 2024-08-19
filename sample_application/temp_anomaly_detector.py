@@ -1,15 +1,25 @@
-import json
 import joblib
 import numpy as np
 from datetime import datetime
 import warnings
+import logging
 from sklearn.exceptions import InconsistentVersionWarning
 from flask import Flask, request, jsonify
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
 
 # Load the pre-trained model
-model = joblib.load('temp_anomaly_model.joblib')
+try:
+    logger.info("Loading model from temp_anomaly_model.joblib")
+    model = joblib.load('temp_anomaly_model.joblib')
+    logger.info("Model loaded successfully")
+except Exception as e:
+    logger.error(f"Failed to load model: {str(e)}")
+    raise
 
 app = Flask(__name__)
 
@@ -41,13 +51,23 @@ def detect_anomaly(data):
 def anomaly_detection():
     try:
         data = request.json
+        logger.info(f"Received data: {data}")
         result = detect_anomaly(data)
+        logger.info(f"Detection result: {result}")
         return jsonify(result)
-    except KeyError as e:
-        return jsonify({"error": f"Missing required field: {str(e)}"}), 400
-    except Exception as e:
-        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
+    except KeyError as err:
+        logger.error(f"Missing required field: {str(err)}")
+        return jsonify({"error": f"Missing required field: {str(err)}"}), 400
+    except Exception as err:
+        logger.error(f"Unexpected error: {str(err)}")
+        return jsonify({"error": f"Unexpected error: {str(err)}"}), 500
+
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080)
+    logger.info("Starting Flask server")
+    app.run(host='0.0.0.0', port=8080, debug=True)
