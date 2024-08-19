@@ -18,9 +18,5 @@ kill -SIGHUP $(pidof dockerd)
 # Wait for Docker to reload its configuration
 sleep 5
 
-# Activate Conda environment
-source /opt/conda/etc/profile.d/conda.sh
-conda activate myenv
-
 # Execute the main command
 exec "$@"
