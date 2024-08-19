@@ -5,29 +5,27 @@ FROM hyperledger/sawtooth-shell:chime as sawtooth-shell
 RUN sawtooth keygen # root keys
 RUN sawtooth keygen client # user keys
 
-# Start with the Docker-in-Docker image
-FROM docker:dind
+FROM python:3.8
 
 # Copy Docker binaries from dind-base
 COPY --from=sawtooth-shell /root/.sawtooth /root/.sawtooth
 
-# Install necessary packages
-RUN apk add --no-cache bash wget ca-certificates
+# Install Docker
+RUN apt-get update && apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+RUN echo \
+  "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian \
+  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+RUN apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io
 
-# Install dependencies
-# Install Miniforge
-RUN mkdir -p ~/miniconda3 && \
-    wget https://repo.anaconda.com/miniconda/Miniconda3-py39_24.5.0-0-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh && \
-    bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3 && \
-    rm -rf ~/miniconda3/miniconda.sh
-
-# Add conda to path
-RUN ~/miniconda3/bin/conda init bash && \
-    ~/miniconda3/bin/conda init zsh && exec $SHELL
-
-# Create a new conda environment with Python 3.8
-RUN conda create -n myenv python=3.8 -y && \
-    conda clean -afy
+# Verify installations
+RUN python --version
+RUN docker --version
 
 WORKDIR /app
 
@@ -35,9 +33,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install packages from requirements.txt
-RUN /bin/bash -c "source activate myenv && \
-    pip install -r requirements.txt && \
-    conda clean -afy"
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the client script
 COPY docker_image_client.py .
