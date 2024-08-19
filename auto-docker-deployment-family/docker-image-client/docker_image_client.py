@@ -5,7 +5,6 @@ import os
 import socket
 import sys
 import docker
-import requests
 
 from docker import errors
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
@@ -39,28 +38,6 @@ def debug_dns(hostname):
         logger.debug(f"DNS resolution for {hostname}: {ip}")
     except socket.gaierror as e:
         logger.error(f"DNS resolution failed for {hostname}: {e}")
-
-
-def verify_image_in_registry(image_name):
-    # Extract repository and tag
-    repo, tag = image_name.split('/')[-1].split(':')
-
-    # Construct the URL to check the image manifest
-    url = f"{REGISTRY_URL}/v1.46/{repo}/manifests/{tag}"
-
-    try:
-        debug_dns('sawtooth-registry')
-        response = requests.head(url, timeout=10)
-        logger.debug(f"Registry response headers: {response.headers}")
-        if response.status_code == 200:
-            logger.info(f"Image {image_name} verified in registry")
-            return True
-        else:
-            logger.error(f"Image {image_name} not found in registry. Status code: {response.status_code}")
-            return False
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error verifying image in registry: {e}")
-        return False
 
 
 def hash_and_push_docker_image(tar_path):
@@ -102,12 +79,6 @@ def hash_and_push_docker_image(tar_path):
             logger.error("Image push did not complete successfully")
             raise Exception("Image push failed")
 
-        # Verify the image is in the registry
-        if verify_image_in_registry(registry_image_name):
-            logger.info("Image verified in registry")
-        else:
-            logger.error("Failed to verify image in registry")
-            raise Exception("Image verification failed")
     except docker.errors.APIError as e:
         logger.error(f"Failed to push image: {e}")
         raise
