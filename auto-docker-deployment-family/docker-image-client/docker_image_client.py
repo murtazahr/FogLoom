@@ -46,7 +46,7 @@ def verify_image_in_registry(image_name):
     repo, tag = image_name.split('/')[-1].split(':')
 
     # Construct the URL to check the image manifest
-    url = f"{REGISTRY_URL}/v2/{repo}/manifests/{tag}"
+    url = f"{REGISTRY_URL}/v1.46/{repo}/manifests/{tag}"
 
     try:
         debug_dns('sawtooth-registry')
