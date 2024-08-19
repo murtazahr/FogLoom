@@ -17,9 +17,9 @@ TEST_APP_DIR=$(pwd)/test-application
 cd "$WORK_DIR" || exit
 
 # Freeze dependencies
-pip freeze > fog-node/requirements.txt
-cp fog-node/requirements.txt auto-docker-deployment-family/docker-image-client/.
-cp fog-node/requirements.txt auto-docker-deployment-family/docker-image-tp/.
+cp requirements.txt fog-node/requirements.txt
+cp requirements.txt auto-docker-deployment-family/docker-image-client/.
+cp requirements.txt auto-docker-deployment-family/docker-image-tp/.
 
 # Bring docker compose down incase it is up
 docker-compose down -v --rmi all
