@@ -6,7 +6,7 @@ WORKDIR /app
 RUN pip install numpy scikit-learn==1.3.2 joblib flask
 
 # Copy the application file and the model
-COPY temp-anomaly-detector.py .
+COPY temp_anomaly_detector.py .
 COPY temp_anomaly_model.joblib .
 
 # Expose the port the app runs on
