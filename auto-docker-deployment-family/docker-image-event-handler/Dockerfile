@@ -1,12 +1,5 @@
 FROM python:3.8
 
-WORKDIR /app
-
-# Install System Dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl gcc libssl-dev && \
-    rm -rf /var/lib/apt/lists/*
-
 # Install Docker
 RUN apt-get update && apt-get install -y \
     apt-transport-https \
@@ -24,6 +17,8 @@ RUN apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io
 RUN python --version
 RUN docker --version
 
+WORKDIR /app
+
 # Install Python Dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -31,4 +26,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the event handler script
 COPY docker_image_event_handler.py .
 
-ENTRYPOINT ["python", "docker_image_event_handler.py"]
+# Copy the entrypoint script
+COPY ../docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Use the entrypoint script
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["python", "docker_image_event_handler.py"]
