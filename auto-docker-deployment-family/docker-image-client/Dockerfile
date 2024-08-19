@@ -12,15 +12,19 @@ FROM docker:dind
 COPY --from=sawtooth-shell /root/.sawtooth /root/.sawtooth
 
 # Install necessary packages
-RUN apt-get update && apt-get install -y \
-    wget curl \
+RUN apk add --no-cache \
+    wget \
+    curl \
     iptables \
-    && rm -rf /var/lib/apt/lists/*
+    bash \
+    libstdc++ \
+    glib \
+    ca-certificates
 
 # Install Miniconda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh \
-    && bash miniconda.sh -b -p /opt/conda \
-    && rm miniconda.sh
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
+    bash miniconda.sh -b -p /opt/conda && \
+    rm miniconda.sh
 
 # Add conda to path
 ENV PATH="/opt/conda/bin:${PATH}"
@@ -45,7 +49,7 @@ COPY temp-anomaly-detection.tar .
 ENV PRIVATE_KEY_FILE /root/.sawtooth/keys/client.priv
 
 # Set up the environment activation in .bashrc
-RUN echo "source activate myenv" >> ~/.bashrc
+RUN echo "source /opt/conda/etc/profile.d/conda.sh && conda activate myenv" >> ~/.bashrc
 
 # Copy the entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
