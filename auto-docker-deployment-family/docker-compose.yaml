@@ -42,6 +42,7 @@ services:
     build:
       context: ./docker-image-client
       dockerfile: Dockerfile
+    privileged: true
     image: sawtooth-registry:5000/docker-image-client:latest
     container_name: sawtooth-docker-image-client
     environment:
@@ -445,6 +446,7 @@ services:
     build:
       context: ./docker-image-event-handler
       dockerfile: Dockerfile
+    privileged: true
     image: sawtooth-registry:5000/docker-image-event-handler:latest
     container_name: sawtooth-docker-image-event-handler-0
     environment:
@@ -459,6 +461,7 @@ services:
     build:
       context: ./docker-image-event-handler
       dockerfile: Dockerfile
+    privileged: true
     image: sawtooth-registry:5000/docker-image-event-handler:latest
     container_name: sawtooth-docker-image-event-handler-1
     environment:
@@ -473,6 +476,7 @@ services:
     build:
       context: ./docker-image-event-handler
       dockerfile: Dockerfile
+    privileged: true
     image: sawtooth-registry:5000/docker-image-event-handler:latest
     container_name: sawtooth-docker-image-event-handler-2
     environment:
@@ -487,6 +491,7 @@ services:
     build:
       context: ./docker-image-event-handler
       dockerfile: Dockerfile
+    privileged: true
     image: sawtooth-registry:5000/docker-image-event-handler:latest
     container_name: sawtooth-docker-image-event-handler-3
     environment:
@@ -501,6 +506,7 @@ services:
     build:
       context: ./docker-image-event-handler
       dockerfile: Dockerfile
+    privileged: true
     image: sawtooth-registry:5000/docker-image-event-handler:latest
     container_name: sawtooth-docker-image-event-handler-4
     environment:
