@@ -41,7 +41,7 @@ services:
   docker-image-client:
     build:
       context: auto-docker-deployment-family/docker-image-client
-      dockerfile: auto-docker-deployment-family/docker-image-client/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/auto-docker-deployment-family/docker-image-client/Dockerfile
     privileged: true
     image: sawtooth-registry:5000/docker-image-client:latest
     container_name: sawtooth-docker-image-client
@@ -375,7 +375,7 @@ services:
   docker-image-tp-0:
     build:
       context: auto-docker-deployment-family/docker-image-tp
-      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-0
     environment:
@@ -389,7 +389,7 @@ services:
   docker-image-tp-1:
     build:
       context: auto-docker-deployment-family/docker-image-tp
-      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-1
     environment:
@@ -403,7 +403,7 @@ services:
   docker-image-tp-2:
     build:
       context: auto-docker-deployment-family/docker-image-tp
-      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-2
     environment:
@@ -417,7 +417,7 @@ services:
   docker-image-tp-3:
     build:
       context: auto-docker-deployment-family/docker-image-tp
-      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-3
     environment:
@@ -431,7 +431,7 @@ services:
   docker-image-tp-4:
     build:
       context: auto-docker-deployment-family/docker-image-tp
-      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-4
     environment:
@@ -445,7 +445,7 @@ services:
   fog-node-0:
     build:
       context: fog-node
-      dockerfile: fog-node/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/fog-node/Dockerfile
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-0
@@ -459,7 +459,7 @@ services:
   fog-node-1:
     build:
       context: fog-node
-      dockerfile: fog-node/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/fog-node/Dockerfile
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-1
@@ -473,7 +473,7 @@ services:
   fog-node-2:
     build:
       context: fog-node
-      dockerfile: fog-node/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/fog-node/Dockerfile
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-2
@@ -487,7 +487,7 @@ services:
   fog-node-3:
     build:
       context: fog-node
-      dockerfile: fog-node/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/fog-node/Dockerfile
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-3
@@ -501,7 +501,7 @@ services:
   fog-node-4:
     build:
       context: fog-node
-      dockerfile: fog-node/Dockerfile
+      dockerfile: Fogbusv3-Transaction-Processors/fog-node/Dockerfile
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-4
