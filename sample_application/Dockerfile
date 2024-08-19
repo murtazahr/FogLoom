@@ -2,9 +2,15 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-RUN pip install numpy scikit-learn==1.3.2 joblib
+# Install dependencies
+RUN pip install numpy scikit-learn==1.3.2 joblib flask
 
-COPY temp_anomaly_detector.py .
+# Copy the application file and the model
+COPY anomaly_detector_server.py .
 COPY temp_anomaly_model.joblib .
 
-CMD ["python", "temp_anomaly_detector.py"]
+# Expose the port the app runs on
+EXPOSE 8080
+
+# Run the application
+CMD ["python", "anomaly_detector_server.py"]

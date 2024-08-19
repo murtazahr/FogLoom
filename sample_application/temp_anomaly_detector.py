@@ -1,15 +1,17 @@
-import sys
 import json
 import joblib
 import numpy as np
 from datetime import datetime
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
+from flask import Flask, request, jsonify
 
 warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
 
 # Load the pre-trained model
 model = joblib.load('temp_anomaly_model.joblib')
+
+app = Flask(__name__)
 
 
 def detect_anomaly(data):
@@ -35,20 +37,17 @@ def detect_anomaly(data):
     }
 
 
-def main():
-    for line in sys.stdin:
-        try:
-            data = json.loads(line)
-            result = detect_anomaly(data)
-            print(json.dumps(result))
-            sys.stdout.flush()
-        except json.JSONDecodeError:
-            print(json.dumps({"error": "Invalid JSON input"}))
-        except KeyError as e:
-            print(json.dumps({"error": f"Missing required field: {str(e)}"}))
-        except Exception as e:
-            print(json.dumps({"error": f"Unexpected error: {str(e)}"}))
+@app.route('/detect_anomaly', methods=['POST'])
+def anomaly_detection():
+    try:
+        data = request.json
+        result = detect_anomaly(data)
+        return jsonify(result)
+    except KeyError as e:
+        return jsonify({"error": f"Missing required field: {str(e)}"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Unexpected error: {str(e)}"}), 500
 
 
 if __name__ == "__main__":
-    main()
+    app.run(host='0.0.0.0', port=8080)
