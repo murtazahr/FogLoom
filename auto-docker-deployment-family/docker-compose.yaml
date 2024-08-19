@@ -44,7 +44,6 @@ services:
       dockerfile: Dockerfile
     image: sawtooth-registry:5000/docker-image-client:latest
     container_name: sawtooth-docker-image-client
-    privileged: true
     environment:
       - VALIDATOR_URL=tcp://validator-0:4004
       - REGISTRY_URL=sawtooth-registry:5000
@@ -451,8 +450,6 @@ services:
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-0:4004
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-0
       - sawtooth-registry
@@ -467,8 +464,6 @@ services:
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-1:4004
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-1
       - sawtooth-registry
@@ -483,8 +478,6 @@ services:
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-2:4004
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-2
       - sawtooth-registry
@@ -499,8 +492,6 @@ services:
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-3:4004
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-3
       - sawtooth-registry
@@ -515,8 +506,6 @@ services:
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-4:4004
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - validator-4
       - sawtooth-registry

@@ -7,7 +7,7 @@ RUN sawtooth keygen client # user keys
 
 FROM python:3.8
 
-# Copy Docker binaries from dind-base
+# Copy Sawtooth keys from shell
 COPY --from=sawtooth-shell /root/.sawtooth /root/.sawtooth
 
 # Install Docker
