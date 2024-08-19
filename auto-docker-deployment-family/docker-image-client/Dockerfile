@@ -16,12 +16,14 @@ RUN apk add --no-cache bash wget ca-certificates
 
 # Install dependencies
 # Install Miniforge
-RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniforge.sh && \
-    bash miniforge.sh -b -p /opt/conda && \
-    rm miniforge.sh
+RUN mkdir -p ~/miniconda3 && \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-py39_24.5.0-0-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh && \
+    bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3 && \
+    rm -rf ~/miniconda3/miniconda.sh
 
 # Add conda to path
-ENV PATH /opt/conda/bin:$PATH
+RUN ~/miniconda3/bin/conda init bash && \
+    ~/miniconda3/bin/conda init zsh && exec $SHELL
 
 # Create a new conda environment with Python 3.8
 RUN conda create -n myenv python=3.8 -y && \
