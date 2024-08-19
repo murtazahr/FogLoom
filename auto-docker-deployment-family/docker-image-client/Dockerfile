@@ -1,12 +1,15 @@
-# Start with the Docker-in-Docker image
-FROM docker:dind AS dind-base
-
 # Now, use the Sawtooth shell image as the main base
-FROM hyperledger/sawtooth-shell:chime
+FROM hyperledger/sawtooth-shell:chime as sawtooth-shell
+
+# Generate Sawtooth keys
+RUN sawtooth keygen # root keys
+RUN sawtooth keygen client # user keys
+
+# Start with the Docker-in-Docker image
+FROM docker:dind
 
 # Copy Docker binaries from dind-base
-COPY --from=dind-base /usr/local/bin/docker /usr/local/bin/
-COPY --from=dind-base /usr/local/bin/dockerd /usr/local/bin/
+COPY --from=sawtooth-shell /root/.sawtooth /root/.sawtooth
 
 # Install necessary packages
 RUN apt-get update && apt-get install -y \
@@ -38,10 +41,6 @@ COPY docker_image_client.py .
 
 # Copy tar file
 COPY temp-anomaly-detection.tar .
-
-# Generate Sawtooth keys
-RUN sawtooth keygen # root keys
-RUN sawtooth keygen client # user keys
 
 ENV PRIVATE_KEY_FILE /root/.sawtooth/keys/client.priv
 

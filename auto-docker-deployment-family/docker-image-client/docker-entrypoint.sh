@@ -12,6 +12,7 @@ done
 
 # Add the registry as an insecure registry
 echo '{"insecure-registries": ["sawtooth-registry:5000"]}' > /etc/docker/daemon.json
+# shellcheck disable=SC2046
 kill -SIGHUP $(pidof dockerd)
 
 # Wait for Docker to reload its configuration
