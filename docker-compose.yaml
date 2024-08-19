@@ -40,8 +40,8 @@ services:
 
   docker-image-client:
     build:
-      context: ./docker-image-client
-      dockerfile: Dockerfile
+      context: auto-docker-deployment-family/docker-image-client
+      dockerfile: auto-docker-deployment-family/docker-image-client/Dockerfile
     privileged: true
     image: sawtooth-registry:5000/docker-image-client:latest
     container_name: sawtooth-docker-image-client
@@ -374,8 +374,8 @@ services:
 
   docker-image-tp-0:
     build:
-      context: ./docker-image-tp
-      dockerfile: Dockerfile
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-0
     environment:
@@ -388,8 +388,8 @@ services:
 
   docker-image-tp-1:
     build:
-      context: ./docker-image-tp
-      dockerfile: Dockerfile
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-1
     environment:
@@ -402,8 +402,8 @@ services:
 
   docker-image-tp-2:
     build:
-      context: ./docker-image-tp
-      dockerfile: Dockerfile
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-2
     environment:
@@ -416,8 +416,8 @@ services:
 
   docker-image-tp-3:
     build:
-      context: ./docker-image-tp
-      dockerfile: Dockerfile
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-3
     environment:
@@ -430,8 +430,8 @@ services:
 
   docker-image-tp-4:
     build:
-      context: ./docker-image-tp
-      dockerfile: Dockerfile
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: auto-docker-deployment-family/docker-image-tp/Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-4
     environment:
@@ -442,80 +442,75 @@ services:
     command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
-  docker-image-event-handler-0:
+  fog-node-0:
     build:
-      context: ./docker-image-event-handler
-      dockerfile: Dockerfile
+      context: fog-node
+      dockerfile: fog-node/Dockerfile
     privileged: true
-    image: sawtooth-registry:5000/docker-image-event-handler:latest
-    container_name: sawtooth-docker-image-event-handler-0
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-0
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-0:4004
     depends_on:
       - validator-0
       - sawtooth-registry
-    command: python3 docker_image_event_handler.py
 
-  docker-image-event-handler-1:
+  fog-node-1:
     build:
-      context: ./docker-image-event-handler
-      dockerfile: Dockerfile
+      context: fog-node
+      dockerfile: fog-node/Dockerfile
     privileged: true
-    image: sawtooth-registry:5000/docker-image-event-handler:latest
-    container_name: sawtooth-docker-image-event-handler-1
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-1
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-1:4004
     depends_on:
       - validator-1
       - sawtooth-registry
-    command: python3 docker_image_event_handler.py
 
-  docker-image-event-handler-2:
+  fog-node-2:
     build:
-      context: ./docker-image-event-handler
-      dockerfile: Dockerfile
+      context: fog-node
+      dockerfile: fog-node/Dockerfile
     privileged: true
-    image: sawtooth-registry:5000/docker-image-event-handler:latest
-    container_name: sawtooth-docker-image-event-handler-2
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-2
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-2:4004
     depends_on:
       - validator-2
       - sawtooth-registry
-    command: python3 docker_image_event_handler.py
 
-  docker-image-event-handler-3:
+  fog-node-3:
     build:
-      context: ./docker-image-event-handler
-      dockerfile: Dockerfile
+      context: fog-node
+      dockerfile: fog-node/Dockerfile
     privileged: true
-    image: sawtooth-registry:5000/docker-image-event-handler:latest
-    container_name: sawtooth-docker-image-event-handler-3
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-3
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-3:4004
     depends_on:
       - validator-3
       - sawtooth-registry
-    command: python3 docker_image_event_handler.py
 
-  docker-image-event-handler-4:
+  fog-node-4:
     build:
-      context: ./docker-image-event-handler
-      dockerfile: Dockerfile
+      context: fog-node
+      dockerfile: fog-node/Dockerfile
     privileged: true
-    image: sawtooth-registry:5000/docker-image-event-handler:latest
-    container_name: sawtooth-docker-image-event-handler-4
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-4
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-4:4004
     depends_on:
       - validator-4
       - sawtooth-registry
-    command: python3 docker_image_event_handler.py
 
   settings-tp-0:
     image: hyperledger/sawtooth-settings-tp:chime

@@ -24,10 +24,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the event handler script
-COPY docker_image_event_handler.py .
+COPY event_handlers/docker_image_event_handler.py .
 
 # Copy the entrypoint script
-COPY ./docker-entrypoint.sh /usr/local/bin/
+COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Use the entrypoint script
