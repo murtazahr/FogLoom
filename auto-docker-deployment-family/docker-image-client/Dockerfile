@@ -12,20 +12,28 @@ FROM docker:dind
 COPY --from=sawtooth-shell /root/.sawtooth /root/.sawtooth
 
 # Install necessary packages
-RUN apk add --no-cache \
-    wget \
-    curl \
-    iptables \
+RUN apk --update add \
     bash \
+    curl \
+    wget \
+    ca-certificates \
     libstdc++ \
     glib \
-    ca-certificates
+    && wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://raw.githubusercontent.com/sgerrand/alpine-pkg-node-bower/master/sgerrand.rsa.pub \
+    && curl -L "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-2.23-r3.apk" -o glibc.apk \
+    && apk add glibc.apk \
+    && curl -L "https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.23-r3/glibc-bin-2.23-r3.apk" -o glibc-bin.apk \
+    && apk add glibc-bin.apk \
+    && curl -L "https://github.com/andyshinn/alpine-pkg-glibc/releases/download/2.25-r0/glibc-i18n-2.25-r0.apk" -o glibc-i18n.apk \
+    && apk add --allow-untrusted glibc-i18n.apk \
+    && /usr/glibc-compat/bin/localedef -i en_US -f UTF-8 en_US.UTF-8 \
+    && /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc/usr/lib \
+    && rm -rf glibc*apk /var/cache/apk/*
 
-# Install Miniforge (Conda for Alpine)
-RUN wget -q -O miniforge.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh \
-    && chmod +x miniforge.sh \
-    && bash miniforge.sh -b -p /opt/conda \
-    && rm miniforge.sh
+# Install Miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
+    bash miniconda.sh -b -p /opt/conda && \
+    rm miniconda.sh
 
 # Add conda to path
 ENV PATH="/opt/conda/bin:${PATH}"
