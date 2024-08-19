@@ -44,7 +44,7 @@ COPY temp-anomaly-detection.tar .
 ENV PRIVATE_KEY_FILE /root/.sawtooth/keys/client.priv
 
 # Copy the entrypoint script
-COPY ../docker-entrypoint.sh /usr/local/bin/
+COPY ./docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Use the entrypoint script
