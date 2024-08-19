@@ -44,20 +44,12 @@ def hash_and_push_docker_image(tar_path):
     logger.info(f"Processing Docker image from tar: {tar_path}")
     client = docker.from_env()
 
-    # Calculate hash
-    sha256_hash = hashlib.sha256()
-    with open(tar_path, 'rb') as f:
-        for chunk in iter(lambda: f.read(4096), b''):
-            sha256_hash.update(chunk)
-    image_hash = sha256_hash.hexdigest()
-    logger.info(f"Calculated image hash: {image_hash}")
-
     # Load image from tar
     with open(tar_path, 'rb') as f:
         image = client.images.load(f.read())[0]
 
     # Tag and push to local registry
-    image_name = image.tags[0] if image.tags else f"image-{image_hash[:12]}"
+    image_name = image.tags[0] if image.tags else f"image-{image.id[:12]}"
     registry_image_name = f"{REGISTRY_URL.split('://')[-1]}/{image_name}"
     image.tag(registry_image_name)
     logger.info(f"Pushing Docker image to local registry: {registry_image_name}")
@@ -66,24 +58,28 @@ def hash_and_push_docker_image(tar_path):
         debug_dns('sawtooth-registry')
         push_result = client.images.push(registry_image_name, stream=True, decode=True)
         push_success = False
+        content_digest = None
         for line in push_result:
             logger.debug(json.dumps(line))
             if 'error' in line:
                 logger.error(f"Error during push: {line['error']}")
+            elif 'status' in line and 'digest' in line:
+                content_digest = line['digest']
+                push_success = True
             elif 'status' in line and 'Pushed' in line['status']:
                 push_success = True
 
-        if push_success:
-            logger.info("Image push completed successfully")
+        if push_success and content_digest:
+            logger.info(f"Image push completed successfully. Content digest: {content_digest}")
         else:
-            logger.error("Image push did not complete successfully")
-            raise Exception("Image push failed")
+            logger.error("Image push did not complete successfully or digest not found")
+            raise Exception("Image push failed or digest not found")
 
     except docker.errors.APIError as e:
         logger.error(f"Failed to push image: {e}")
         raise
 
-    return image_hash, registry_image_name
+    return content_digest, registry_image_name
 
 
 def create_transaction(image_hash, image_name, signer):

@@ -47,7 +47,7 @@ def hash_docker_image(image):
     return image_hash
 
 
-def verify_and_run_container(stored_hash, image_name):
+def verify_and_run_container(stored_digest, image_name):
     client = docker.from_env()
     logger.info(f"Pulling Image: {image_name}")
     try:
@@ -61,12 +61,19 @@ def verify_and_run_container(stored_hash, image_name):
         logger.error(f"Error pulling image: {str(e)}")
         return
 
-    calculated_hash = hash_docker_image(image)
-    if calculated_hash != stored_hash:
-        logger.error(f"Image hash mismatch. Expected: {stored_hash} Got: {calculated_hash}")
+    # Get the content digest of the pulled image
+    image_inspect = client.api.inspect_image(image.id)
+    pulled_digest = image_inspect['RepoDigests'][0].split('@')[1] if image_inspect['RepoDigests'] else None
+
+    if not pulled_digest:
+        logger.error("Could not obtain content digest for pulled image")
         return
 
-    logger.info("Image hash verified successfully")
+    if pulled_digest != stored_digest:
+        logger.error(f"Image digest mismatch. Expected: {stored_digest} Got: {pulled_digest}")
+        return
+
+    logger.info("Image digest verified successfully")
 
     try:
         container = client.containers.run(image, detach=True)
