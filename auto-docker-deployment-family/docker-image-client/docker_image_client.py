@@ -57,23 +57,20 @@ def hash_and_push_docker_image(tar_path):
     try:
         debug_dns('sawtooth-registry')
         push_result = client.images.push(registry_image_name, stream=True, decode=True)
-        push_success = False
         content_digest = None
         for line in push_result:
             logger.debug(json.dumps(line))
             if 'error' in line:
                 logger.error(f"Error during push: {line['error']}")
-            elif 'status' in line and 'digest' in line:
-                content_digest = line['digest']
-                push_success = True
-            elif 'status' in line and 'Pushed' in line['status']:
-                push_success = True
+                raise Exception(f"Error during image push: {line['error']}")
+            elif 'aux' in line and 'Digest' in line['aux']:
+                content_digest = line['aux']['Digest']
+                logger.info(f"Image push completed successfully. Content digest: {content_digest}")
+                break
 
-        if push_success and content_digest:
-            logger.info(f"Image push completed successfully. Content digest: {content_digest}")
-        else:
-            logger.error("Image push did not complete successfully or digest not found")
-            raise Exception("Image push failed or digest not found")
+        if not content_digest:
+            logger.error("Image push completed but digest not found")
+            raise Exception("Image push completed but digest not found")
 
     except docker.errors.APIError as e:
         logger.error(f"Failed to push image: {e}")
