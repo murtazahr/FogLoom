@@ -1,0 +1,179 @@
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ------------------------------------------------------------------------------
+
+version: "2.1"
+
+volumes:
+  registry-data:
+
+services:
+  sawtooth-registry:
+    image: registry:2
+    container_name: sawtooth-registry
+    ports:
+      - "5000:5000"
+    environment:
+      - REGISTRY_HTTP_SECRET=Y74bs7QpaHmI1NKDGO8I3JdquvVxL+5K15NupwxhSbc=
+    volumes:
+      - ./registry-data:/var/lib/registry
+
+  fog-node-0:
+    build:
+      context: fog-node
+      dockerfile: Dockerfile
+    privileged: true
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-0
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-0:4004
+    depends_on:
+      - validator-0
+      - sawtooth-registry
+
+  fog-node-1:
+    build:
+      context: fog-node
+      dockerfile: Dockerfile
+    privileged: true
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-1
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-1:4004
+    depends_on:
+      - validator-1
+      - sawtooth-registry
+
+  fog-node-2:
+    build:
+      context: fog-node
+      dockerfile: Dockerfile
+    privileged: true
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-2
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-2:4004
+    depends_on:
+      - validator-2
+      - sawtooth-registry
+
+  fog-node-3:
+    build:
+      context: fog-node
+      dockerfile: Dockerfile
+    privileged: true
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-3
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-3:4004
+    depends_on:
+      - validator-3
+      - sawtooth-registry
+
+  fog-node-4:
+    build:
+      context: fog-node
+      dockerfile: Dockerfile
+    privileged: true
+    image: sawtooth-registry:5000/fog-node:latest
+    container_name: sawtooth-fog-node-4
+    environment:
+      - REGISTRY_URL=sawtooth-registry:5000
+      - VALIDATOR_URL=tcp://validator-4:4004
+    depends_on:
+      - validator-4
+      - sawtooth-registry
+
+  docker-image-client:
+    build:
+      context: auto-docker-deployment-family/docker-image-client
+      dockerfile: Dockerfile
+    privileged: true
+    image: sawtooth-registry:5000/docker-image-client:latest
+    container_name: sawtooth-docker-image-client
+    environment:
+      - VALIDATOR_URL=tcp://validator-0:4004
+      - REGISTRY_URL=sawtooth-registry:5000
+    volumes:
+      - ./docker-images:/docker-images
+    depends_on:
+      - validator-0
+      - sawtooth-registry
+    command: tail -f /dev/null
+
+  docker-image-tp-0:
+    build:
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-0
+    environment:
+      - VALIDATOR_URL=tcp://validator-0:4004
+    depends_on:
+      - validator-0
+      - sawtooth-registry
+    command: python3 docker_image_tp.py
+    stop_signal: SIGKILL
+
+  docker-image-tp-1:
+    build:
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-1
+    environment:
+      - VALIDATOR_URL=tcp://validator-1:4004
+    depends_on:
+      - validator-1
+      - sawtooth-registry
+    command: python3 docker_image_tp.py
+    stop_signal: SIGKILL
+
+  docker-image-tp-2:
+    build:
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-2
+    environment:
+      - VALIDATOR_URL=tcp://validator-2:4004
+    depends_on:
+      - validator-2
+      - sawtooth-registry
+    command: python3 docker_image_tp.py
+    stop_signal: SIGKILL
+
+  docker-image-tp-3:
+    build:
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-3
+    environment:
+      - VALIDATOR_URL=tcp://validator-3:4004
+    depends_on:
+      - validator-3
+      - sawtooth-registry
+    command: python3 docker_image_tp.py
+    stop_signal: SIGKILL
+
+  docker-image-tp-4:
+    build:
+      context: auto-docker-deployment-family/docker-image-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/docker-image-tp:latest
+    container_name: sawtooth-docker-image-tp-4
+    environment:
+      - VALIDATOR_URL=tcp://validator-4:4004
+    depends_on:
+      - validator-4
+      - sawtooth-registry
+    command: python3 docker_image_tp.py
+    stop_signal: SIGKILL
