@@ -11,7 +11,7 @@
 # Main script content starts here
 
 WORK_DIR=$(pwd)
-TEST_APP_DIR=$(pwd)/test-application
+TEST_APP_DIR=$(pwd)/example-application
 
 # Make sure user is in the correct working directory
 cd "$WORK_DIR" || exit
