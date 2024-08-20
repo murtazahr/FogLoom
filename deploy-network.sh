@@ -42,7 +42,8 @@ cp requirements.txt auto-docker-deployment-family/docker-image-client/.
 cp requirements.txt auto-docker-deployment-family/docker-image-tp/.
 
 # Bring docker compose down in case it is up
-docker-compose -f "$BASE_COMPOSE_FILE" -f fogbus-docker-compose.yaml down -v --rmi all
+docker-compose -f poet-docker-compose.yaml -f fogbus-docker-compose.yaml down -v --rmi all
+docker-compose -f pbft-docker-compose.yaml -f fogbus-docker-compose.yaml down -v --rmi all
 
 # Building docker image for test docker application
 cd "$TEST_APP_DIR" || exit
