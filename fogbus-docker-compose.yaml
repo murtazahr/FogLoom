@@ -99,7 +99,7 @@ services:
       - couchdb4_data:/opt/couchdb/data
       - couchdb4_config:/opt/couchdb/etc/local.d
     ports:
-      - "5987:5984"
+      - "5988:5984"
 
   couchdb-setup:
     image: curlimages/curl:7.78.0
