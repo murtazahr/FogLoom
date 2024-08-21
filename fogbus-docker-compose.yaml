@@ -38,7 +38,7 @@ services:
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
-      - NODENAME=couchdb@couch-db-0
+      - NODENAME=couch-db-0
     volumes:
       - couchdb0_data:/opt/couchdb/data
       - couchdb0_config:/opt/couchdb/etc/local.d
@@ -52,7 +52,7 @@ services:
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
-      - NODENAME=couchdb@couch-db-1
+      - NODENAME=couch-db-1
     volumes:
       - couchdb1_data:/opt/couchdb/data
       - couchdb1_config:/opt/couchdb/etc/local.d
@@ -66,7 +66,7 @@ services:
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
-      - NODENAME=couchdb@couch-db-2
+      - NODENAME=couch-db-2
     volumes:
       - couchdb2_data:/opt/couchdb/data
       - couchdb2_config:/opt/couchdb/etc/local.d
@@ -80,7 +80,7 @@ services:
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
-      - NODENAME=couchdb@couch-db-3
+      - NODENAME=couch-db-3
     volumes:
       - couchdb3_data:/opt/couchdb/data
       - couchdb3_config:/opt/couchdb/etc/local.d
@@ -94,7 +94,7 @@ services:
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
-      - NODENAME=couchdb@couch-db-4
+      - NODENAME=couch-db-4
     volumes:
       - couchdb4_data:/opt/couchdb/data
       - couchdb4_config:/opt/couchdb/etc/local.d
