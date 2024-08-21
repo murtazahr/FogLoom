@@ -105,6 +105,7 @@ services:
     command: >
       sh -c "
       sleep 5 &&
+      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\", \"node_count\":\"5\"}' &&
       for num in $$(seq 0 4); do
         curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-$$num\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}';
       done &&
