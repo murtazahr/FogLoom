@@ -9,6 +9,16 @@ version: "3.6"
 
 volumes:
   registry-data:
+  couchdb0_data:
+  couchdb0_config:
+  couchdb1_data:
+  couchdb1_config:
+  couchdb2_data:
+  couchdb2_config:
+  couchdb3_data:
+  couchdb3_config:
+  couchdb4_data:
+  couchdb4_config:
 
 services:
   sawtooth-registry:
@@ -17,9 +27,100 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - REGISTRY_HTTP_SECRET=Y74bs7QpaHmI1NKDGO8I3JdquvVxL+5K15NupwxhSbc=
+      - REGISTRY_HTTP_SECRET=${REGISTRY_HTTP_SECRET}
     volumes:
       - ./registry-data:/var/lib/registry
+
+  couch-db-0:
+    image: couchdb:3.1.1
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_SECRET=${COUCHDB_SECRET}
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - NODENAME=couchdb@couchdb0
+    volumes:
+      - couchdb0_data:/opt/couchdb/data
+      - couchdb0_config:/opt/couchdb/etc/local.d
+    ports:
+      - "5984:5984"
+
+  couch-db-1:
+    image: couchdb:3.1.1
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_SECRET=${COUCHDB_SECRET}
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - NODENAME=couchdb@couchdb1
+    volumes:
+      - couchdb1_data:/opt/couchdb/data
+      - couchdb1_config:/opt/couchdb/etc/local.d
+    ports:
+      - "5985:5984"
+
+  couch-db-2:
+    image: couchdb:3.1.1
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_SECRET=${COUCHDB_SECRET}
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - NODENAME=couchdb@couchdb2
+    volumes:
+      - couchdb2_data:/opt/couchdb/data
+      - couchdb2_config:/opt/couchdb/etc/local.d
+    ports:
+      - "5986:5984"
+
+  couch-db-3:
+    image: couchdb:3.1.1
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_SECRET=${COUCHDB_SECRET}
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - NODENAME=couchdb@couchdb3
+    volumes:
+      - couchdb3_data:/opt/couchdb/data
+      - couchdb3_config:/opt/couchdb/etc/local.d
+    ports:
+      - "5987:5984"
+
+  couch-db-4:
+    image: couchdb:3.1.1
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_SECRET=${COUCHDB_SECRET}
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - NODENAME=couchdb@couchdb4
+    volumes:
+      - couchdb4_data:/opt/couchdb/data
+      - couchdb4_config:/opt/couchdb/etc/local.d
+    ports:
+      - "5987:5984"
+
+  couchdb-setup:
+    image: curlimages/curl:7.78.0
+    environment:
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+    depends_on:
+      - couch-db-0
+      - couch-db-1
+      - couch-db-2
+      - couch-db-3
+      - couch-db-4
+    command: >
+      sh -c "
+      sleep 15 &&
+      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\", \"node_count\":\"5\"}' &&
+      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-1\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}' &&
+      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-2\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}' &&
+      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-3\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}' &&
+      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-4\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}' &&
+      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"finish_cluster\"}'"
 
   fog-node-0:
     build:
@@ -35,7 +136,9 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-0:4004
       - NODE_ID=sawtooth-fog-node-0
+      - COUCHDB_URL=http://couch-db-0:5984
     depends_on:
+      - couch-db-0
       - validator-0
       - sawtooth-registry
 
@@ -53,7 +156,9 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-1:4004
       - NODE_ID=sawtooth-fog-node-1
+      - COUCHDB_URL=http://couch-db-1:5984
     depends_on:
+      - couch-db-1
       - validator-1
       - sawtooth-registry
 
@@ -71,7 +176,9 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-2:4004
       - NODE_ID=sawtooth-fog-node-2
+      - COUCHDB_URL=http://couch-db-2:5984
     depends_on:
+      - couch-db-2
       - validator-2
       - sawtooth-registry
 
@@ -89,7 +196,9 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-3:4004
       - NODE_ID=sawtooth-fog-node-3
+      - COUCHDB_URL=http://couch-db-3:5984
     depends_on:
+      - couch-db-3
       - validator-3
       - sawtooth-registry
 
@@ -107,7 +216,9 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-4:4004
       - NODE_ID=sawtooth-fog-node-4
+      - COUCHDB_URL=http://couch-db-4:5984
     depends_on:
+      - couch-db-4
       - validator-4
       - sawtooth-registry
 
