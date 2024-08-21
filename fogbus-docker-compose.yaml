@@ -38,11 +38,6 @@ services:
       - couchdb0_data:/opt/couchdb/data
     ports:
       - "5984:5984"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   couch-db-1:
     image: couchdb:latest
@@ -56,11 +51,6 @@ services:
       - couchdb1_data:/opt/couchdb/data
     ports:
       - "5985:5984"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   couch-db-2:
     image: couchdb:latest
@@ -74,11 +64,6 @@ services:
       - couchdb2_data:/opt/couchdb/data
     ports:
       - "5986:5984"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   couch-db-3:
     image: couchdb:latest
@@ -92,11 +77,6 @@ services:
       - couchdb3_data:/opt/couchdb/data
     ports:
       - "5987:5984"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   couch-db-4:
     image: couchdb:latest
@@ -110,11 +90,6 @@ services:
       - couchdb4_data:/opt/couchdb/data
     ports:
       - "5988:5984"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   couchdb-setup:
     image: curlimages/curl:7.78.0
@@ -129,13 +104,12 @@ services:
       - couch-db-4
     command: >
       sh -c "
-      sleep 15 &&
-      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-1\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}' &&
-      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-2\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}' &&
-      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-3\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}' &&
-      curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-4\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}' &&
+      sleep 5 &&
+      for num in $$(seq 0 4); do
+        curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"add_node\", \"host\":\"couch-db-$$num\", \"port\": 5984, \"username\": \"$${COUCHDB_USER}\", \"password\":\"$${COUCHDB_PASSWORD}\"}';
+      done &&
       curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"finish_cluster\"}' &&
-      sleep 10 &&
+      sleep 3 &&
       for num in $$(seq 0 4); do
         for db in _users _replicator _global_changes; do
           curl -X PUT http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-$$num:5984/$$db;
