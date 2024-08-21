@@ -38,8 +38,9 @@ cd "$WORK_DIR" || exit
 
 # Freeze dependencies
 cp requirements.txt fog-node/requirements.txt
-cp requirements.txt auto-docker-deployment-family/docker-image-client/.
-cp requirements.txt auto-docker-deployment-family/docker-image-tp/.
+cp requirements.txt auto-docker-deployment/docker-image-client/.
+cp requirements.txt auto-docker-deployment/docker-image-tp/.
+cp requirements.txt peer-registry/peer-registry-tp/.
 
 # Bring docker compose down in case it is up
 docker-compose -f poet-docker-compose.yaml -f fogbus-docker-compose.yaml down -v --rmi all
@@ -53,7 +54,7 @@ docker build -t temp-anomaly-detection:latest -f Dockerfile .
 cd "$WORK_DIR" || exit
 
 # Export test docker application
-docker save -o auto-docker-deployment-family/docker-image-client/temp-anomaly-detection.tar temp-anomaly-detection
+docker save -o auto-docker-deployment/docker-image-client/temp-anomaly-detection.tar temp-anomaly-detection
 
 # Run docker compose
 docker-compose -f "$BASE_COMPOSE_FILE" -f fogbus-docker-compose.yaml build

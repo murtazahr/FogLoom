@@ -29,9 +29,6 @@ class DockerImageTransactionHandler(TransactionHandler):
     def apply(self, transaction, context):
         logger.info('Applying Docker Image Transaction')
 
-        # The header is already a TransactionHeader object, no need to parse
-        header = transaction.header
-
         try:
             image_hash, image_name = transaction.payload.decode().split(',')
             logger.debug(f"Received image hash: {image_hash} for image: {image_name}")

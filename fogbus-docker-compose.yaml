@@ -93,7 +93,7 @@ services:
 
   docker-image-client:
     build:
-      context: auto-docker-deployment-family/docker-image-client
+      context: auto-docker-deployment/docker-image-client
       dockerfile: Dockerfile
     privileged: true
     image: sawtooth-registry:5000/docker-image-client:latest
@@ -110,7 +110,7 @@ services:
 
   docker-image-tp-0:
     build:
-      context: auto-docker-deployment-family/docker-image-tp
+      context: auto-docker-deployment/docker-image-tp
       dockerfile: Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-0
@@ -119,12 +119,11 @@ services:
     depends_on:
       - validator-0
       - sawtooth-registry
-    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
   docker-image-tp-1:
     build:
-      context: auto-docker-deployment-family/docker-image-tp
+      context: auto-docker-deployment/docker-image-tp
       dockerfile: Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-1
@@ -133,12 +132,11 @@ services:
     depends_on:
       - validator-1
       - sawtooth-registry
-    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
   docker-image-tp-2:
     build:
-      context: auto-docker-deployment-family/docker-image-tp
+      context: auto-docker-deployment/docker-image-tp
       dockerfile: Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-2
@@ -147,12 +145,11 @@ services:
     depends_on:
       - validator-2
       - sawtooth-registry
-    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
   docker-image-tp-3:
     build:
-      context: auto-docker-deployment-family/docker-image-tp
+      context: auto-docker-deployment/docker-image-tp
       dockerfile: Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-3
@@ -161,12 +158,11 @@ services:
     depends_on:
       - validator-3
       - sawtooth-registry
-    command: python3 docker_image_tp.py
     stop_signal: SIGKILL
 
   docker-image-tp-4:
     build:
-      context: auto-docker-deployment-family/docker-image-tp
+      context: auto-docker-deployment/docker-image-tp
       dockerfile: Dockerfile
     image: sawtooth-registry:5000/docker-image-tp:latest
     container_name: sawtooth-docker-image-tp-4
@@ -175,5 +171,64 @@ services:
     depends_on:
       - validator-4
       - sawtooth-registry
-    command: python3 docker_image_tp.py
+    stop_signal: SIGKILL
+
+  peer-registry-tp-0:
+    build:
+      context: peer-registry/peer-registry-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/peer-registry-tp:latest
+    container_name: sawtooth-peer-registry-tp-0
+    environment:
+      - VALIDATOR_URL=tcp://validator-0:4004
+    depends_on:
+      - validator-0
+    stop_signal: SIGKILL
+
+  peer-registry-tp-1:
+    build:
+      context: peer-registry/peer-registry-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/peer-registry-tp:latest
+    container_name: sawtooth-peer-registry-tp-1
+    environment:
+      - VALIDATOR_URL=tcp://validator-1:4004
+    depends_on:
+      - validator-1
+    stop_signal: SIGKILL
+
+  peer-registry-tp-2:
+    build:
+      context: peer-registry/peer-registry-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/peer-registry-tp:latest
+    container_name: sawtooth-peer-registry-tp-2
+    environment:
+      - VALIDATOR_URL=tcp://validator-2:4004
+    depends_on:
+      - validator-2
+    stop_signal: SIGKILL
+
+  peer-registry-tp-3:
+    build:
+      context: peer-registry/peer-registry-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/peer-registry-tp:latest
+    container_name: sawtooth-peer-registry-tp-3
+    environment:
+      - VALIDATOR_URL=tcp://validator-3:4004
+    depends_on:
+      - validator-3
+    stop_signal: SIGKILL
+
+  peer-registry-tp-4:
+    build:
+      context: peer-registry/peer-registry-tp
+      dockerfile: Dockerfile
+    image: sawtooth-registry:5000/peer-registry-tp:latest
+    container_name: sawtooth-peer-registry-tp-4
+    environment:
+      - VALIDATOR_URL=tcp://validator-4:4004
+    depends_on:
+      - validator-4
     stop_signal: SIGKILL
