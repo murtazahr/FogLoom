@@ -110,8 +110,8 @@ services:
       done &&
       curl -X POST -H 'Content-Type: application/json' http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup -d '{\"action\": \"finish_cluster\"}' &&
       sleep 3 &&
-      for num in $$(seq 0 4); do
-        for db in _users _replicator _global_changes; do
+      for num in $$(seq 1 4); do
+        for db in _users _replicator; do
           curl -X PUT http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-$$num:5984/$$db;
         done
       done &&
