@@ -13,7 +13,7 @@ from sawtooth_signing import create_context, CryptoFactory, secp256k1
 
 logger = logging.getLogger(__name__)
 
-FAMILY_NAME = 'resource'
+FAMILY_NAME = 'peer-registry'
 FAMILY_VERSION = '1.0'
 NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
