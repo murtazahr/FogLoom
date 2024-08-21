@@ -1,10 +1,21 @@
+# Now, use the Sawtooth shell image as the main base
+FROM hyperledger/sawtooth-shell:chime as sawtooth-shell
+
+# Generate Sawtooth keys
+RUN sawtooth keygen # root keys
+RUN sawtooth keygen client # user keys
+
 FROM python:3.8
+
+# Copy Sawtooth keys from shell
+COPY --from=sawtooth-shell /root/.sawtooth /root/.sawtooth
 
 # Install Docker
 RUN apt-get update && apt-get install -y \
     apt-transport-https \
     ca-certificates \
     curl \
+    procps \
     gnupg \
     lsb-release
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
@@ -23,8 +34,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the event handler script
-COPY event_handlers/docker_image_event_handler.py .
+ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/client.priv
+
+# Copy the event handler scripts
+COPY event_handlers/* ./event_handlers/
+
+# Copy scheduler scripts
+COPY scheduled/* ./scheduled/
 
 # Copy the entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
@@ -32,4 +48,5 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Use the entrypoint script
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["python", "docker_image_event_handler.py"]
+CMD for file in event_handlers/*.py; do python "$file" & done; wait
+CMD for file in scheduled/*.py; do python "$file" & done; wait

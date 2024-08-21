@@ -41,7 +41,7 @@ COPY docker_image_client.py .
 # Copy tar file
 COPY temp-anomaly-detection.tar .
 
-ENV PRIVATE_KEY_FILE /root/.sawtooth/keys/client.priv
+ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/client.priv
 
 # Copy the entrypoint script
 COPY ./docker-entrypoint.sh /usr/local/bin/

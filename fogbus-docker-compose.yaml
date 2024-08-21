@@ -28,9 +28,13 @@ services:
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-0
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-0:4004
+      - NODE_ID=sawtooth-fog-node-0
     depends_on:
       - validator-0
       - sawtooth-registry
@@ -42,9 +46,13 @@ services:
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-1
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-1:4004
+      - NODE_ID=sawtooth-fog-node-1
     depends_on:
       - validator-1
       - sawtooth-registry
@@ -56,9 +64,13 @@ services:
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-2
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-2:4004
+      - NODE_ID=sawtooth-fog-node-2
     depends_on:
       - validator-2
       - sawtooth-registry
@@ -70,9 +82,13 @@ services:
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-3
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-3:4004
+      - NODE_ID=sawtooth-fog-node-3
     depends_on:
       - validator-3
       - sawtooth-registry
@@ -84,9 +100,13 @@ services:
     privileged: true
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-4
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
     environment:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-4:4004
+      - NODE_ID=sawtooth-fog-node-4
     depends_on:
       - validator-4
       - sawtooth-registry

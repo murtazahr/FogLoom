@@ -36,12 +36,6 @@ TEST_APP_DIR=$(pwd)/example-application
 # Make sure user is in the correct working directory
 cd "$WORK_DIR" || exit
 
-# Freeze dependencies
-cp requirements.txt fog-node/requirements.txt
-cp requirements.txt auto-docker-deployment/docker-image-client/.
-cp requirements.txt auto-docker-deployment/docker-image-tp/.
-cp requirements.txt peer-registry/peer-registry-tp/.
-
 # Bring docker compose down in case it is up
 docker-compose -f poet-docker-compose.yaml -f fogbus-docker-compose.yaml down -v --rmi all
 docker-compose -f pbft-docker-compose.yaml -f fogbus-docker-compose.yaml down -v --rmi all
