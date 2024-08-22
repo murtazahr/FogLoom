@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 import json
+from logging import currentframe
 
 from sawtooth_sdk.processor.handler import TransactionHandler
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
@@ -33,15 +34,30 @@ class PeerRegistryTransactionHandler(TransactionHandler):
         try:
             payload = json.loads(transaction.payload.decode())
             node_id = payload['node_id']
-            resource_data = payload['resource_data']
+            updates = payload['updates']
 
-            logger.debug(f"Received resource data for node {node_id}: {json.dumps(resource_data, indent=2)}")
+            logger.debug(f"Processing {len(updates)} resource updates for node {node_id}")
 
             # Store the resource data in the blockchain state
             state_key = NAMESPACE + hashlib.sha512(node_id.encode()).hexdigest()[:64]
-            state_value = json.dumps(resource_data).encode()
-            context.set_state({state_key: state_value})
-            logger.info(f"Stored resource data in state: {state_key}")
+            state_entries = context.get_state([state_key])
+
+            if state_entries:
+                current_state = json.loads(state_entries[0].data.decode())
+                current_state['updates'].extend(updates)
+            else:
+                current_state = {'node_id': node_id, 'updates': updates}
+
+            # Limit the number of stored updates to prevent unbounded growth
+            max_updates = os.getenv('MAX_UPDATES_PER_NODE', 100)
+            if len(current_state['updates']) > max_updates:
+                current_state['updates'] = current_state['updates'][-max_updates:]
+
+            # Update the state
+            state_data = json.dumps(current_state).encode()
+            context.set_state({ state_key: state_data })
+
+            logger.info(f"Updated state for node {node_id} with {len(updates)} new resource updates")
 
         except json.JSONDecodeError as e:
             raise InvalidTransaction("Invalid payload format: not valid JSON") from e

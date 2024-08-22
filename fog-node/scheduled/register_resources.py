@@ -5,8 +5,9 @@ import sys
 import time
 import json
 import psutil
-from sawtooth_sdk.messaging.stream import Stream
+import couchdb
 
+from sawtooth_sdk.messaging.stream import Stream
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
@@ -19,7 +20,11 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
 # Path to the private key file
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
+COUCHDB_URL = os.getenv('COUCHDB_URL', 'http://couch-db-0:5984')
+COUCHDB_DB = 'resource_registry'
 
+UPDATE_INTERVAL = os.getenv('RESOURCE_UPDATE_INTERVAL', 300)
+BLOCKCHAIN_BATCH_SIZE = os.getenv('RESOURCE_UPDATE_BATCH_SIZE', 5)
 
 def get_resource_data():
     try:
@@ -69,11 +74,53 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(e)}") from e
 
 
-def create_transaction(node_id, resource_data, signer):
-    logger.info(f"Creating peer registry transaction for node ID: {node_id}")
+def connect_to_couchdb():
+    try:
+        couch = couchdb.Server(COUCHDB_URL)
+        if COUCHDB_DB not in couch:
+            db = couch.create(COUCHDB_DB)
+        else:
+            db = couch[COUCHDB_DB]
+        return db
+    except Exception as e:
+        logger.error(f"Error connecting to couchdb: {str(e)}")
+        return None
+
+
+def store_resource_data(db, node_id, resource_data):
+    try:
+        doc_id = f"resource_{node_id}"
+        timestamp = int(time.time())
+        data_hash = hashlib.sha256(json.dumps(resource_data, sort_keys=True).encode()).hexdigest()
+
+        if doc_id in db:
+            doc = db[doc_id]
+            doc['resource_data'] = resource_data
+            doc['updates'].append({
+                'timestamp': timestamp,
+                'data_hash': data_hash
+            })
+        else:
+            doc = {
+                'resource_data': resource_data,
+                'updates': [{
+                    'timestamp': timestamp,
+                    'data_hash': data_hash
+                }]
+            }
+
+        db[doc_id] = doc
+        logger.info(f"Stored resource data for node {node_id} in CouchDB")
+        return {'timestamp': timestamp, 'data_hash': data_hash}
+    except Exception as e:
+        logger.error(f"Error storing resource data for node {node_id} in CouchDB: {str(e)}")
+        return None
+
+
+def create_transaction(node_id, updates, signer):
     payload = json.dumps({
         'node_id': node_id,
-        'resource_data': resource_data
+        'updates': updates
     }).encode()
 
     header = TransactionHeader(
@@ -135,7 +182,7 @@ def submit_batch(batch):
 
 def main():
     logger.info("Starting Resource Registration Client")
-    node_id = os.getenv('NODE_ID', 'node1')
+    node_id = os.getenv('NODE_ID', 'unrecognized_node')
 
     try:
         private_key = load_private_key(PRIVATE_KEY_FILE)
@@ -146,19 +193,32 @@ def main():
     context = create_context('secp256k1')
     signer = CryptoFactory(context).new_signer(private_key)
 
+    db = connect_to_couchdb()
+    if not db:
+        logger.error("Couldn't connect to CouchDB. Exiting.")
+        sys.exit(1)
+
+    updates = []
     while True:
         try:
             resource_data = get_resource_data()
             if resource_data:
                 logger.debug(f"Resource data: {json.dumps(resource_data, indent=2)}")
-                transaction = create_transaction(node_id, resource_data, signer)
-                batch = create_batch([transaction], signer)
-                submit_batch(batch)
+                update_info = store_resource_data(db, node_id, resource_data)
+                if update_info:
+                    updates.append(update_info)
+
+                    if len(updates) >= BLOCKCHAIN_BATCH_SIZE:
+                        transaction = create_transaction(node_id, updates, signer)
+                        batch = create_batch(transaction, signer)
+                        submit_batch(batch)
+                        logger.info(f"Logged {len(updates)} resource updates in blockchain for node {node_id}")
+                        updates = []
             else:
                 logger.warning("Failed to get resource data")
         except Exception as e:
             logger.error(f"Error in main loop: {str(e)}")
-        time.sleep(60)
+        time.sleep(UPDATE_INTERVAL)
 
 
 if __name__ == '__main__':

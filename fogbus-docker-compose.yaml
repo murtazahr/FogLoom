@@ -132,6 +132,8 @@ services:
       - VALIDATOR_URL=tcp://validator-0:4004
       - NODE_ID=sawtooth-fog-node-0
       - COUCHDB_URL=http://couch-db-0:5984
+      - RESOURCE_UPDATE_INTERVAL=300
+      - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
       - couch-db-0
       - validator-0
@@ -152,6 +154,8 @@ services:
       - VALIDATOR_URL=tcp://validator-1:4004
       - NODE_ID=sawtooth-fog-node-1
       - COUCHDB_URL=http://couch-db-1:5984
+      - RESOURCE_UPDATE_INTERVAL=300
+      - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
       - couch-db-1
       - validator-1
@@ -172,6 +176,8 @@ services:
       - VALIDATOR_URL=tcp://validator-2:4004
       - NODE_ID=sawtooth-fog-node-2
       - COUCHDB_URL=http://couch-db-2:5984
+      - RESOURCE_UPDATE_INTERVAL=300
+      - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
       - couch-db-2
       - validator-2
@@ -192,6 +198,8 @@ services:
       - VALIDATOR_URL=tcp://validator-3:4004
       - NODE_ID=sawtooth-fog-node-3
       - COUCHDB_URL=http://couch-db-3:5984
+      - RESOURCE_UPDATE_INTERVAL=300
+      - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
       - couch-db-3
       - validator-3
@@ -212,6 +220,8 @@ services:
       - VALIDATOR_URL=tcp://validator-4:4004
       - NODE_ID=sawtooth-fog-node-4
       - COUCHDB_URL=http://couch-db-4:5984
+      - RESOURCE_UPDATE_INTERVAL=300
+      - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
       - couch-db-4
       - validator-4
@@ -306,6 +316,7 @@ services:
     image: sawtooth-registry:5000/peer-registry-tp:latest
     container_name: sawtooth-peer-registry-tp-0
     environment:
+      - MAX_UPDATES_PER_NODE=100
       - VALIDATOR_URL=tcp://validator-0:4004
     depends_on:
       - validator-0
@@ -318,6 +329,7 @@ services:
     image: sawtooth-registry:5000/peer-registry-tp:latest
     container_name: sawtooth-peer-registry-tp-1
     environment:
+      - MAX_UPDATES_PER_NODE=100
       - VALIDATOR_URL=tcp://validator-1:4004
     depends_on:
       - validator-1
@@ -330,6 +342,7 @@ services:
     image: sawtooth-registry:5000/peer-registry-tp:latest
     container_name: sawtooth-peer-registry-tp-2
     environment:
+      - MAX_UPDATES_PER_NODE=100
       - VALIDATOR_URL=tcp://validator-2:4004
     depends_on:
       - validator-2
@@ -342,6 +355,7 @@ services:
     image: sawtooth-registry:5000/peer-registry-tp:latest
     container_name: sawtooth-peer-registry-tp-3
     environment:
+      - MAX_UPDATES_PER_NODE=100
       - VALIDATOR_URL=tcp://validator-3:4004
     depends_on:
       - validator-3
@@ -354,6 +368,7 @@ services:
     image: sawtooth-registry:5000/peer-registry-tp:latest
     container_name: sawtooth-peer-registry-tp-4
     environment:
+      - MAX_UPDATES_PER_NODE=100
       - VALIDATOR_URL=tcp://validator-4:4004
     depends_on:
       - validator-4
