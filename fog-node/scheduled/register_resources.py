@@ -23,8 +23,8 @@ PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.
 COUCHDB_URL = os.getenv('COUCHDB_URL', 'http://couch-db-0:5984')
 COUCHDB_DB = 'resource_registry'
 
-UPDATE_INTERVAL = os.getenv('RESOURCE_UPDATE_INTERVAL', 300)
-BLOCKCHAIN_BATCH_SIZE = os.getenv('RESOURCE_UPDATE_BATCH_SIZE', 5)
+UPDATE_INTERVAL = int(os.getenv('RESOURCE_UPDATE_INTERVAL', 300))
+BLOCKCHAIN_BATCH_SIZE = int(os.getenv('RESOURCE_UPDATE_BATCH_SIZE', 5))
 
 def get_resource_data():
     try:

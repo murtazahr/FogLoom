@@ -49,7 +49,7 @@ class PeerRegistryTransactionHandler(TransactionHandler):
                 current_state = {'node_id': node_id, 'updates': updates}
 
             # Limit the number of stored updates to prevent unbounded growth
-            max_updates = os.getenv('MAX_UPDATES_PER_NODE', 100)
+            max_updates = int(os.getenv('MAX_UPDATES_PER_NODE', 100))
             if len(current_state['updates']) > max_updates:
                 current_state['updates'] = current_state['updates'][-max_updates:]
 
