@@ -22,8 +22,6 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
 COUCHDB_URL = os.getenv('COUCHDB_URL', 'http://couch-db-0:5984')
 COUCHDB_DB = 'resource_registry'
-COUCHDB_USER = os.getenv('COUCHDB_USER')
-COUCHDB_PASSWORD = os.getenv('COUCHDB_PASSWORD')
 
 UPDATE_INTERVAL = os.getenv('RESOURCE_UPDATE_INTERVAL', 300)
 BLOCKCHAIN_BATCH_SIZE = os.getenv('RESOURCE_UPDATE_BATCH_SIZE', 5)
@@ -78,22 +76,12 @@ def load_private_key(key_file):
 
 def connect_to_couchdb():
     try:
-        if COUCHDB_USER and COUCHDB_PASSWORD:
-            auth = (COUCHDB_USER, COUCHDB_PASSWORD)
-            couch = couchdb.Server(COUCHDB_URL, auth)
-        else:
-            logger.warning("CouchDB credentials not provided. Attempting connection without authentication.")
-            couch = couchdb.Server(COUCHDB_URL)
-
+        couch = couchdb.Server(COUCHDB_URL)
         if COUCHDB_DB not in couch:
             db = couch.create(COUCHDB_DB)
         else:
             db = couch[COUCHDB_DB]
         return db
-
-    except couchdb.http.Unauthorized:
-        logger.error("Unauthorized access to CouchDB. Please check your credentials.")
-        return None
     except Exception as e:
         logger.error(f"Error connecting to couchdb: {str(e)}")
         return None

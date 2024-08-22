@@ -116,9 +116,6 @@ services:
         done
       done &&
       curl -X GET http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_membership &&
-      for num in $(seq 0 4); do
-        curl -X PUT http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-$$num:5984/_node/_local/_config/admins/$${COUCHDB_USER} -d "\"$${COUCHDB_PASSWORD}\""
-      done &&
       sleep 2"
 
   fog-node-0:
@@ -135,9 +132,7 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-0:4004
       - NODE_ID=sawtooth-fog-node-0
-      - COUCHDB_URL=http://couch-db-0:5984
-      - COUCHDB_USER=${COUCHDB_USER}
-      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
@@ -162,9 +157,7 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-1:4004
       - NODE_ID=sawtooth-fog-node-1
-      - COUCHDB_URL=http://couch-db-1:5984
-      - COUCHDB_USER=${COUCHDB_USER}
-      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-1:5984
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
@@ -189,9 +182,7 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-2:4004
       - NODE_ID=sawtooth-fog-node-2
-      - COUCHDB_URL=http://couch-db-2:5984
-      - COUCHDB_USER=${COUCHDB_USER}
-      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-2:5984
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
@@ -216,9 +207,7 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-3:4004
       - NODE_ID=sawtooth-fog-node-3
-      - COUCHDB_URL=http://couch-db-3:5984
-      - COUCHDB_USER=${COUCHDB_USER}
-      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-3:5984
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
@@ -243,9 +232,7 @@ services:
       - REGISTRY_URL=sawtooth-registry:5000
       - VALIDATOR_URL=tcp://validator-4:4004
       - NODE_ID=sawtooth-fog-node-4
-      - COUCHDB_URL=http://couch-db-4:5984
-      - COUCHDB_USER=${COUCHDB_USER}
-      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-4:5984
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
