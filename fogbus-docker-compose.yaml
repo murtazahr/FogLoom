@@ -132,6 +132,8 @@ services:
       - VALIDATOR_URL=tcp://validator-0:4004
       - NODE_ID=sawtooth-fog-node-0
       - COUCHDB_URL=http://couch-db-0:5984
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
@@ -154,6 +156,8 @@ services:
       - VALIDATOR_URL=tcp://validator-1:4004
       - NODE_ID=sawtooth-fog-node-1
       - COUCHDB_URL=http://couch-db-1:5984
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
@@ -176,6 +180,8 @@ services:
       - VALIDATOR_URL=tcp://validator-2:4004
       - NODE_ID=sawtooth-fog-node-2
       - COUCHDB_URL=http://couch-db-2:5984
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
@@ -198,6 +204,8 @@ services:
       - VALIDATOR_URL=tcp://validator-3:4004
       - NODE_ID=sawtooth-fog-node-3
       - COUCHDB_URL=http://couch-db-3:5984
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
@@ -220,6 +228,8 @@ services:
       - VALIDATOR_URL=tcp://validator-4:4004
       - NODE_ID=sawtooth-fog-node-4
       - COUCHDB_URL=http://couch-db-4:5984
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
