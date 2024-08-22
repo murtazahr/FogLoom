@@ -137,9 +137,12 @@ services:
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
-      - couch-db-0
-      - validator-0
-      - sawtooth-registry
+      validator-0:
+        condition: service_started
+      sawtooth-registry:
+        condition: service_started
+      couchdb-setup:
+        condition: service_completed_successfully
 
   fog-node-1:
     build:
@@ -161,9 +164,12 @@ services:
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
-      - couch-db-1
-      - validator-1
-      - sawtooth-registry
+      validator-1:
+        condition: service_started
+      sawtooth-registry:
+        condition: service_started
+      couchdb-setup:
+        condition: service_completed_successfully
 
   fog-node-2:
     build:
@@ -185,9 +191,12 @@ services:
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
-      - couch-db-2
-      - validator-2
-      - sawtooth-registry
+      validator-2:
+        condition: service_started
+      sawtooth-registry:
+        condition: service_started
+      couchdb-setup:
+        condition: service_completed_successfully
 
   fog-node-3:
     build:
@@ -209,9 +218,12 @@ services:
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
-      - couch-db-3
-      - validator-3
-      - sawtooth-registry
+      validator-3:
+        condition: service_started
+      sawtooth-registry:
+        condition: service_started
+      couchdb-setup:
+        condition: service_completed_successfully
 
   fog-node-4:
     build:
@@ -233,9 +245,12 @@ services:
       - RESOURCE_UPDATE_INTERVAL=300
       - RESOURCE_UPDATE_BATCH_SIZE=10
     depends_on:
-      - couch-db-4
-      - validator-4
-      - sawtooth-registry
+      validator-4:
+        condition: service_started
+      sawtooth-registry:
+        condition: service_started
+      couchdb-setup:
+        condition: service_completed_successfully
 
   docker-image-client:
     build:
