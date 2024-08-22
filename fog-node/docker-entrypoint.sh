@@ -15,8 +15,11 @@ echo '{"insecure-registries": ["sawtooth-registry:5000"]}' > /etc/docker/daemon.
 # shellcheck disable=SC2046
 kill -SIGHUP $(pidof dockerd)
 
-# Wait for Docker to reload its configuration
-sleep 5
+echo "Waiting for couchdb setup to complete..."
+while [ ! -f /shared/couch_db_setup_done ]; do
+    sleep 1
+done
+echo "Couch DB setup has completed. Starting main process..."
 
 # Execute the main command
 exec "$@"
