@@ -14,7 +14,6 @@ volumes:
   couchdb2_data:
   couchdb3_data:
   couchdb4_data:
-  shared-data:
 
 services:
   sawtooth-registry:
@@ -97,16 +96,12 @@ services:
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
-    volumes:
-      - shared-data:/shared
-      - ./couchdb-setup-entrypoint.sh:/couchdb-setup-entrypoint.sh
     depends_on:
       - couch-db-0
       - couch-db-1
       - couch-db-2
       - couch-db-3
       - couch-db-4
-    entrypoint: ["/couchdb-setup-entrypoint.sh"]
     command: >
       sh -c "
       sleep 5 &&
@@ -130,7 +125,6 @@ services:
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-0
     volumes:
-      - shared-data:/shared
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     environment:
@@ -155,7 +149,6 @@ services:
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-1
     volumes:
-      - shared-data:/shared
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     environment:
@@ -180,7 +173,6 @@ services:
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-2
     volumes:
-      - shared-data:/shared
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     environment:
@@ -205,7 +197,6 @@ services:
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-3
     volumes:
-      - shared-data:/shared
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     environment:
@@ -230,7 +221,6 @@ services:
     image: sawtooth-registry:5000/fog-node:latest
     container_name: sawtooth-fog-node-4
     volumes:
-      - shared-data:/shared
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
     environment:
