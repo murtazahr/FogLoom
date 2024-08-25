@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: '3.8'
-
 volumes:
   pbft-shared:
 
@@ -151,13 +149,13 @@ services:
         done
         MEMBERS=""
         for i in 0 1 2 3 4; do
-          if [ -f /pbft-shared/validators/validator-$i.pub ]; then
-            if [ -n "$MEMBERS" ]; then
-              MEMBERS="$MEMBERS,"
+          if [ -f /pbft-shared/validators/validator-$$i.pub ]; then
+            if [ -n "$$MEMBERS" ]; then
+              MEMBERS="$$MEMBERS,"
             fi
-            MEMBERS="$MEMBERS\"$(cat /pbft-shared/validators/validator-$i.pub)\""
+            MEMBERS="$$MEMBERS\"$$(cat /pbft-shared/validators/validator-$$i.pub)\""
           else
-            echo "Warning: /pbft-shared/validators/validator-$i.pub not found"
+            echo "Warning: /pbft-shared/validators/validator-$$i.pub not found"
           fi
         done
         if [ ! -e config.batch ]; then
@@ -165,7 +163,7 @@ services:
             -k /etc/sawtooth/keys/validator.priv \
             sawtooth.consensus.algorithm.name=pbft \
             sawtooth.consensus.algorithm.version=1.0 \
-            sawtooth.consensus.pbft.members=[$MEMBERS] \
+            sawtooth.consensus.pbft.members=[$$MEMBERS] \
             sawtooth.publisher.max_batches_per_block=1200 \
             -o config.batch
         fi

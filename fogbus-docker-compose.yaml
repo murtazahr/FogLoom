@@ -5,8 +5,6 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 
-version: "3.8"
-
 volumes:
   registry-data:
   couchdb0_data:
