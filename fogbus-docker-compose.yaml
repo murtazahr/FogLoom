@@ -103,7 +103,7 @@ services:
       - couch-db-3
       - couch-db-4
     volumes:
-      - ./setup-couchdb-replication.sh:/setup-replication.sh
+      - ./setup-couchdb-replication.sh:/setup-couchdb-replication.sh
     command: >
       sh -c "
       sleep 5 &&
@@ -118,7 +118,7 @@ services:
         done
       done &&
       curl -X GET http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_membership &&
-      /setup-replication.sh"
+      /setup-couchdb-replication.sh"
 
   fog-node-0:
     build:
