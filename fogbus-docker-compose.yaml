@@ -26,12 +26,13 @@ services:
 
   couch-db-0:
     image: couchdb:3
+    hostname: couchdb0
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch-db-0
+      - NODENAME=couchdb0.local
     volumes:
       - couchdb0_data:/opt/couchdb/data
     ports:
@@ -44,12 +45,13 @@ services:
 
   couch-db-1:
     image: couchdb:3
+    hostname: couchdb1
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch-db-1
+      - NODENAME=couchdb1.local
     volumes:
       - couchdb1_data:/opt/couchdb/data
     ports:
@@ -62,12 +64,13 @@ services:
 
   couch-db-2:
     image: couchdb:3
+    hostname: couchdb2
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch-db-2
+      - NODENAME=couchdb2.local
     volumes:
       - couchdb2_data:/opt/couchdb/data
     ports:
@@ -80,12 +83,13 @@ services:
 
   couch-db-3:
     image: couchdb:3
+    hostname: couchdb3
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch-db-3
+      - NODENAME=couchdb3.local
     volumes:
       - couchdb3_data:/opt/couchdb/data
     ports:
@@ -98,12 +102,13 @@ services:
 
   couch-db-4:
     image: couchdb:3
+    hostname: couchdb4
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
-      - NODENAME=couch-db-4
+      - NODENAME=couchdb4.local
     volumes:
       - couchdb4_data:/opt/couchdb/data
     ports:
