@@ -55,6 +55,10 @@ log_message "Finishing cluster setup"
 response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb0.local:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}")
 log_message "Finish cluster response: ${response}"
 
+log_message "Checking cluster membership"
+membership=$(curl -s -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb0.local:5984/_membership")
+log_message "Cluster membership: ${membership}"
+
 # shellcheck disable=SC2188
 <<COMMENT
 log_message "Creating system databases on all nodes"
@@ -64,10 +68,6 @@ for num in 0 1 2 3 4; do
       log_message "Creating $db on couch-db-$num response: ${response}"
     done
 done
-
-log_message "Checking cluster membership"
-membership=$(curl -s -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb0.local:5984/_membership")
-log_message "Cluster membership: ${membership}"
 
 log_message "Creating ${DB_NAME} database on all nodes"
 for node in couchdb0 couchdb1 couchdb2 couchdb3 couchdb4; do
