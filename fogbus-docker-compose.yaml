@@ -26,7 +26,7 @@ services:
 
   couch-db-0:
     image: couchdb:3
-    hostname: couchdb0
+    hostname: couchdb0.local
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
@@ -45,7 +45,7 @@ services:
 
   couch-db-1:
     image: couchdb:3
-    hostname: couchdb1
+    hostname: couchdb1.local
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
@@ -64,7 +64,7 @@ services:
 
   couch-db-2:
     image: couchdb:3
-    hostname: couchdb2
+    hostname: couchdb2.local
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
@@ -83,7 +83,7 @@ services:
 
   couch-db-3:
     image: couchdb:3
-    hostname: couchdb3
+    hostname: couchdb3.local
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
@@ -102,7 +102,7 @@ services:
 
   couch-db-4:
     image: couchdb:3
-    hostname: couchdb4
+    hostname: couchdb4.local
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
