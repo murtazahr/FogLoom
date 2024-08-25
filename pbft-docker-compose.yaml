@@ -149,13 +149,23 @@ services:
               [ ! -f /pbft-shared/validators/validator-4.pub ]; do
           sleep 1
         done
-        MEMBERS=$(for i in $(seq 0 4); do cat /pbft-shared/validators/validator-$i.pub; done | paste -sd "," -)
+        MEMBERS=""
+        for i in 0 1 2 3 4; do
+          if [ -f /pbft-shared/validators/validator-$i.pub ]; then
+            if [ -n "$MEMBERS" ]; then
+              MEMBERS="$MEMBERS,"
+            fi
+            MEMBERS="$MEMBERS\"$(cat /pbft-shared/validators/validator-$i.pub)\""
+          else
+            echo "Warning: /pbft-shared/validators/validator-$i.pub not found"
+          fi
+        done
         if [ ! -e config.batch ]; then
-         sawset proposal create \
+          sawset proposal create \
             -k /etc/sawtooth/keys/validator.priv \
             sawtooth.consensus.algorithm.name=pbft \
             sawtooth.consensus.algorithm.version=1.0 \
-            sawtooth.consensus.pbft.members=[${MEMBERS}] \
+            sawtooth.consensus.pbft.members=[$MEMBERS] \
             sawtooth.publisher.max_batches_per_block=1200 \
             -o config.batch
         fi
