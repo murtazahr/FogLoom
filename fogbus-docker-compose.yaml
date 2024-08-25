@@ -32,7 +32,6 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-0
-      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb0_data:/opt/couchdb/data
     ports:
@@ -51,7 +50,6 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-1
-      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb1_data:/opt/couchdb/data
     ports:
@@ -70,7 +68,6 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-2
-      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb2_data:/opt/couchdb/data
     ports:
@@ -89,7 +86,6 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-3
-      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb3_data:/opt/couchdb/data
     ports:
@@ -108,7 +104,6 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-4
-      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb4_data:/opt/couchdb/data
     ports:

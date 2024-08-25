@@ -45,12 +45,11 @@ sleep 5
 
 log_message "Adding nodes to the cluster"
 for num in 1 2 3 4; do
+  response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"port\": 5984, \"node_count\": \"5\", \"remote_node\": \"couch-db-$num\", \"remote_current_user\": \"${COUCHDB_USER}\", \"remote_current_password\": \"${COUCHDB_PASSWORD}\" }")
+  log_message "Enable cluster on couch-db-$num response: ${response}"
   response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"couch-db-$num\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
   log_message "Adding node couch-db-$num response: ${response}"
 done
-
-# see https://github.com/apache/couchdb/issues/2858
-curl "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/"
 
 log_message "Finishing cluster setup"
 response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}")
@@ -58,6 +57,8 @@ log_message "Finish cluster response: ${response}"
 
 sleep 3
 
+# shellcheck disable=SC2188
+<<COMMENT
 log_message "Creating system databases on all nodes"
 for num in 0 1 2 3 4; do
     for db in _users _replicator; do
@@ -65,6 +66,7 @@ for num in 0 1 2 3 4; do
       log_message "Creating $db on couch-db-$num response: ${response}"
     done
 done
+COMMENT
 
 log_message "Checking cluster membership"
 membership=$(curl -s -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_membership")
