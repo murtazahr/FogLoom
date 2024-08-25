@@ -118,7 +118,6 @@ services:
         done
       done &&
       curl -X GET http://$${COUCHDB_USER}:$${COUCHDB_PASSWORD}@couch-db-0:5984/_membership &&
-      chmod +x /setup-replication.sh &&
       /setup-replication.sh"
 
   fog-node-0:
