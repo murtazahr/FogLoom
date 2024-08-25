@@ -25,7 +25,7 @@ services:
       - ./registry-data:/var/lib/registry
 
   couch-db-0:
-    image: couchdb:latest
+    image: couchdb:3
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
@@ -44,7 +44,7 @@ services:
       retries: 5
 
   couch-db-1:
-    image: couchdb:latest
+    image: couchdb:3
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
@@ -63,7 +63,7 @@ services:
       retries: 5
 
   couch-db-2:
-    image: couchdb:latest
+    image: couchdb:3
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
@@ -82,7 +82,7 @@ services:
       retries: 5
 
   couch-db-3:
-    image: couchdb:latest
+    image: couchdb:3
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
@@ -101,7 +101,7 @@ services:
       retries: 5
 
   couch-db-4:
-    image: couchdb:latest
+    image: couchdb:3
     environment:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
