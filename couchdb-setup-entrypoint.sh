@@ -40,7 +40,7 @@ curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCH
 
 sleep 3
 
-for num in 1 2 3 4; do
+for num in 0 1 2 3 4; do
     for db in _users _replicator; do
       curl -X PUT "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-$num:5984/$db"
     done
