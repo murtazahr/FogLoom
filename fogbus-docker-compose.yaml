@@ -30,7 +30,7 @@ services:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
-      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
       - NODENAME=couch-db-0
     volumes:
       - couchdb0_data:/opt/couchdb/data
@@ -48,7 +48,7 @@ services:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
-      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
       - NODENAME=couch-db-1
     volumes:
       - couchdb1_data:/opt/couchdb/data
@@ -66,7 +66,7 @@ services:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
-      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
       - NODENAME=couch-db-2
     volumes:
       - couchdb2_data:/opt/couchdb/data
@@ -84,7 +84,7 @@ services:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
-      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
       - NODENAME=couch-db-3
     volumes:
       - couchdb3_data:/opt/couchdb/data
@@ -102,7 +102,7 @@ services:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
       - COUCHDB_SECRET=${COUCHDB_SECRET}
-      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
+      - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200
       - NODENAME=couch-db-4
     volumes:
       - couchdb4_data:/opt/couchdb/data
