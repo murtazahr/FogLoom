@@ -104,7 +104,7 @@ services:
       - couch-db-4
     volumes:
       - ./couchdb-setup-entrypoint.sh:/couchdb-setup-entrypoint.sh
-    entrypoint: ["/bin/bash", "/setup_couchdb_cluster.sh"]
+    entrypoint: ["/couchdb-setup-entrypoint.sh"]
 
   fog-node-0:
     build:
