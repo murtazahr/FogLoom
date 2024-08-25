@@ -1,14 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 
 # CouchDB cluster configuration
-NODES=("couch-db-0" "couch-db-1" "couch-db-2" "couch-db-3" "couch-db-4")
 PORT=5984
 DB_NAME="resource_registry"
 
 # Function to setup bidirectional replication between two nodes
 setup_bidirectional_replication() {
-    local source=$1
-    local target=$2
+    source=$1
+    target=$2
 
     # Setup replication from source to target
     curl -X POST "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@${source}:${PORT}/_replicator" \
@@ -33,16 +32,15 @@ setup_bidirectional_replication() {
 
 sleep 5
 
-for num in {0..4}; do
+for num in 0 1 2 3 4; do
   curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"couch-db-$num\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}"
 done
-
 
 curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}"
 
 sleep 3
 
-for num in {1..4}; do
+for num in 1 2 3 4; do
     for db in _users _replicator; do
       curl -X PUT "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-$num:5984/$db"
     done
@@ -51,14 +49,14 @@ done
 curl -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_membership"
 
 # Create the database on all nodes
-for node in "${NODES[@]}"; do
+for node in couch-db-0 couch-db-1 couch-db-2 couch-db-3 couch-db-4; do
     curl -X PUT "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@${node}:${PORT}/${DB_NAME}"
 done
 
 # Setup bidirectional replication between all node pairs
-for ((i=0; i<${#NODES[@]}; i++)); do
-    for ((j=i+1; j<${#NODES[@]}; j++)); do
-        setup_bidirectional_replication "${NODES[i]}" "${NODES[j]}"
+for i in 0 1 2 3; do
+    for j in $(seq $((i+1)) 4); do
+        setup_bidirectional_replication "couch-db-$i" "couch-db-$j"
     done
 done
 
