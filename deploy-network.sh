@@ -37,8 +37,8 @@ TEST_APP_DIR=$(pwd)/example-application
 cd "$WORK_DIR" || exit
 
 # Bring docker compose down in case it is up
-docker-compose -f poet-docker-compose.yaml -f fogbus-docker-compose.yaml down --remove-orphans -v --rmi all
-docker-compose -f pbft-docker-compose.yaml -f fogbus-docker-compose.yaml down --remove-orphans -v --rmi all
+docker-compose -f poet-docker-compose.yaml -f fogbus-docker-compose.yaml down --remove-orphans -v all
+docker-compose -f pbft-docker-compose.yaml -f fogbus-docker-compose.yaml down --remove-orphans -v all
 
 # Building docker image for test docker application
 cd "$TEST_APP_DIR" || exit
