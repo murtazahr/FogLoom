@@ -26,6 +26,7 @@ COUCHDB_DB = 'resource_registry'
 UPDATE_INTERVAL = int(os.getenv('RESOURCE_UPDATE_INTERVAL', 300))
 BLOCKCHAIN_BATCH_SIZE = int(os.getenv('RESOURCE_UPDATE_BATCH_SIZE', 5))
 
+
 def get_resource_data():
     try:
         # CPU information
