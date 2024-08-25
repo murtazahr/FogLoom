@@ -43,8 +43,11 @@ log_message "Starting CouchDB cluster setup"
 
 sleep 5
 
+response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup/" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"node_count\":\"5\"}")
+log_message "Initializing Cluster with 5 nodes: ${response}"
+
 log_message "Adding nodes to the cluster"
-for num in 1 2 3 4; do
+for num in 0 1 2 3 4; do
   response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"couch-db-$num\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
   log_message "Adding node couch-db-$num response: ${response}"
 done
