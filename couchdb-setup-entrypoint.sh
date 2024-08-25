@@ -49,6 +49,7 @@ for num in 1 2 3 4; do
   log_message "Adding node couch-db-$num response: ${response}"
 done
 
+sleep 3
 log_message "Finishing cluster setup"
 response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}")
 log_message "Finish cluster response: ${response}"

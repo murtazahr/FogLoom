@@ -32,10 +32,16 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-0
+      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb0_data:/opt/couchdb/data
     ports:
       - "5984:5984"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   couch-db-1:
     image: couchdb:latest
@@ -45,10 +51,16 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-1
+      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb1_data:/opt/couchdb/data
     ports:
       - "5985:5984"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   couch-db-2:
     image: couchdb:latest
@@ -58,10 +70,16 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-2
+      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb2_data:/opt/couchdb/data
     ports:
       - "5986:5984"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   couch-db-3:
     image: couchdb:latest
@@ -71,10 +89,16 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-3
+      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb3_data:/opt/couchdb/data
     ports:
       - "5987:5984"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   couch-db-4:
     image: couchdb:latest
@@ -84,10 +108,16 @@ services:
       - COUCHDB_SECRET=${COUCHDB_SECRET}
       - ERL_FLAGS=-setcookie "${ERLANG_COOKIE}"
       - NODENAME=couch-db-4
+      - COUCHDB_CLUSTER_NODES=couch-db-0,couch-db-1,couch-db-2,couch-db-3,couch-db-4
     volumes:
       - couchdb4_data:/opt/couchdb/data
     ports:
       - "5988:5984"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5984" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   couchdb-setup:
     image: curlimages/curl:7.78.0
@@ -95,11 +125,16 @@ services:
       - COUCHDB_USER=${COUCHDB_USER}
       - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
     depends_on:
-      - couch-db-0
-      - couch-db-1
-      - couch-db-2
-      - couch-db-3
-      - couch-db-4
+      couch-db-0:
+        condition: service_healthy
+      couch-db-1:
+        condition: service_healthy
+      couch-db-2:
+        condition: service_healthy
+      couch-db-3:
+        condition: service_healthy
+      couch-db-4:
+        condition: service_healthy
     volumes:
       - ./couchdb-setup-entrypoint.sh:/couchdb-setup-entrypoint.sh
     entrypoint: ["/couchdb-setup-entrypoint.sh"]
