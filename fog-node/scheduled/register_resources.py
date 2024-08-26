@@ -224,7 +224,7 @@ def main():
 
                     if len(updates) >= BLOCKCHAIN_BATCH_SIZE:
                         transaction = create_transaction(node_id, updates, signer)
-                        batch = create_batch(transaction, signer)
+                        batch = create_batch([transaction], signer)
                         submit_batch(batch)
                         logger.info(f"Logged {len(updates)} resource updates in blockchain for node {node_id}")
                         updates = []
