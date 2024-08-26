@@ -6,7 +6,7 @@ import time
 import json
 import psutil
 import couchdb
-from couchdb import ResourceConflict
+from couchdb import ResourceNotFound, Unauthorized
 
 from sawtooth_sdk.messaging.stream import Stream
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
@@ -80,23 +80,25 @@ def connect_to_couchdb(max_retries=5, retry_delay=1):
     for attempt in range(max_retries):
         try:
             couch = couchdb.Server(COUCHDB_URL)
-            try:
-                db = couch.create(COUCHDB_DB)
-                logger.info(f"Database '{COUCHDB_DB}' created successfully.")
-            except ResourceConflict:
-                logger.info(f"Database '{COUCHDB_DB}' already exists. Connecting to existing database.")
-                db = couch[COUCHDB_DB]
+            db = couch[COUCHDB_DB]
+            logger.info(f"Successfully connected to database '{COUCHDB_DB}'.")
             return db
-        except ResourceConflict:
+        except ResourceNotFound:
+            logger.error(f"Database '{COUCHDB_DB}' not found. Ensure it has been created during cluster setup.")
+            return None
+        except Unauthorized:
+            logger.error("Unauthorized: Check your CouchDB credentials.")
+            return None
+        except Exception as e:
+            logger.error(f"Error connecting to CouchDB: {str(e)}")
             if attempt < max_retries - 1:
-                logger.warning(f"ResourceConflict occurred. Retrying in {retry_delay} seconds. Attempt {attempt + 1}/{max_retries}")
+                logger.warning(f"Retrying in {retry_delay} seconds. Attempt {attempt + 1}/{max_retries}")
                 time.sleep(retry_delay)
             else:
                 logger.error(f"Failed to connect to CouchDB after {max_retries} attempts.")
                 return None
-        except Exception as e:
-            logger.error(f"Error connecting to CouchDB: {str(e)}")
-            return None
+
+    return None
 
 
 def store_resource_data(db, node_id, resource_data):
