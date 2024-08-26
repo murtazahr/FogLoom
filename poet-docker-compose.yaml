@@ -53,17 +53,17 @@ services:
         if [ ! -e config-genesis.batch ]; then
           sawset genesis -k /etc/sawtooth/keys/validator.priv -o config-genesis.batch
         fi
-        REPORT_PUBLIC_KEY_PEM="\"$$(cat /poet-shared/simulator_rk_pub.pem)\""
-        VALID_ENCLAVE_MEASUREMENTS="$$(cat /poet-shared/poet-enclave-measurement)"
-        VALID_ENCLAVE_BASENAMES="$$(cat /poet-shared/poet-enclave-basename)"
+        REPORT_PUBLIC_KEY_PEM=$$(sed -z 's/\n/\\n/g' < /poet-shared/simulator_rk_pub.pem)
+        VALID_ENCLAVE_MEASUREMENTS=$$(cat /poet-shared/poet-enclave-measurement)
+        VALID_ENCLAVE_BASENAMES=$$(cat /poet-shared/poet-enclave-basename)
         if [ ! -e config.batch ]; then
           sawset proposal create \
             -k /etc/sawtooth/keys/validator.priv \
             sawtooth.consensus.algorithm.name=PoET \
             sawtooth.consensus.algorithm.version=0.1 \
-            sawtooth.poet.report_public_key_pem=$$REPORT_PUBLIC_KEY_PEM \
-            sawtooth.poet.valid_enclave_measurements=$$VALID_ENCLAVE_MEASUREMENTS \
-            sawtooth.poet.valid_enclave_basenames=$$VALID_ENCLAVE_BASENAMES \
+            "sawtooth.poet.report_public_key_pem=$${REPORT_PUBLIC_KEY_PEM}" \
+            "sawtooth.poet.valid_enclave_measurements=$${VALID_ENCLAVE_MEASUREMENTS}" \
+            "sawtooth.poet.valid_enclave_basenames=$${VALID_ENCLAVE_BASENAMES}" \
             -o config.batch
         fi
         if [ ! -e poet-settings.batch ]; then
@@ -74,7 +74,9 @@ services:
             sawtooth.publisher.max_batches_per_block=100 \
             -o poet-settings.batch
         fi
-        sawadm genesis config-genesis.batch config.batch poet.batch poet-settings.batch
+        if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
+          sawadm genesis config-genesis.batch config.batch poet.batch poet-settings.batch
+        fi
         sawtooth-validator -vv \
           --endpoint tcp://validator-0:8800 \
           --bind component:tcp://eth0:4004 \
