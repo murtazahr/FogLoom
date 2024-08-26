@@ -154,8 +154,8 @@ services:
       - VALIDATOR_URL=tcp://validator-0:4004
       - NODE_ID=sawtooth-fog-node-0
       - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-0:5984
-      - RESOURCE_UPDATE_INTERVAL=300
-      - RESOURCE_UPDATE_BATCH_SIZE=10
+      - RESOURCE_UPDATE_INTERVAL=60
+      - RESOURCE_UPDATE_BATCH_SIZE=2
     depends_on:
       validator-0:
         condition: service_started
@@ -179,8 +179,8 @@ services:
       - VALIDATOR_URL=tcp://validator-1:4004
       - NODE_ID=sawtooth-fog-node-1
       - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-1:5984
-      - RESOURCE_UPDATE_INTERVAL=300
-      - RESOURCE_UPDATE_BATCH_SIZE=10
+      - RESOURCE_UPDATE_INTERVAL=60
+      - RESOURCE_UPDATE_BATCH_SIZE=2
     depends_on:
       validator-1:
         condition: service_started
@@ -204,8 +204,8 @@ services:
       - VALIDATOR_URL=tcp://validator-2:4004
       - NODE_ID=sawtooth-fog-node-2
       - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-2:5984
-      - RESOURCE_UPDATE_INTERVAL=300
-      - RESOURCE_UPDATE_BATCH_SIZE=10
+      - RESOURCE_UPDATE_INTERVAL=60
+      - RESOURCE_UPDATE_BATCH_SIZE=2
     depends_on:
       validator-2:
         condition: service_started
@@ -229,8 +229,8 @@ services:
       - VALIDATOR_URL=tcp://validator-3:4004
       - NODE_ID=sawtooth-fog-node-3
       - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-3:5984
-      - RESOURCE_UPDATE_INTERVAL=300
-      - RESOURCE_UPDATE_BATCH_SIZE=10
+      - RESOURCE_UPDATE_INTERVAL=60
+      - RESOURCE_UPDATE_BATCH_SIZE=2
     depends_on:
       validator-3:
         condition: service_started
@@ -254,8 +254,8 @@ services:
       - VALIDATOR_URL=tcp://validator-4:4004
       - NODE_ID=sawtooth-fog-node-4
       - COUCHDB_URL=http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couch-db-4:5984
-      - RESOURCE_UPDATE_INTERVAL=300
-      - RESOURCE_UPDATE_BATCH_SIZE=10
+      - RESOURCE_UPDATE_INTERVAL=60
+      - RESOURCE_UPDATE_BATCH_SIZE=2
     depends_on:
       validator-4:
         condition: service_started
