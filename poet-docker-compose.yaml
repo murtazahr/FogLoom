@@ -38,9 +38,9 @@ services:
           -k /etc/sawtooth/keys/validator.priv \
           sawtooth.consensus.algorithm.name=PoET \
           sawtooth.consensus.algorithm.version=0.1 \
-          sawtooth.poet.report_public_key_pem=\\"$(cat /poet-shared/simulator_rk_pub.pem)\\" \
-          sawtooth.poet.valid_enclave_measurements=$(cat /poet-shared/poet-enclave-measurement) \
-          sawtooth.poet.valid_enclave_basenames=$(cat /poet-shared/poet-enclave-basename) \
+          sawtooth.poet.report_public_key_pem=\"\$(cat /poet-shared/simulator_rk_pub.pem)\" \
+          sawtooth.poet.valid_enclave_measurements=\$(cat /poet-shared/poet-enclave-measurement) \
+          sawtooth.poet.valid_enclave_basenames=\$(cat /poet-shared/poet-enclave-basename) \
           -o config.batch &&
         sawset proposal create \
           -k /etc/sawtooth/keys/validator.priv \
@@ -61,8 +61,8 @@ services:
       "
     environment:
       PYTHONPATH: "/project/sawtooth-core/consensus/poet/common:\
-        /project/sawtooth-core/consensus/poet/simulator:\
-        /project/sawtooth-core/consensus/poet/core"
+          /project/sawtooth-core/consensus/poet/simulator:\
+          /project/sawtooth-core/consensus/poet/core"
     stop_signal: SIGKILL
 
   validator-1:
