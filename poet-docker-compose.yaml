@@ -74,9 +74,7 @@ services:
             sawtooth.publisher.max_batches_per_block=100 \
             -o poet-settings.batch
         fi
-        if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
-          sawadm genesis config-genesis.batch config.batch poet.batch poet-settings.batch
-        fi
+        sawadm genesis config-genesis.batch config.batch poet.batch poet-settings.batch
         sawtooth-validator -vv \
           --endpoint tcp://validator-0:8800 \
           --bind component:tcp://eth0:4004 \
