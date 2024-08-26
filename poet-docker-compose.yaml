@@ -69,8 +69,8 @@ services:
         if [ ! -e poet-settings.batch ]; then
           sawset proposal create \
             -k /etc/sawtooth/keys/validator.priv \
-            sawtooth.poet.target_wait_time=20 \
-            sawtooth.poet.initial_wait_time=45 \
+            sawtooth.poet.target_wait_time=10 \
+            sawtooth.poet.initial_wait_time=30 \
             sawtooth.publisher.max_batches_per_block=100 \
             -o poet-settings.batch
         fi
