@@ -1044,7 +1044,7 @@ items:
             - name: couchdb-setup
               image: curlimages/curl:latest
               command: [ "/bin/sh" ]
-              args: ["-c", "curl -o couchdb-setup-entrypoint.sh https://github.com/murtazahr/Fogbusv3/blob/7b9ae0ee4a7d62ccca3927021fb6c11e50021d71/couchdb-setup-entrypoint.sh && chmod +x couchdb-setup-entrypoint.sh && ./couchdb-setup-entrypoint.sh"]
+              args: ["-c", "curl -o https://github.com/murtazahr/Fogbusv3/blob/4129d93d4a4fa949c05e80e9a61496ee036df3bc/couchdb-setup-entrypoint.sh && chmod +x couchdb-setup-entrypoint.sh && ./couchdb-setup-entrypoint.sh"]
               env:
                 - name: COUCHDB_USER
                   valueFrom:
