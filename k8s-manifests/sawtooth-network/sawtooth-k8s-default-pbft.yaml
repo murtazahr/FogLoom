@@ -1043,7 +1043,8 @@ items:
           containers:
             - name: couchdb-setup
               image: curlimages/curl:latest
-              command: bash
+              command:
+                - bash
               args:
                 - -c
                 - |
