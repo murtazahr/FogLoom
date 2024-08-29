@@ -225,7 +225,6 @@ items:
 
             - name: peer-registry-tp
               image: peer-registry-tp:local
-              imagePullPolicy: Never
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -234,7 +233,6 @@ items:
 
             - name: docker-image-tp
               image: docker-image-tp:local
-              imagePullPolicy: Never
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://$HOSTNAME:4004"
@@ -415,7 +413,6 @@ items:
 
             - name: peer-registry-tp
               image: peer-registry-tp:local
-              imagePullPolicy: Never
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -424,7 +421,6 @@ items:
 
             - name: docker-image-tp
               image: docker-image-tp:local
-              imagePullPolicy: Never
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://$HOSTNAME:4004"
@@ -605,7 +601,6 @@ items:
 
             - name: peer-registry-tp
               image: peer-registry-tp:local
-              imagePullPolicy: Never
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -614,7 +609,6 @@ items:
 
             - name: docker-image-tp
               image: docker-image-tp:local
-              imagePullPolicy: Never
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://$HOSTNAME:4004"
@@ -799,7 +793,6 @@ items:
 
             - name: peer-registry-tp
               image: peer-registry-tp:local
-              imagePullPolicy: Never
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -808,7 +801,6 @@ items:
 
             - name: docker-image-tp
               image: docker-image-tp:local
-              imagePullPolicy: Never
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://$HOSTNAME:4004"
@@ -992,7 +984,6 @@ items:
 
             - name: peer-registry-tp
               image: peer-registry-tp:local
-              imagePullPolicy: Never
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -1001,7 +992,6 @@ items:
 
             - name: docker-image-tp
               image: docker-image-tp:local
-              imagePullPolicy: Never
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://$HOSTNAME:4004"
@@ -1066,3 +1056,15 @@ items:
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+
+  # Add secret for couchDB credentials
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: couchdb-secrets
+    type: Opaque
+    stringData:
+      COUCHDB_USER: fogbus
+      COUCHDB_PASSWORD: mwg478jR04vAonMu2QnFYF3sVyVKUujYrGrzVsrq3I
+      COUCHDB_SECRET: LEv+K7x24ITqcAYp0R0e1GzBqiE98oSSarPD1sdeOyM=
+      ERLANG_COOKIE: jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA=
