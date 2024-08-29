@@ -216,7 +216,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "couchdb0.local"
+                  value: "sawtooth-0"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -404,7 +404,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "couchdb1.local"
+                  value: "sawtooth-1"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -592,7 +592,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "couchdb2.local"
+                  value: "sawtooth-2"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -784,7 +784,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "couchdb3.local"
+                  value: "sawtooth-3"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -975,7 +975,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "couchdb4.local"
+                  value: "sawtooth-4"
               ports:
                 - containerPort: 5984
               volumeMounts:
