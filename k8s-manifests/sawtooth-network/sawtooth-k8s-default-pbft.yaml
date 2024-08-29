@@ -229,13 +229,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
             - name: docker-image-tp
               image: docker-image-tp:local
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
   - apiVersion: v1
     kind: Service
@@ -417,13 +417,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
             - name: docker-image-tp
               image: docker-image-tp:local
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
   - apiVersion: v1
     kind: Service
@@ -605,13 +605,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
             - name: docker-image-tp
               image: docker-image-tp:local
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
 
 
@@ -797,13 +797,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
             - name: docker-image-tp
               image: docker-image-tp:local
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
   - apiVersion: v1
     kind: Service
@@ -988,13 +988,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
             - name: docker-image-tp
               image: docker-image-tp:local
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://$HOSTNAME:4004"
+                  value: "tcp://localhost:4004"
 
   - apiVersion: v1
     kind: Service
