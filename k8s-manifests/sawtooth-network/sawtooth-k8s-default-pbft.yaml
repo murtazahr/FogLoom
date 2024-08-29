@@ -216,7 +216,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-0.default.svc.cluster.local"
+                  value: "couchdb-0.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -243,7 +243,6 @@ items:
       name: sawtooth-0
     spec:
       type: ClusterIP
-      clusterIP: None
       selector:
         name: pbft-0
       ports:
@@ -267,7 +266,17 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
-        - name: "couchdb"
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-0
+    spec:
+      clusterIP: None
+      selector:
+        name: pbft-0
+      ports:
+        - name: couchdb
           port: 5984
           targetPort: 5984
 
@@ -405,7 +414,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-1.default.svc.cluster.local"
+                  value: "couchdb-1.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -432,7 +441,6 @@ items:
       name: sawtooth-1
     spec:
       type: ClusterIP
-      clusterIP: None
       selector:
         name: pbft-1
       ports:
@@ -456,7 +464,17 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
-        - name: "couchdb"
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-1
+    spec:
+      clusterIP: None
+      selector:
+        name: pbft-1
+      ports:
+        - name: couchdb
           port: 5984
           targetPort: 5984
 
@@ -594,7 +612,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-2.default.svc.cluster.local"
+                  value: "couchdb-2.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -623,7 +641,6 @@ items:
       name: sawtooth-2
     spec:
       type: ClusterIP
-      clusterIP: None
       selector:
         name: pbft-2
       ports:
@@ -647,10 +664,19 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
-        - name: "couchdb"
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-2
+    spec:
+      clusterIP: None
+      selector:
+        name: pbft-2
+      ports:
+        - name: couchdb
           port: 5984
           targetPort: 5984
-
 
   # --------------------------=== pod 3 ===--------------------------
 
@@ -787,7 +813,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-3.default.svc.cluster.local"
+                  value: "couchdb-3.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -814,7 +840,6 @@ items:
       name: sawtooth-3
     spec:
       type: ClusterIP
-      clusterIP: None
       selector:
         name: pbft-3
       ports:
@@ -838,10 +863,19 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
-        - name: "couchdb"
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-3
+    spec:
+      clusterIP: None
+      selector:
+        name: pbft-3
+      ports:
+        - name: couchdb
           port: 5984
           targetPort: 5984
-
 
   # --------------------------=== pod 4 ===--------------------------
 
@@ -979,7 +1013,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-4.default.svc.cluster.local"
+                  value: "couchdb-4.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -1008,7 +1042,6 @@ items:
       type: ClusterIP
       selector:
         name: pbft-4
-      clusterIP: None
       ports:
         - name: "4004"
           protocol: TCP
@@ -1030,7 +1063,17 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
-        - name: "couchdb"
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-4
+    spec:
+      clusterIP: None
+      selector:
+        name: pbft-4
+      ports:
+        - name: couchdb
           port: 5984
           targetPort: 5984
 
@@ -1056,29 +1099,29 @@ items:
                   DB_NAME="resource_registry" &&
                   echo "Starting CouchDB cluster setup" &&
                   for i in 0 1 2 3 4; do
-                    echo "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-${i}.default.svc.cluster.local:5984"
-                    until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-${i}.default.svc.cluster.local:5984" > /dev/null; do
-                      echo "Waiting for CouchDB on sawtooth-${i} to be ready..."
+                    echo "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984"
+                    until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984" > /dev/null; do
+                      echo "Waiting for CouchDB on couchdb-${i} to be ready..."
                       sleep 5
                     done
-                    echo "CouchDB on sawtooth-${i} is ready"
+                    echo "CouchDB on couchdb-${i} is ready"
                   done &&
                   echo "Adding nodes to the cluster" &&
                   for num in 1 2 3 4; do
-                    response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"port\": 5984, \"node_count\": \"5\", \"remote_node\": \"sawtooth-${num}.default.svc.cluster.local\", \"remote_current_user\": \"${COUCHDB_USER}\", \"remote_current_password\": \"${COUCHDB_PASSWORD}\" }")
+                    response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"port\": 5984, \"node_count\": \"5\", \"remote_node\": \"couchdb-${num}.default.svc.cluster.local\", \"remote_current_user\": \"${COUCHDB_USER}\", \"remote_current_password\": \"${COUCHDB_PASSWORD}\" }")
                     echo "Enable cluster on sawtooth-${num} response: ${response}"
-                    response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"sawtooth-${num}.default.svc.cluster.local\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
-                    echo "Adding node sawtooth-${num} response: ${response}"
+                    response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"couchdb-${num}.default.svc.cluster.local\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
+                    echo "Adding node couchdb-${num} response: ${response}"
                   done &&
                   echo "Finishing cluster setup" &&
-                  response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}") &&
+                  response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}") &&
                   echo "Finish cluster response: ${response}" &&
                   echo "Checking cluster membership" &&
-                  membership=$(curl -s -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_membership") &&
+                  membership=$(curl -s -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_membership") &&
                   echo "Cluster membership: ${membership}" &&
                   echo "Creating ${DB_NAME} database on all nodes" &&
-                  response=$(curl -s -X PUT "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/${DB_NAME}") &&
-                  echo "Creating ${DB_NAME} on sawtooth-0 response: ${response}" &&                  
+                  response=$(curl -s -X PUT "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/${DB_NAME}") &&
+                  echo "Creating ${DB_NAME} on couchdb-0 response: ${response}" &&                  
                   echo "CouchDB cluster setup completed"
               env:
                 - name: DB_NAME
