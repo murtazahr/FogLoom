@@ -1044,7 +1044,7 @@ items:
             - name: couchdb-setup
               image: curlimages/curl:latest
               command:
-                - bash
+                - /bin/sh
               args:
                 - -c
                 - |
