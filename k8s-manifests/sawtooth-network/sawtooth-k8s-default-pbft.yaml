@@ -20,11 +20,14 @@ items:
 
   # --------------------------=== pod 0 ===--------------------------
 
-  - apiVersion: extensions/v1beta1
+  - apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: pbft-0
     spec:
+      selector:
+        matchLabels:
+          name: pbft-0
       replicas: 1
       template:
         metadata:
@@ -180,11 +183,14 @@ items:
 
   # --------------------------=== pod 1 ===--------------------------
 
-  - apiVersion: extensions/v1beta1
+  - apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: pbft-1
     spec:
+      selector:
+        matchLabels:
+          name: pbft-1
       replicas: 1
       template:
         metadata:
@@ -329,11 +335,14 @@ items:
 
   # --------------------------=== pod 2 ===--------------------------
 
-  - apiVersion: extensions/v1beta1
+  - apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: pbft-2
     spec:
+      selector:
+        matchLabels:
+          name: pbft-2
       replicas: 1
       template:
         metadata:
@@ -480,11 +489,14 @@ items:
 
   # --------------------------=== pod 3 ===--------------------------
 
-  - apiVersion: extensions/v1beta1
+  - apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: pbft-3
     spec:
+      selector:
+        matchLabels:
+          name: pbft-3
       replicas: 1
       template:
         metadata:
@@ -632,18 +644,21 @@ items:
 
   # --------------------------=== pod 4 ===--------------------------
 
-  - apiVersion: extensions/v1beta1
+  - apiVersion: apps/v1
     kind: Deployment
     metadata:
       name: pbft-4
     spec:
+      selector:
+        matchLabels:
+          name: pbft-4
       replicas: 1
       template:
         metadata:
           labels:
             name: pbft-4
         spec:
-          containers:
+            containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
               command:
