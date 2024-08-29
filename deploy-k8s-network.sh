@@ -26,10 +26,10 @@ docker build -t docker-image-client:local ./auto-docker-deployment/docker-image-
 docker build -t fog-node:local ./fog-node
 
 # Import images into k3s
-docker save peer-registry-tp:local | sudo k3s ctr images import -
-docker save docker-image-tp:local | sudo k3s ctr images import -
-docker save docker-image-client:local | sudo k3s ctr images import -
-docker save fog-node:local | sudo k3s ctr images import -
+sudo k3s ctr images import docker.io/library/peer-registry-tp:local
+sudo k3s ctr images import docker.io/library/docker-image-tp:local
+sudo k3s ctr images import docker.io/library/docker-image-client:local
+sudo k3s ctr images import docker.io/library/fog-node:local
 
 echo "Images built and imported into k3s successfully"
 
