@@ -1,5 +1,4 @@
 #!/bin/sh
-
 # CouchDB cluster configuration
 DB_NAME="resource_registry"
 
