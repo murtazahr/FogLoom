@@ -1060,9 +1060,9 @@ items:
                   done &&
                   echo "Adding nodes to the cluster" &&
                   for num in 1 2 3 4; do
-                    response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"port\": 5984, \"node_count\": \"5\", \"remote_node\": \"sawtooth-${num}\", \"remote_current_user\": \"${COUCHDB_USER}\", \"remote_current_password\": \"${COUCHDB_PASSWORD}\" }")
+                    response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"port\": 5984, \"node_count\": \"5\", \"remote_node\": \"sawtooth-${num}.default.svc.cluster.local\", \"remote_current_user\": \"${COUCHDB_USER}\", \"remote_current_password\": \"${COUCHDB_PASSWORD}\" }")
                     echo "Enable cluster on sawtooth-${num} response: ${response}"
-                    response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"sawtooth-${num}\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
+                    response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"sawtooth-${num}.default.svc.cluster.local\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
                     echo "Adding node sawtooth-${num} response: ${response}"
                   done &&
                   echo "Finishing cluster setup" &&
