@@ -18,6 +18,61 @@ kind: List
 
 items:
 
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb0-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb1-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb2-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb3-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb4-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
   # --------------------------=== pod 0 ===--------------------------
 
   - apiVersion: apps/v1
@@ -36,6 +91,10 @@ items:
         spec:
           nodeSelector:
             kubernetes.io/hostname: fogchain-node-1
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb0-data
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -85,14 +144,6 @@ items:
               args:
                 - -c
                 - "sawtooth keygen && tail -f /dev/null"
-
-            - name: sawtooth-smallbank-tp-rust
-              image: hyperledger/sawtooth-smallbank-tp-rust:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "smallbank-tp-rust -vv -C tcp://$HOSTNAME:4004"
 
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
@@ -144,13 +195,49 @@ items:
                     --peering static \
                     --maximum-peer-connectivity 10000
 
-            - name: sawtooth-xo-tp-python
-              image: hyperledger/sawtooth-xo-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "xo-tp-python -vv -C tcp://$HOSTNAME:4004"
+            - name: couch-db-0
+              image: couchdb:3
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb0.local"
+              ports:
+                - containerPort: 5984
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+
+            - name: peer-registry-tp
+              image: peer-registry-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
+
+            - name: docker-image-tp
+              image: docker-image-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
 
   - apiVersion: v1
     kind: Service
@@ -181,6 +268,9 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
+        - name: "couchdb"
+          port: 5984
+          targetPort: 5984
 
 
   # --------------------------=== pod 1 ===--------------------------
@@ -201,6 +291,10 @@ items:
         spec:
           nodeSelector:
             kubernetes.io/hostname: fogchain-node-2
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb1-data
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -251,14 +345,6 @@ items:
                 - -c
                 - "sawtooth keygen && tail -f /dev/null"
 
-            - name: sawtooth-smallbank-tp-rust
-              image: hyperledger/sawtooth-smallbank-tp-rust:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "smallbank-tp-rust -vv -C tcp://$HOSTNAME:4004"
-
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
               ports:
@@ -299,13 +385,49 @@ items:
                     --maximum-peer-connectivity 10000 \
                     --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800
 
-            - name: sawtooth-xo-tp-python
-              image: hyperledger/sawtooth-xo-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "xo-tp-python -vv -C tcp://$HOSTNAME:4004"
+            - name: couch-db-1
+              image: couchdb:3
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb1.local"
+              ports:
+                - containerPort: 5984
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+
+            - name: peer-registry-tp
+              image: peer-registry-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
+
+            - name: docker-image-tp
+              image: docker-image-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
 
   - apiVersion: v1
     kind: Service
@@ -336,6 +458,9 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
+        - name: "couchdb"
+          port: 5984
+          targetPort: 5984
 
   # --------------------------=== pod 2 ===--------------------------
 
@@ -355,6 +480,10 @@ items:
         spec:
           nodeSelector:
             kubernetes.io/hostname: fogchain-node-3
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb2-data
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -405,14 +534,6 @@ items:
                 - -c
                 - "sawtooth keygen && tail -f /dev/null"
 
-            - name: sawtooth-smallbank-tp-rust
-              image: hyperledger/sawtooth-smallbank-tp-rust:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "smallbank-tp-rust -vv -C tcp://$HOSTNAME:4004"
-
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
               ports:
@@ -454,13 +575,51 @@ items:
                     --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 \
                     --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800
 
-            - name: sawtooth-xo-tp-python
-              image: hyperledger/sawtooth-xo-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "xo-tp-python -vv -C tcp://$HOSTNAME:4004"
+            - name: couch-db-2
+              image: couchdb:3
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb2.local"
+              ports:
+                - containerPort: 5984
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+
+            - name: peer-registry-tp
+              image: peer-registry-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
+
+            - name: docker-image-tp
+              image: docker-image-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
+
+
 
   - apiVersion: v1
     kind: Service
@@ -491,6 +650,9 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
+        - name: "couchdb"
+          port: 5984
+          targetPort: 5984
 
 
   # --------------------------=== pod 3 ===--------------------------
@@ -511,6 +673,10 @@ items:
         spec:
           nodeSelector:
             kubernetes.io/hostname: fogchain-node-4
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb3-data
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -560,14 +726,6 @@ items:
               args:
                 - -c
                 - "sawtooth keygen && tail -f /dev/null"
-
-            - name: sawtooth-smallbank-tp-rust
-              image: hyperledger/sawtooth-smallbank-tp-rust:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "smallbank-tp-rust -vv -C tcp://$HOSTNAME:4004"
 
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
@@ -611,13 +769,49 @@ items:
                     --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 \
                     --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800
 
-            - name: sawtooth-xo-tp-python
-              image: hyperledger/sawtooth-xo-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "xo-tp-python -vv -C tcp://$HOSTNAME:4004"
+            - name: couch-db-3
+              image: couchdb:3
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb3.local"
+              ports:
+                - containerPort: 5984
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+
+            - name: peer-registry-tp
+              image: peer-registry-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
+
+            - name: docker-image-tp
+              image: docker-image-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
 
   - apiVersion: v1
     kind: Service
@@ -648,6 +842,9 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
+        - name: "couchdb"
+          port: 5984
+          targetPort: 5984
 
 
   # --------------------------=== pod 4 ===--------------------------
@@ -668,6 +865,10 @@ items:
         spec:
           nodeSelector:
             kubernetes.io/hostname: fogchain-node-5
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb4-data
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -717,14 +918,6 @@ items:
               args:
                 - -c
                 - "sawtooth keygen && tail -f /dev/null"
-
-            - name: sawtooth-smallbank-tp-rust
-              image: hyperledger/sawtooth-smallbank-tp-rust:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "smallbank-tp-rust -vv -C tcp://$HOSTNAME:4004"
 
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
@@ -769,13 +962,49 @@ items:
                     --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800 \
                     --peers tcp://$SAWTOOTH_3_SERVICE_HOST:8800
 
-            - name: sawtooth-xo-tp-python
-              image: hyperledger/sawtooth-xo-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "xo-tp-python -vv -C tcp://$HOSTNAME:4004"
+            - name: couch-db-4
+              image: couchdb:3
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb4.local"
+              ports:
+                - containerPort: 5984
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+
+            - name: peer-registry-tp
+              image: peer-registry-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
+
+            - name: docker-image-tp
+              image: docker-image-tp:local
+              imagePullPolicy: Never
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://$HOSTNAME:4004"
 
   - apiVersion: v1
     kind: Service
@@ -806,3 +1035,34 @@ items:
           protocol: TCP
           port: 8800
           targetPort: 8800
+        - name: "couchdb"
+          port: 5984
+          targetPort: 5984
+
+  # --------------------------=== CouchDB Setup Job ===----------------------
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: couchdb-setup
+    spec:
+      template:
+        metadata:
+          name: couchdb-setup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: couchdb-setup
+              image: curlimages/curl:latest
+              command: [ "/bin/sh" ]
+              args: ["-c", "curl -o couchdb-setup-entrypoint.sh https://github.com/murtazahr/Fogbusv3/blob/7b9ae0ee4a7d62ccca3927021fb6c11e50021d71/couchdb-setup-entrypoint.sh && chmod +x couchdb-setup-entrypoint.sh && ./couchdb-setup-entrypoint.sh"]
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
