@@ -243,6 +243,7 @@ items:
       name: sawtooth-0
     spec:
       type: ClusterIP
+      clusterIP: None
       selector:
         name: pbft-0
       ports:
@@ -431,6 +432,7 @@ items:
       name: sawtooth-1
     spec:
       type: ClusterIP
+      clusterIP: None
       selector:
         name: pbft-1
       ports:
@@ -621,6 +623,7 @@ items:
       name: sawtooth-2
     spec:
       type: ClusterIP
+      clusterIP: None
       selector:
         name: pbft-2
       ports:
@@ -811,6 +814,7 @@ items:
       name: sawtooth-3
     spec:
       type: ClusterIP
+      clusterIP: None
       selector:
         name: pbft-3
       ports:
@@ -1004,6 +1008,7 @@ items:
       type: ClusterIP
       selector:
         name: pbft-4
+      clusterIP: None
       ports:
         - name: "4004"
           protocol: TCP
