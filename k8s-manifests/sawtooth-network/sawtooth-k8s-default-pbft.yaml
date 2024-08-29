@@ -224,7 +224,7 @@ items:
                   mountPath: /opt/couchdb/data
 
             - name: peer-registry-tp
-              image: peer-registry-tp:local
+              image: murtazahr/peer-registry-tp:latest
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -232,7 +232,7 @@ items:
                   value: "tcp://localhost:4004"
 
             - name: docker-image-tp
-              image: docker-image-tp:local
+              image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://localhost:4004"
@@ -412,7 +412,7 @@ items:
                   mountPath: /opt/couchdb/data
 
             - name: peer-registry-tp
-              image: peer-registry-tp:local
+              image: murtazahr/peer-registry-tp:latest
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -420,7 +420,7 @@ items:
                   value: "tcp://localhost:4004"
 
             - name: docker-image-tp
-              image: docker-image-tp:local
+              image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://localhost:4004"
@@ -600,7 +600,7 @@ items:
                   mountPath: /opt/couchdb/data
 
             - name: peer-registry-tp
-              image: peer-registry-tp:local
+              image: murtazahr/peer-registry-tp:latest
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -608,7 +608,7 @@ items:
                   value: "tcp://localhost:4004"
 
             - name: docker-image-tp
-              image: docker-image-tp:local
+              image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://localhost:4004"
@@ -792,7 +792,7 @@ items:
                   mountPath: /opt/couchdb/data
 
             - name: peer-registry-tp
-              image: peer-registry-tp:local
+              image: murtazahr/peer-registry-tp:latest
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -800,7 +800,7 @@ items:
                   value: "tcp://localhost:4004"
 
             - name: docker-image-tp
-              image: docker-image-tp:local
+              image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://localhost:4004"
@@ -983,7 +983,7 @@ items:
                   mountPath: /opt/couchdb/data
 
             - name: peer-registry-tp
-              image: peer-registry-tp:local
+              image: murtazahr/peer-registry-tp:latest
               env:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
@@ -991,7 +991,7 @@ items:
                   value: "tcp://localhost:4004"
 
             - name: docker-image-tp
-              image: docker-image-tp:local
+              image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://localhost:4004"
