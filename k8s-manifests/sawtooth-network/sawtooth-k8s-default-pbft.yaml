@@ -216,7 +216,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-0"
+                  value: "sawtooth-0.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -404,7 +404,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-1"
+                  value: "sawtooth-1.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -592,7 +592,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-2"
+                  value: "sawtooth-2.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -784,7 +784,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-3"
+                  value: "sawtooth-3.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -975,7 +975,7 @@ items:
                 - name: ERL_FLAGS
                   value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
                 - name: NODENAME
-                  value: "sawtooth-4"
+                  value: "sawtooth-4.default.svc.cluster.local"
               ports:
                 - containerPort: 5984
               volumeMounts:
@@ -1051,8 +1051,8 @@ items:
                   DB_NAME="resource_registry" &&
                   echo "Starting CouchDB cluster setup" &&
                   for i in 0 1 2 3 4; do
-                    echo "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-${i}:5984"
-                    until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-${i}:5984" > /dev/null; do
+                    echo "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-${i}.default.svc.cluster.local:5984"
+                    until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-${i}.default.svc.cluster.local:5984" > /dev/null; do
                       echo "Waiting for CouchDB on sawtooth-${i} to be ready..."
                       sleep 5
                     done
@@ -1060,19 +1060,19 @@ items:
                   done &&
                   echo "Adding nodes to the cluster" &&
                   for num in 1 2 3 4; do
-                    response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0:5984/_cluster_setup" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"port\": 5984, \"node_count\": \"5\", \"remote_node\": \"sawtooth-${num}\", \"remote_current_user\": \"${COUCHDB_USER}\", \"remote_current_password\": \"${COUCHDB_PASSWORD}\" }")
+                    response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"port\": 5984, \"node_count\": \"5\", \"remote_node\": \"sawtooth-${num}\", \"remote_current_user\": \"${COUCHDB_USER}\", \"remote_current_password\": \"${COUCHDB_PASSWORD}\" }")
                     echo "Enable cluster on sawtooth-${num} response: ${response}"
-                    response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"sawtooth-${num}\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
+                    response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"sawtooth-${num}\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
                     echo "Adding node sawtooth-${num} response: ${response}"
                   done &&
                   echo "Finishing cluster setup" &&
-                  response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}") &&
+                  response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}") &&
                   echo "Finish cluster response: ${response}" &&
                   echo "Checking cluster membership" &&
-                  membership=$(curl -s -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0:5984/_membership") &&
+                  membership=$(curl -s -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/_membership") &&
                   echo "Cluster membership: ${membership}" &&
                   echo "Creating ${DB_NAME} database on all nodes" &&
-                  response=$(curl -s -X PUT "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0:5984/${DB_NAME}") &&
+                  response=$(curl -s -X PUT "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-0.default.svc.cluster.local:5984/${DB_NAME}") &&
                   echo "Creating ${DB_NAME} on sawtooth-0 response: ${response}" &&                  
                   echo "CouchDB cluster setup completed"
               env:
