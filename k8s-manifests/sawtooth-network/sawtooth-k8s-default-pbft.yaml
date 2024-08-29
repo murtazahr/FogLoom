@@ -1056,6 +1056,7 @@ items:
                   
                   # Wait for all CouchDB instances to be ready
                   for i in 0 1 2 3 4; do
+                    echo "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-$i:5984"
                     until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@sawtooth-$i:5984" > /dev/null; do
                       echo "Waiting for CouchDB on sawtooth-$i to be ready..."
                       sleep 5
