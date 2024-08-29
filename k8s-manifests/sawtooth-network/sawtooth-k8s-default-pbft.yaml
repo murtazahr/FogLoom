@@ -34,6 +34,8 @@ items:
           labels:
             name: pbft-0
         spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-1
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -197,6 +199,8 @@ items:
           labels:
             name: pbft-1
         spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-2
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -349,6 +353,8 @@ items:
           labels:
             name: pbft-2
         spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-3
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -503,6 +509,8 @@ items:
           labels:
             name: pbft-3
         spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-4
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
@@ -658,7 +666,9 @@ items:
           labels:
             name: pbft-4
         spec:
-            containers:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-5
+          containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
               command:
