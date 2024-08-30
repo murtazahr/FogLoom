@@ -1084,30 +1084,15 @@ items:
   # --------------------------=== Docker Registry Volume Claim ===----------------------
 
   - apiVersion: v1
-    kind: PersistentVolume
-    metadata:
-      name: nfs-pv
-    spec:
-      capacity:
-        storage: 20Gi
-      accessModes:
-        - ReadWriteMany
-      nfs:
-        server: nfs-server.default.svc.cluster.local
-        path: "/"
-
-  - apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
-      name: nfs-pvc
+      name: sawtooth-registry-data
     spec:
       accessModes:
-        - ReadWriteMany
-      storageClassName: ""
+        - ReadWriteOnce
       resources:
         requests:
           storage: 20Gi
-      volumeName: nfs-pv
 
   # --------------------------=== Docker Registry ===----------------------
 
@@ -1116,7 +1101,7 @@ items:
     metadata:
       name: sawtooth-registry
     spec:
-      replicas: 3
+      replicas: 1
       selector:
         matchLabels:
           app: sawtooth-registry
@@ -1125,18 +1110,6 @@ items:
           labels:
             app: sawtooth-registry
         spec:
-          affinity:
-            podAntiAffinity:
-              preferredDuringSchedulingIgnoredDuringExecution:
-                - weight: 100
-                  podAffinityTerm:
-                    labelSelector:
-                      matchExpressions:
-                        - key: app
-                          operator: In
-                          values:
-                            - sawtooth-registry
-                    topologyKey: "kubernetes.io/hostname"
           containers:
             - name: registry
               image: registry:2
@@ -1148,15 +1121,13 @@ items:
                     secretKeyRef:
                       name: registry-secret
                       key: http-secret
-                - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
-                  value: /var/lib/registry
               volumeMounts:
-                - name: registry-storage
+                - name: registry-data
                   mountPath: /var/lib/registry
           volumes:
-            - name: registry-storage
+            - name: registry-data
               persistentVolumeClaim:
-                claimName: nfs-pvc
+                claimName: sawtooth-registry-data
 
   - apiVersion: v1
     kind: Service
