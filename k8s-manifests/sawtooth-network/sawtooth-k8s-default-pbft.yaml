@@ -18,6 +18,8 @@ kind: List
 
 items:
 
+  # --------------------------=== CouchDB Volume Claims ===----------------------
+
   - apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
@@ -223,20 +225,6 @@ items:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
 
-            - name: peer-registry-tp
-              image: murtazahr/peer-registry-tp:latest
-              env:
-                - name: MAX_UPDATES_PER_NODE
-                  value: "100"
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
-
-            - name: docker-image-tp
-              image: murtazahr/docker-image-tp:latest
-              env:
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
-
   - apiVersion: v1
     kind: Service
     metadata:
@@ -420,20 +408,6 @@ items:
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
-
-            - name: peer-registry-tp
-              image: murtazahr/peer-registry-tp:latest
-              env:
-                - name: MAX_UPDATES_PER_NODE
-                  value: "100"
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
-
-            - name: docker-image-tp
-              image: murtazahr/docker-image-tp:latest
-              env:
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
 
   - apiVersion: v1
     kind: Service
@@ -619,22 +593,6 @@ items:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
 
-            - name: peer-registry-tp
-              image: murtazahr/peer-registry-tp:latest
-              env:
-                - name: MAX_UPDATES_PER_NODE
-                  value: "100"
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
-
-            - name: docker-image-tp
-              image: murtazahr/docker-image-tp:latest
-              env:
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
-
-
-
   - apiVersion: v1
     kind: Service
     metadata:
@@ -819,20 +777,6 @@ items:
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
-
-            - name: peer-registry-tp
-              image: murtazahr/peer-registry-tp:latest
-              env:
-                - name: MAX_UPDATES_PER_NODE
-                  value: "100"
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
-
-            - name: docker-image-tp
-              image: murtazahr/docker-image-tp:latest
-              env:
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
 
   - apiVersion: v1
     kind: Service
@@ -1020,20 +964,6 @@ items:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
 
-            - name: peer-registry-tp
-              image: murtazahr/peer-registry-tp:latest
-              env:
-                - name: MAX_UPDATES_PER_NODE
-                  value: "100"
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
-
-            - name: docker-image-tp
-              image: murtazahr/docker-image-tp:latest
-              env:
-                - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
-
   - apiVersion: v1
     kind: Service
     metadata:
@@ -1078,6 +1008,7 @@ items:
           targetPort: 5984
 
   # --------------------------=== CouchDB Setup Job ===----------------------
+
   - apiVersion: batch/v1
     kind: Job
     metadata:
@@ -1137,7 +1068,8 @@ items:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
 
-  # Add secret for couchDB credentials
+  # --------------------------=== CouchDB Secrets ===----------------------
+
   - apiVersion: v1
     kind: Secret
     metadata:
@@ -1148,3 +1080,73 @@ items:
       COUCHDB_PASSWORD: mwg478jR04vAonMu2QnFYF3sVyVKUujYrGrzVsrq3I
       COUCHDB_SECRET: LEv+K7x24ITqcAYp0R0e1GzBqiE98oSSarPD1sdeOyM=
       ERLANG_COOKIE: jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA=
+
+  # --------------------------=== Docker Registry Volume Claim ===----------------------
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: sawtooth-registry-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+
+  # --------------------------=== Docker Registry ===----------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: sawtooth-registry
+    spec:
+      replicas: 3
+      selector:
+        matchLabels:
+          app: sawtooth-registry
+      template:
+        metadata:
+          labels:
+            app: sawtooth-registry
+        spec:
+          containers:
+            - name: registry
+              image: registry:2
+              ports:
+                - containerPort: 5000
+              env:
+                - name: REGISTRY_HTTP_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: registry-secret
+                      key: http-secret
+              volumeMounts:
+                - name: registry-data
+                  mountPath: /var/lib/registry
+          volumes:
+            - name: registry-data
+              persistentVolumeClaim:
+                claimName: sawtooth-registry-data
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: sawtooth-registry
+    spec:
+      selector:
+        app: sawtooth-registry
+      ports:
+        - protocol: TCP
+          port: 5000
+          targetPort: 5000
+
+  # --------------------------=== Docker Registry Secret ===----------------------
+
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: registry-secret
+    type: Opaque
+    stringData:
+      http-secret: Y74bs7QpaHmI1NKDGO8I3JdquvVxL+5K15NupwxhSbc=
