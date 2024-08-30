@@ -1,0 +1,1124 @@
+apiVersion: v1
+kind: List
+metadata:
+  name: {{ include "fogbus-helm.fullname" . }}-
+  labels:
+  {{- include "fogbus-helm.labels" . | nindent 4 }}
+items:
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: couchdb0-data
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: couchdb1-data
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: couchdb2-data
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: couchdb3-data
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: couchdb4-data
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: pbft-0
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        name: pbft-0
+    template:
+      metadata:
+        labels:
+          name: pbft-0
+      spec:
+        containers:
+        - args:
+          - -c
+          - intkey-tp-python -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-intkey-tp-python:chime
+          name: sawtooth-intkey-tp-python
+        - env:
+          - name: MAX_UPDATES_PER_NODE
+            value: "100"
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/peer-registry-tp:latest
+          name: peer-registry-tp
+        - env:
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/docker-image-tp:latest
+          name: docker-image-tp
+        - args:
+          - -c
+          - pbft-engine -vv --connect tcp://$HOSTNAME:5050
+          command:
+          - bash
+          image: hyperledger/sawtooth-pbft-engine:chime
+          name: sawtooth-pbft-engine
+        - args:
+          - -c
+          - sawtooth-rest-api -vv -C tcp://$HOSTNAME:4004 -B 0.0.0.0:8008
+          command:
+          - bash
+          image: hyperledger/sawtooth-rest-api:chime
+          name: sawtooth-rest-api
+          ports:
+          - containerPort: 8008
+            name: api
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8008
+            initialDelaySeconds: 15
+            periodSeconds: 10
+        - args:
+          - -c
+          - settings-tp -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-settings-tp:chime
+          name: sawtooth-settings-tp
+        - args:
+          - -c
+          - sawtooth keygen && tail -f /dev/null
+          command:
+          - bash
+          image: hyperledger/sawtooth-shell:chime
+          name: sawtooth-shell
+        - args:
+          - -c
+          - |
+            if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+              echo $pbft0priv > /etc/sawtooth/keys/validator.priv
+              echo $pbft0pub > /etc/sawtooth/keys/validator.pub
+            fi &&
+            if [ ! -e /root/.sawtooth/keys/my_key.priv ]; then
+              sawtooth keygen my_key
+            fi &&
+            if [ ! -e config-genesis.batch ]; then
+              sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
+            fi &&
+            sleep 30 &&
+            echo sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\",\"$pbft4pub\""] &&
+            if [ ! -e config.batch ]; then
+              sawset proposal create \
+                -k /root/.sawtooth/keys/my_key.priv \
+                sawtooth.consensus.algorithm.name=pbft \
+                sawtooth.consensus.algorithm.version=1.0\
+                sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\",\"$pbft4pub\""] \
+                sawtooth.publisher.max_batches_per_block=1200 \
+                -o config.batch
+            fi && \
+            if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
+              sawadm genesis config-genesis.batch config.batch
+            fi &&
+            sawtooth-validator -vv \
+              --endpoint tcp://$SAWTOOTH_0_SERVICE_HOST:8800 \
+              --bind component:tcp://eth0:4004 \
+              --bind consensus:tcp://eth0:5050 \
+              --bind network:tcp://eth0:8800 \
+              --scheduler parallel \
+              --peering static \
+              --maximum-peer-connectivity 10000
+          command:
+          - bash
+          envFrom:
+          - configMapRef:
+              name: keys-config
+          image: hyperledger/sawtooth-validator:chime
+          name: sawtooth-validator
+          ports:
+          - containerPort: 4004
+            name: tp
+          - containerPort: 5050
+            name: consensus
+          - containerPort: 8800
+            name: validators
+        - env:
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_USER
+                name: couchdb-secrets
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_PASSWORD
+                name: couchdb-secrets
+          - name: COUCHDB_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_SECRET
+                name: couchdb-secrets
+          - name: ERL_FLAGS
+            value: -setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100
+              -kernel inet_dist_listen_max 9200
+          - name: NODENAME
+            value: couchdb-0.default.svc.cluster.local
+          image: couchdb:3
+          name: couch-db-0
+          ports:
+          - containerPort: 5984
+          volumeMounts:
+          - mountPath: /opt/couchdb/data
+            name: couchdb-data
+        nodeSelector:
+          kubernetes.io/hostname: fogchain-node-1
+        volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: couchdb0-data
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: sawtooth-0
+  spec:
+    ports:
+    - name: "4004"
+      port: 4004
+      protocol: TCP
+      targetPort: 4004
+    - name: "5050"
+      port: 5050
+      protocol: TCP
+      targetPort: 5050
+    - name: "8008"
+      port: 8008
+      protocol: TCP
+      targetPort: 8008
+    - name: "8080"
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: "8800"
+      port: 8800
+      protocol: TCP
+      targetPort: 8800
+    selector:
+      name: pbft-0
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: couchdb-0
+  spec:
+    clusterIP: None
+    ports:
+    - name: couchdb
+      port: 5984
+      targetPort: 5984
+    selector:
+      name: pbft-0
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: pbft-1
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        name: pbft-1
+    template:
+      metadata:
+        labels:
+          name: pbft-1
+      spec:
+        containers:
+        - args:
+          - -c
+          - intkey-tp-python -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-intkey-tp-python:chime
+          name: sawtooth-intkey-tp-python
+        - env:
+          - name: MAX_UPDATES_PER_NODE
+            value: "100"
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/peer-registry-tp:latest
+          name: peer-registry-tp
+        - env:
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/docker-image-tp:latest
+          name: docker-image-tp
+        - args:
+          - -c
+          - pbft-engine -vv --connect tcp://$HOSTNAME:5050
+          command:
+          - bash
+          image: hyperledger/sawtooth-pbft-engine:chime
+          name: sawtooth-pbft-engine
+        - args:
+          - -c
+          - sawtooth-rest-api -vv -C tcp://$HOSTNAME:4004 -B 0.0.0.0:8008
+          command:
+          - bash
+          image: hyperledger/sawtooth-rest-api:chime
+          name: sawtooth-rest-api
+          ports:
+          - containerPort: 8008
+            name: api
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8008
+            initialDelaySeconds: 15
+            periodSeconds: 10
+        - args:
+          - -c
+          - settings-tp -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-settings-tp:chime
+          name: sawtooth-settings-tp
+        - args:
+          - -c
+          - sawtooth keygen && tail -f /dev/null
+          command:
+          - bash
+          image: hyperledger/sawtooth-shell:chime
+          name: sawtooth-shell
+        - args:
+          - -c
+          - |
+            if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+              echo $pbft1priv > /etc/sawtooth/keys/validator.priv
+              echo $pbft1pub > /etc/sawtooth/keys/validator.pub
+            fi &&
+            sawtooth keygen my_key &&
+            sawtooth-validator -vv \
+              --endpoint tcp://$SAWTOOTH_1_SERVICE_HOST:8800 \
+              --bind component:tcp://eth0:4004 \
+              --bind consensus:tcp://eth0:5050 \
+              --bind network:tcp://eth0:8800 \
+              --scheduler parallel \
+              --peering static \
+              --maximum-peer-connectivity 10000 \
+              --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800
+          command:
+          - bash
+          env:
+          - name: pbft1priv
+            valueFrom:
+              configMapKeyRef:
+                key: pbft1priv
+                name: keys-config
+          - name: pbft1pub
+            valueFrom:
+              configMapKeyRef:
+                key: pbft1pub
+                name: keys-config
+          image: hyperledger/sawtooth-validator:chime
+          name: sawtooth-validator
+          ports:
+          - containerPort: 4004
+            name: tp
+          - containerPort: 5050
+            name: consensus
+          - containerPort: 8800
+            name: validators
+        - env:
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_USER
+                name: couchdb-secrets
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_PASSWORD
+                name: couchdb-secrets
+          - name: COUCHDB_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_SECRET
+                name: couchdb-secrets
+          - name: ERL_FLAGS
+            value: -setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100
+              -kernel inet_dist_listen_max 9200
+          - name: NODENAME
+            value: couchdb-1.default.svc.cluster.local
+          image: couchdb:3
+          name: couch-db-1
+          ports:
+          - containerPort: 5984
+          volumeMounts:
+          - mountPath: /opt/couchdb/data
+            name: couchdb-data
+        nodeSelector:
+          kubernetes.io/hostname: fogchain-node-2
+        volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: couchdb1-data
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: sawtooth-1
+  spec:
+    ports:
+    - name: "4004"
+      port: 4004
+      protocol: TCP
+      targetPort: 4004
+    - name: "5050"
+      port: 5050
+      protocol: TCP
+      targetPort: 5050
+    - name: "8008"
+      port: 8008
+      protocol: TCP
+      targetPort: 8008
+    - name: "8080"
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: "8800"
+      port: 8800
+      protocol: TCP
+      targetPort: 8800
+    selector:
+      name: pbft-1
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: couchdb-1
+  spec:
+    clusterIP: None
+    ports:
+    - name: couchdb
+      port: 5984
+      targetPort: 5984
+    selector:
+      name: pbft-1
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: pbft-2
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        name: pbft-2
+    template:
+      metadata:
+        labels:
+          name: pbft-2
+      spec:
+        containers:
+        - args:
+          - -c
+          - intkey-tp-python -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-intkey-tp-python:chime
+          name: sawtooth-intkey-tp-python
+        - env:
+          - name: MAX_UPDATES_PER_NODE
+            value: "100"
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/peer-registry-tp:latest
+          name: peer-registry-tp
+        - env:
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/docker-image-tp:latest
+          name: docker-image-tp
+        - args:
+          - -c
+          - pbft-engine -vv --connect tcp://$HOSTNAME:5050
+          command:
+          - bash
+          image: hyperledger/sawtooth-pbft-engine:chime
+          name: sawtooth-pbft-engine
+        - args:
+          - -c
+          - sawtooth-rest-api -vv -C tcp://$HOSTNAME:4004 -B 0.0.0.0:8008
+          command:
+          - bash
+          image: hyperledger/sawtooth-rest-api:chime
+          name: sawtooth-rest-api
+          ports:
+          - containerPort: 8008
+            name: api
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8008
+            initialDelaySeconds: 30
+            periodSeconds: 10
+        - args:
+          - -c
+          - settings-tp -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-settings-tp:chime
+          name: sawtooth-settings-tp
+        - args:
+          - -c
+          - sawtooth keygen && tail -f /dev/null
+          command:
+          - bash
+          image: hyperledger/sawtooth-shell:chime
+          name: sawtooth-shell
+        - args:
+          - -c
+          - |
+            if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+              echo $pbft2priv > /etc/sawtooth/keys/validator.priv
+              echo $pbft2pub > /etc/sawtooth/keys/validator.pub
+            fi &&
+            sawtooth keygen my_key &&
+            sawtooth-validator -vv \
+              --endpoint tcp://$SAWTOOTH_2_SERVICE_HOST:8800 \
+              --bind component:tcp://eth0:4004 \
+              --bind consensus:tcp://eth0:5050 \
+              --bind network:tcp://eth0:8800 \
+              --scheduler parallel \
+              --peering static \
+              --maximum-peer-connectivity 10000 \
+              --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 \
+              --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800
+          command:
+          - bash
+          env:
+          - name: pbft2priv
+            valueFrom:
+              configMapKeyRef:
+                key: pbft2priv
+                name: keys-config
+          - name: pbft2pub
+            valueFrom:
+              configMapKeyRef:
+                key: pbft1pub
+                name: keys-config
+          image: hyperledger/sawtooth-validator:chime
+          name: sawtooth-validator
+          ports:
+          - containerPort: 4004
+            name: tp
+          - containerPort: 5050
+            name: consensus
+          - containerPort: 8800
+            name: validators
+        - env:
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_USER
+                name: couchdb-secrets
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_PASSWORD
+                name: couchdb-secrets
+          - name: COUCHDB_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_SECRET
+                name: couchdb-secrets
+          - name: ERL_FLAGS
+            value: -setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100
+              -kernel inet_dist_listen_max 9200
+          - name: NODENAME
+            value: couchdb-2.default.svc.cluster.local
+          image: couchdb:3
+          name: couch-db-2
+          ports:
+          - containerPort: 5984
+          volumeMounts:
+          - mountPath: /opt/couchdb/data
+            name: couchdb-data
+        nodeSelector:
+          kubernetes.io/hostname: fogchain-node-3
+        volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: couchdb2-data
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: sawtooth-2
+  spec:
+    ports:
+    - name: "4004"
+      port: 4004
+      protocol: TCP
+      targetPort: 4004
+    - name: "5050"
+      port: 5050
+      protocol: TCP
+      targetPort: 5050
+    - name: "8008"
+      port: 8008
+      protocol: TCP
+      targetPort: 8008
+    - name: "8080"
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: "8800"
+      port: 8800
+      protocol: TCP
+      targetPort: 8800
+    selector:
+      name: pbft-2
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: couchdb-2
+  spec:
+    clusterIP: None
+    ports:
+    - name: couchdb
+      port: 5984
+      targetPort: 5984
+    selector:
+      name: pbft-2
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: pbft-3
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        name: pbft-3
+    template:
+      metadata:
+        labels:
+          name: pbft-3
+      spec:
+        containers:
+        - args:
+          - -c
+          - intkey-tp-python -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-intkey-tp-python:chime
+          name: sawtooth-intkey-tp-python
+        - env:
+          - name: MAX_UPDATES_PER_NODE
+            value: "100"
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/peer-registry-tp:latest
+          name: peer-registry-tp
+        - env:
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/docker-image-tp:latest
+          name: docker-image-tp
+        - args:
+          - -c
+          - pbft-engine -vv --connect tcp://$HOSTNAME:5050
+          command:
+          - bash
+          image: hyperledger/sawtooth-pbft-engine:chime
+          name: sawtooth-pbft-engine
+        - args:
+          - -c
+          - sawtooth-rest-api -vv -C tcp://$HOSTNAME:4004 -B 0.0.0.0:8008
+          command:
+          - bash
+          image: hyperledger/sawtooth-rest-api:chime
+          name: sawtooth-rest-api
+          ports:
+          - containerPort: 8008
+            name: api
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8008
+            initialDelaySeconds: 15
+            periodSeconds: 10
+        - args:
+          - -c
+          - settings-tp -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-settings-tp:chime
+          name: sawtooth-settings-tp
+        - args:
+          - -c
+          - sawtooth keygen && tail -f /dev/null
+          command:
+          - bash
+          image: hyperledger/sawtooth-shell:chime
+          name: sawtooth-shell
+        - args:
+          - -c
+          - |
+            if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+              echo $pbft3priv > /etc/sawtooth/keys/validator.priv
+              echo $pbft3pub > /etc/sawtooth/keys/validator.pub
+            fi &&
+            sawtooth keygen my_key &&
+            sawtooth-validator -vv \
+              --endpoint tcp://$SAWTOOTH_3_SERVICE_HOST:8800 \
+              --bind component:tcp://eth0:4004 \
+              --bind consensus:tcp://eth0:5050 \
+              --bind network:tcp://eth0:8800 \
+              --scheduler parallel \
+              --peering static \
+              --maximum-peer-connectivity 10000 \
+              --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 \
+              --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 \
+              --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800
+          command:
+          - bash
+          env:
+          - name: pbft3priv
+            valueFrom:
+              configMapKeyRef:
+                key: pbft3priv
+                name: keys-config
+          - name: pbft3pub
+            valueFrom:
+              configMapKeyRef:
+                key: pbft3pub
+                name: keys-config
+          image: hyperledger/sawtooth-validator:chime
+          name: sawtooth-validator
+          ports:
+          - containerPort: 4004
+            name: tp
+          - containerPort: 5050
+            name: consensus
+          - containerPort: 8800
+            name: validators
+        - env:
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_USER
+                name: couchdb-secrets
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_PASSWORD
+                name: couchdb-secrets
+          - name: COUCHDB_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_SECRET
+                name: couchdb-secrets
+          - name: ERL_FLAGS
+            value: -setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100
+              -kernel inet_dist_listen_max 9200
+          - name: NODENAME
+            value: couchdb-3.default.svc.cluster.local
+          image: couchdb:3
+          name: couch-db-3
+          ports:
+          - containerPort: 5984
+          volumeMounts:
+          - mountPath: /opt/couchdb/data
+            name: couchdb-data
+        nodeSelector:
+          kubernetes.io/hostname: fogchain-node-4
+        volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: couchdb3-data
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: sawtooth-3
+  spec:
+    ports:
+    - name: "4004"
+      port: 4004
+      protocol: TCP
+      targetPort: 4004
+    - name: "5050"
+      port: 5050
+      protocol: TCP
+      targetPort: 5050
+    - name: "8008"
+      port: 8008
+      protocol: TCP
+      targetPort: 8008
+    - name: "8080"
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: "8800"
+      port: 8800
+      protocol: TCP
+      targetPort: 8800
+    selector:
+      name: pbft-3
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: couchdb-3
+  spec:
+    clusterIP: None
+    ports:
+    - name: couchdb
+      port: 5984
+      targetPort: 5984
+    selector:
+      name: pbft-3
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: pbft-4
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        name: pbft-4
+    template:
+      metadata:
+        labels:
+          name: pbft-4
+      spec:
+        containers:
+        - args:
+          - -c
+          - intkey-tp-python -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-intkey-tp-python:chime
+          name: sawtooth-intkey-tp-python
+        - env:
+          - name: MAX_UPDATES_PER_NODE
+            value: "100"
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/peer-registry-tp:latest
+          name: peer-registry-tp
+        - env:
+          - name: VALIDATOR_URL
+            value: tcp://localhost:4004
+          image: murtazahr/docker-image-tp:latest
+          name: docker-image-tp
+        - args:
+          - -c
+          - pbft-engine -vv --connect tcp://$HOSTNAME:5050
+          command:
+          - bash
+          image: hyperledger/sawtooth-pbft-engine:chime
+          name: sawtooth-pbft-engine
+        - args:
+          - -c
+          - sawtooth-rest-api -vv -C tcp://$HOSTNAME:4004 -B 0.0.0.0:8008
+          command:
+          - bash
+          image: hyperledger/sawtooth-rest-api:chime
+          name: sawtooth-rest-api
+          ports:
+          - containerPort: 8008
+            name: api
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8008
+            initialDelaySeconds: 15
+            periodSeconds: 10
+        - args:
+          - -c
+          - settings-tp -vv -C tcp://$HOSTNAME:4004
+          command:
+          - bash
+          image: hyperledger/sawtooth-settings-tp:chime
+          name: sawtooth-settings-tp
+        - args:
+          - -c
+          - sawtooth keygen && tail -f /dev/null
+          command:
+          - bash
+          image: hyperledger/sawtooth-shell:chime
+          name: sawtooth-shell
+        - args:
+          - -c
+          - |
+            if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+              echo $pbft4priv > /etc/sawtooth/keys/validator.priv
+              echo $pbft4pub > /etc/sawtooth/keys/validator.pub
+            fi &&
+            sawtooth keygen my_key &&
+            sawtooth-validator -vv \
+              --endpoint tcp://$SAWTOOTH_4_SERVICE_HOST:8800 \
+              --bind component:tcp://eth0:4004 \
+              --bind consensus:tcp://eth0:5050 \
+              --bind network:tcp://eth0:8800 \
+              --scheduler parallel \
+              --peering static \
+              --maximum-peer-connectivity 10000 \
+              --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 \
+              --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 \
+              --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800 \
+              --peers tcp://$SAWTOOTH_3_SERVICE_HOST:8800
+          command:
+          - bash
+          env:
+          - name: pbft4priv
+            valueFrom:
+              configMapKeyRef:
+                key: pbft4priv
+                name: keys-config
+          - name: pbft4pub
+            valueFrom:
+              configMapKeyRef:
+                key: pbft4pub
+                name: keys-config
+          image: hyperledger/sawtooth-validator:chime
+          name: sawtooth-validator
+          ports:
+          - containerPort: 4004
+            name: tp
+          - containerPort: 5050
+            name: consensus
+          - containerPort: 8800
+            name: validators
+        - env:
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_USER
+                name: couchdb-secrets
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_PASSWORD
+                name: couchdb-secrets
+          - name: COUCHDB_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_SECRET
+                name: couchdb-secrets
+          - name: ERL_FLAGS
+            value: -setcookie "${ERLANG_COOKIE}" -kernel inet_dist_listen_min 9100
+              -kernel inet_dist_listen_max 9200
+          - name: NODENAME
+            value: couchdb-4.default.svc.cluster.local
+          image: couchdb:3
+          name: couch-db-4
+          ports:
+          - containerPort: 5984
+          volumeMounts:
+          - mountPath: /opt/couchdb/data
+            name: couchdb-data
+        nodeSelector:
+          kubernetes.io/hostname: fogchain-node-5
+        volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: couchdb4-data
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: sawtooth-4
+  spec:
+    ports:
+    - name: "4004"
+      port: 4004
+      protocol: TCP
+      targetPort: 4004
+    - name: "5050"
+      port: 5050
+      protocol: TCP
+      targetPort: 5050
+    - name: "8008"
+      port: 8008
+      protocol: TCP
+      targetPort: 8008
+    - name: "8080"
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: "8800"
+      port: 8800
+      protocol: TCP
+      targetPort: 8800
+    selector:
+      name: pbft-4
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: couchdb-4
+  spec:
+    clusterIP: None
+    ports:
+    - name: couchdb
+      port: 5984
+      targetPort: 5984
+    selector:
+      name: pbft-4
+- apiVersion: batch/v1
+  kind: Job
+  metadata:
+    name: couchdb-setup
+  spec:
+    template:
+      metadata:
+        name: couchdb-setup
+      spec:
+        containers:
+        - args:
+          - -c
+          - "DB_NAME=\"resource_registry\" &&\necho \"Starting CouchDB cluster setup\"
+            &&\nfor i in 0 1 2 3 4; do\n  echo \"http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984\"\n
+            \ until curl -s \"http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984\"
+            > /dev/null; do\n    echo \"Waiting for CouchDB on couchdb-${i} to be
+            ready...\"\n    sleep 5\n  done\n  echo \"CouchDB on couchdb-${i} is ready\"\ndone
+            &&\necho \"Adding nodes to the cluster\" &&\nfor num in 1 2 3 4; do\n
+            \ response=$(curl -X POST -H 'Content-Type: application/json' \"http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup\"
+            -d \"{\\\"action\\\": \\\"enable_cluster\\\", \\\"bind_address\\\":\\\"0.0.0.0\\\",
+            \\\"username\\\": \\\"${COUCHDB_USER}\\\", \\\"password\\\":\\\"${COUCHDB_PASSWORD}\\\",
+            \\\"port\\\": 5984, \\\"node_count\\\": \\\"5\\\", \\\"remote_node\\\":
+            \\\"couchdb-${num}.default.svc.cluster.local\\\", \\\"remote_current_user\\\":
+            \\\"${COUCHDB_USER}\\\", \\\"remote_current_password\\\": \\\"${COUCHDB_PASSWORD}\\\"
+            }\")\n  echo \"Enable cluster on sawtooth-${num} response: ${response}\"\n
+            \ response=$(curl -s -X POST -H 'Content-Type: application/json' \"http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup\"
+            -d \"{\\\"action\\\": \\\"add_node\\\", \\\"host\\\":\\\"couchdb-${num}.default.svc.cluster.local\\\",
+            \\\"port\\\": 5984, \\\"username\\\": \\\"${COUCHDB_USER}\\\", \\\"password\\\":\\\"${COUCHDB_PASSWORD}\\\"}\")\n
+            \ echo \"Adding node couchdb-${num} response: ${response}\"\ndone &&\necho
+            \"Finishing cluster setup\" &&\nresponse=$(curl -s -X POST -H 'Content-Type:
+            application/json' \"http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup\"
+            -d \"{\\\"action\\\": \\\"finish_cluster\\\"}\") &&\necho \"Finish cluster
+            response: ${response}\" &&\necho \"Checking cluster membership\" &&\nmembership=$(curl
+            -s -X GET \"http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_membership\")
+            &&\necho \"Cluster membership: ${membership}\" &&\necho \"Creating ${DB_NAME}
+            database on all nodes\" &&\nresponse=$(curl -s -X PUT \"http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/${DB_NAME}\")
+            &&\necho \"Creating ${DB_NAME} on couchdb-0 response: ${response}\" &&
+            \                 \necho \"CouchDB cluster setup completed\"\n"
+          command:
+          - /bin/sh
+          env:
+          - name: DB_NAME
+            value: resource_registry
+          - name: COUCHDB_USER
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_USER
+                name: couchdb-secrets
+          - name: COUCHDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: COUCHDB_PASSWORD
+                name: couchdb-secrets
+          image: curlimages/curl:latest
+          name: couchdb-setup
+        restartPolicy: OnFailure
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: couchdb-secrets
+  stringData:
+    COUCHDB_PASSWORD: mwg478jR04vAonMu2QnFYF3sVyVKUujYrGrzVsrq3I
+    COUCHDB_SECRET: LEv+K7x24ITqcAYp0R0e1GzBqiE98oSSarPD1sdeOyM=
+    COUCHDB_USER: fogbus
+    ERLANG_COOKIE: jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA=
+  type: Opaque
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: sawtooth-registry-data
+  spec:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 20Gi
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: sawtooth-registry
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: sawtooth-registry
+    template:
+      metadata:
+        labels:
+          app: sawtooth-registry
+      spec:
+        containers:
+        - env:
+          - name: REGISTRY_HTTP_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: http-secret
+                name: registry-secret
+          image: registry:2
+          name: registry
+          ports:
+          - containerPort: 5000
+          volumeMounts:
+          - mountPath: /var/lib/registry
+            name: registry-data
+        volumes:
+        - name: registry-data
+          persistentVolumeClaim:
+            claimName: sawtooth-registry-data
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: sawtooth-registry
+  spec:
+    ports:
+    - port: 5000
+      protocol: TCP
+      targetPort: 5000
+    selector:
+      app: sawtooth-registry
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: registry-secret
+  stringData:
+    http-secret: Y74bs7QpaHmI1NKDGO8I3JdquvVxL+5K15NupwxhSbc=
+  type: Opaque
