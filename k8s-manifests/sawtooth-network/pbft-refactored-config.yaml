@@ -28,7 +28,7 @@ data:
           containers:
             - name: sawtooth-intkey-tp-python
               image: hyperledger/sawtooth-intkey-tp-python:chime
-              command: ["intkey-tp-python", "-vv", "-C", "tcp://$HOSTNAME:4004"]
+              command: ["intkey-tp-python", "-vv", "-C", "tcp://localhost:4004"]
             - name: peer-registry-tp
               image: murtazahr/peer-registry-tp:latest
               env:
@@ -43,13 +43,13 @@ data:
                   value: "tcp://localhost:4004"
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
-              command: ["pbft-engine", "-vv", "--connect", "tcp://$HOSTNAME:5050"]
+              command: ["pbft-engine", "-vv", "--connect", "tcp://localhost:5050"]
             - name: sawtooth-rest-api
               image: hyperledger/sawtooth-rest-api:chime
               ports:
                 - name: api
                   containerPort: 8008
-              command: ["sawtooth-rest-api", "-vv", "-C", "tcp://$HOSTNAME:4004", "-B", "0.0.0.0:8008"]
+              command: ["sawtooth-rest-api", "-vv", "-C", "tcp://localhost:4004", "-B", "0.0.0.0:8008"]
               readinessProbe:
                 httpGet:
                   path: /status
@@ -58,10 +58,11 @@ data:
                 periodSeconds: 10
             - name: sawtooth-settings-tp
               image: hyperledger/sawtooth-settings-tp:chime
-              command: ["settings-tp", "-vv", "-C", "tcp://$HOSTNAME:4004"]
+              command: ["settings-tp", "-vv", "-C", "tcp://localhost:4004"]
             - name: sawtooth-shell
               image: hyperledger/sawtooth-shell:chime
-              command: ["sawtooth", "keygen", "&&", "tail", "-f", "/dev/null"]
+              command: ["/bin/sh", "-c"]
+              args: ["sawtooth keygen && tail -f /dev/null"]
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
               ports:
@@ -83,7 +84,7 @@ data:
                       name: keys-config
                       key: pbft{NODE_NUM}pub
               command:
-                - bash
+                - /bin/bash
               args:
                 - -c
                 - |
@@ -94,7 +95,7 @@ data:
                   sawtooth keygen my_key &&
                   {GENESIS_COMMANDS}
                   sawtooth-validator -vv \
-                    --endpoint tcp://$SAWTOOTH_{NODE_NUM}_SERVICE_HOST:8800 \
+                    --endpoint tcp://sawtooth-{NODE_NUM}:8800 \
                     --bind component:tcp://eth0:4004 \
                     --bind consensus:tcp://eth0:5050 \
                     --bind network:tcp://eth0:8800 \
@@ -255,9 +256,6 @@ items:
       NODE_NUM: "0"
       NODE_NUM_PLUS_ONE: "1"
       GENESIS_COMMANDS: |
-        if [ ! -e /root/.sawtooth/keys/my_key.priv ]; then
-          sawtooth keygen my_key
-        fi &&
         if [ ! -e config-genesis.batch ]; then
           sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
         fi &&
@@ -286,7 +284,7 @@ items:
       NODE_NUM: "1"
       NODE_NUM_PLUS_ONE: "2"
       GENESIS_COMMANDS: ""
-      PEERS: "--peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800"
+      PEERS: "--peers tcp://sawtooth-0:8800"
   - $ref: '#/data/service-template'
     params:
       NODE_NUM: "1"
@@ -297,7 +295,7 @@ items:
       NODE_NUM: "2"
       NODE_NUM_PLUS_ONE: "3"
       GENESIS_COMMANDS: ""
-      PEERS: "--peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800"
+      PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800"
   - $ref: '#/data/service-template'
     params:
       NODE_NUM: "2"
@@ -308,7 +306,7 @@ items:
       NODE_NUM: "3"
       NODE_NUM_PLUS_ONE: "4"
       GENESIS_COMMANDS: ""
-      PEERS: "--peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800"
+      PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800 --peers tcp://sawtooth-2:8800"
   - $ref: '#/data/service-template'
     params:
       NODE_NUM: "3"
@@ -319,7 +317,7 @@ items:
       NODE_NUM: "4"
       NODE_NUM_PLUS_ONE: "5"
       GENESIS_COMMANDS: ""
-      PEERS: "--peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_3_SERVICE_HOST:8800"
+      PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800 --peers tcp://sawtooth-2:8800 --peers tcp://sawtooth-3:8800"
   - $ref: '#/data/service-template'
     params:
       NODE_NUM: "4"
