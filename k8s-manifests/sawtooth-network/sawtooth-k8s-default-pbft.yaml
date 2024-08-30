@@ -1081,18 +1081,83 @@ items:
       COUCHDB_SECRET: LEv+K7x24ITqcAYp0R0e1GzBqiE98oSSarPD1sdeOyM=
       ERLANG_COOKIE: jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA=
 
+  # --------------------------=== Setup NFS Server ===----------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: nfs-server
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: nfs-server
+      template:
+        metadata:
+          labels:
+            app: nfs-server
+        spec:
+          containers:
+            - name: nfs-server
+              image: k8s.gcr.io/volume-nfs:0.8
+              ports:
+                - name: nfs
+                  containerPort: 2049
+                - name: mountd
+                  containerPort: 20048
+                - name: rpcbind
+                  containerPort: 111
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: nfs-storage
+                  mountPath: /exports
+          volumes:
+            - name: nfs-storage
+              emptyDir: {}
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: nfs-server
+    spec:
+      ports:
+        - name: nfs
+          port: 2049
+        - name: mountd
+          port: 20048
+        - name: rpcbind
+          port: 111
+      selector:
+        app: nfs-server
+
   # --------------------------=== Docker Registry Volume Claim ===----------------------
+
+  - apiVersion: v1
+    kind: PersistentVolume
+    metadata:
+      name: nfs-pv
+    spec:
+      capacity:
+        storage: 20Gi
+      accessModes:
+        - ReadWriteMany
+      nfs:
+        server: nfs-server.default.svc.cluster.local
+        path: "/"
 
   - apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
-      name: sawtooth-registry-data
+      name: nfs-pvc
     spec:
       accessModes:
-        - ReadWriteOnce
+        - ReadWriteMany
+      storageClassName: ""
       resources:
         requests:
           storage: 20Gi
+      volumeName: nfs-pv
 
   # --------------------------=== Docker Registry ===----------------------
 
@@ -1112,14 +1177,16 @@ items:
         spec:
           affinity:
             podAntiAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                - labelSelector:
-                    matchExpressions:
-                      - key: app
-                        operator: In
-                        values:
-                          - sawtooth-registry
-                  topologyKey: "kubernetes.io/hostname"
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: app
+                          operator: In
+                          values:
+                            - sawtooth-registry
+                    topologyKey: "kubernetes.io/hostname"
           containers:
             - name: registry
               image: registry:2
@@ -1131,13 +1198,15 @@ items:
                     secretKeyRef:
                       name: registry-secret
                       key: http-secret
+                - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+                  value: /var/lib/registry
               volumeMounts:
-                - name: registry-data
+                - name: registry-storage
                   mountPath: /var/lib/registry
           volumes:
-            - name: registry-data
+            - name: registry-storage
               persistentVolumeClaim:
-                claimName: sawtooth-registry-data
+                claimName: nfs-pvc
 
   - apiVersion: v1
     kind: Service
