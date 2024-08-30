@@ -11,6 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keys-config
+data:
+  pbft0priv: 7b68dbf4ba1b07f9a83916e6cc1288bb3755107bf3faf6e8ab8723f5c8ed9aab
+  pbft0pub: 03032fc04eed89fb600a6c7ae40be5d53d5ca448f39b8458d77cfdb20e07c096d3
+  pbft1priv: 0a1941140dbc252404af1a6890a9b0e6968bf9c4f3687123308f0dfb50f30b34
+  pbft1pub: 03a6bdb46e160ebbd765564ee22d8d3b3e2611f1658ebc08bf35b85d4af6f5e2aa
+  pbft2priv: f60474081afcfb237665b493a287df0e39fc7a1ee1381dccb12ca3001a67dc67
+  pbft2pub: 03af53fe503848e39d56f5757ae1d7a23673d6e99531705bcae4b0503d1e3ddff8
+  pbft3priv: 8fa92273525a49562fe5f54a962cb070049c328189256349edffaa8f9f38a2f8
+  pbft3pub: 02210ea4147b2eef9eaf4f2a3b07ca2dc4e1e88dacce60c4f5ec511340a9897fd2
+  pbft4priv: 7dd3ff6b1c96c4e6fc55bcf9b8b65663edb38b56bf76488db76bc90111443935
+  pbft4pub: 0214bf7aa37463e5657f88df60e303a3b3db322f1cf6b5443d214caa119402afd4
 
 ---
 apiVersion: v1
