@@ -250,77 +250,107 @@ items:
 
   # Sawtooth and CouchDB deployments and services
   - $patch: replace
-    source:
-      $ref: '#/data/node-template'
-    params:
-      NODE_NUM: "0"
-      NODE_NUM_PLUS_ONE: "1"
-      GENESIS_COMMANDS: |
-        if [ ! -e config-genesis.batch ]; then
-          sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
-        fi &&
-        sleep 30 &&
-        echo sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\",\"$pbft4pub\""] &&
-        if [ ! -e config.batch ]; then
-          sawset proposal create \
-            -k /root/.sawtooth/keys/my_key.priv \
-            sawtooth.consensus.algorithm.name=pbft \
-            sawtooth.consensus.algorithm.version=1.0 \
-            sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\",\"$pbft4pub\""] \
-            sawtooth.publisher.max_batches_per_block=1200 \
-            -o config.batch
-        fi && \
-        if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
-          sawadm genesis config-genesis.batch config.batch
-        fi &&
-      PEERS: ""
-  - $ref: '#/data/service-template'
-    params:
-      NODE_NUM: "0"
+    $type: object
+    $value:
+      $patch: replace
+      source:
+        $ref: '#/data/node-template'
+      params:
+        NODE_NUM: "0"
+        NODE_NUM_PLUS_ONE: "1"
+        GENESIS_COMMANDS: |
+          if [ ! -e config-genesis.batch ]; then
+            sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
+          fi &&
+          sleep 30 &&
+          echo sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\",\"$pbft4pub\""] &&
+          if [ ! -e config.batch ]; then
+            sawset proposal create \
+              -k /root/.sawtooth/keys/my_key.priv \
+              sawtooth.consensus.algorithm.name=pbft \
+              sawtooth.consensus.algorithm.version=1.0 \
+              sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\",\"$pbft4pub\""] \
+              sawtooth.publisher.max_batches_per_block=1200 \
+              -o config.batch
+          fi && \
+          if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
+            sawadm genesis config-genesis.batch config.batch
+          fi &&
+        PEERS: ""
   - $patch: replace
-    source:
-      $ref: '#/data/node-template'
-    params:
-      NODE_NUM: "1"
-      NODE_NUM_PLUS_ONE: "2"
-      GENESIS_COMMANDS: ""
-      PEERS: "--peers tcp://sawtooth-0:8800"
-  - $ref: '#/data/service-template'
-    params:
-      NODE_NUM: "1"
+    $type: object
+    $value:
+      $ref: '#/data/service-template'
+      params:
+        NODE_NUM: "0"
   - $patch: replace
-    source:
-      $ref: '#/data/node-template'
-    params:
-      NODE_NUM: "2"
-      NODE_NUM_PLUS_ONE: "3"
-      GENESIS_COMMANDS: ""
-      PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800"
-  - $ref: '#/data/service-template'
-    params:
-      NODE_NUM: "2"
+    $type: object
+    $value:
+      $patch: replace
+      source:
+        $ref: '#/data/node-template'
+      params:
+        NODE_NUM: "1"
+        NODE_NUM_PLUS_ONE: "2"
+        GENESIS_COMMANDS: ""
+        PEERS: "--peers tcp://sawtooth-0:8800"
   - $patch: replace
-    source:
-      $ref: '#/data/node-template'
-    params:
-      NODE_NUM: "3"
-      NODE_NUM_PLUS_ONE: "4"
-      GENESIS_COMMANDS: ""
-      PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800 --peers tcp://sawtooth-2:8800"
-  - $ref: '#/data/service-template'
-    params:
-      NODE_NUM: "3"
+    $type: object
+    $value:
+      $ref: '#/data/service-template'
+      params:
+        NODE_NUM: "1"
   - $patch: replace
-    source:
-      $ref: '#/data/node-template'
-    params:
-      NODE_NUM: "4"
-      NODE_NUM_PLUS_ONE: "5"
-      GENESIS_COMMANDS: ""
-      PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800 --peers tcp://sawtooth-2:8800 --peers tcp://sawtooth-3:8800"
-  - $ref: '#/data/service-template'
-    params:
-      NODE_NUM: "4"
+    $type: object
+    $value:
+      $patch: replace
+      source:
+        $ref: '#/data/node-template'
+      params:
+        NODE_NUM: "2"
+        NODE_NUM_PLUS_ONE: "3"
+        GENESIS_COMMANDS: ""
+        PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800"
+  - $patch: replace
+    $type: object
+    $value:
+      $ref: '#/data/service-template'
+      params:
+        NODE_NUM: "2"
+  - $patch: replace
+    $type: object
+    $value:
+      $patch: replace
+      source:
+        $ref: '#/data/node-template'
+      params:
+        NODE_NUM: "3"
+        NODE_NUM_PLUS_ONE: "4"
+        GENESIS_COMMANDS: ""
+        PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800 --peers tcp://sawtooth-2:8800"
+  - $patch: replace
+    $type: object
+    $value:
+      $ref: '#/data/service-template'
+      params:
+        NODE_NUM: "3"
+  - $patch: replace
+    $type: object
+    $value:
+      $patch: replace
+      source:
+        $ref: '#/data/node-template'
+      params:
+        NODE_NUM: "4"
+        NODE_NUM_PLUS_ONE: "5"
+        GENESIS_COMMANDS: ""
+        PEERS: "--peers tcp://sawtooth-0:8800 --peers tcp://sawtooth-1:8800 --peers tcp://sawtooth-2:8800 --peers tcp://sawtooth-3:8800"
+  - $patch: replace
+    $type: object
+    $value:
+      $ref: '#/data/service-template'
+      params:
+        NODE_NUM: "4"
 
   # CouchDB Setup Job
   - apiVersion: batch/v1
