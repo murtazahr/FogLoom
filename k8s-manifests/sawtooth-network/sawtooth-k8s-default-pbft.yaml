@@ -106,6 +106,20 @@ items:
                 - -c
                 - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
 
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
+
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
               command:
@@ -300,6 +314,20 @@ items:
                 - -c
                 - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
 
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
+
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
               command:
@@ -482,6 +510,20 @@ items:
               args:
                 - -c
                 - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
+
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -667,6 +709,20 @@ items:
                 - -c
                 - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
 
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
+
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
               command:
@@ -851,6 +907,20 @@ items:
               args:
                 - -c
                 - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
+
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://localhost:4004"
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
