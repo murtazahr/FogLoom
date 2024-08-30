@@ -1110,6 +1110,16 @@ items:
           labels:
             app: sawtooth-registry
         spec:
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: app
+                        operator: In
+                        values:
+                          - sawtooth-registry
+                  topologyKey: "kubernetes.io/hostname"
           containers:
             - name: registry
               image: registry:2
