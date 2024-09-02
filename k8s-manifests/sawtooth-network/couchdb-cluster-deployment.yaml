@@ -1,0 +1,473 @@
+apiVersion: v1
+kind: List
+
+items:
+  # --------------------------=== CouchDB Volume Claims ===----------------------
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb0-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb1-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb2-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb3-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: couchdb4-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+  # --------------------------=== CouchDB Deployments ===------------------------
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: couchdb-0
+    spec:
+      selector:
+        matchLabels:
+          app: couchdb-0
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: couchdb-0
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-1
+          containers:
+            - name: couchdb
+              image: couchdb:3
+              ports:
+                - containerPort: 5984
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb-0.default.svc.cluster.local"
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+              readinessProbe:
+                httpGet:
+                  path: /
+                  port: 5984
+                initialDelaySeconds: 5
+                periodSeconds: 10
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb0-data
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: couchdb-1
+    spec:
+      selector:
+        matchLabels:
+          app: couchdb-1
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: couchdb-1
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-2
+          containers:
+            - name: couchdb
+              image: couchdb:3
+              ports:
+                - containerPort: 5984
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb-1.default.svc.cluster.local"
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+              readinessProbe:
+                httpGet:
+                  path: /
+                  port: 5984
+                initialDelaySeconds: 5
+                periodSeconds: 10
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb1-data
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: couchdb-2
+    spec:
+      selector:
+        matchLabels:
+          app: couchdb-2
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: couchdb-2
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-3
+          containers:
+            - name: couchdb
+              image: couchdb:3
+              ports:
+                - containerPort: 5984
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb-2.default.svc.cluster.local"
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+              readinessProbe:
+                httpGet:
+                  path: /
+                  port: 5984
+                initialDelaySeconds: 5
+                periodSeconds: 10
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb2-data
+
+      # Repeat for couchdb-1 through couchdb-4, changing the appropriate values
+
+      # CouchDB Services
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: couchdb-3
+    spec:
+      selector:
+        matchLabels:
+          app: couchdb-3
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: couchdb-3
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-4
+          containers:
+            - name: couchdb
+              image: couchdb:3
+              ports:
+                - containerPort: 5984
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb-3.default.svc.cluster.local"
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+              readinessProbe:
+                httpGet:
+                  path: /
+                  port: 5984
+                initialDelaySeconds: 5
+                periodSeconds: 10
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb3-data
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: couchdb-4
+    spec:
+      selector:
+        matchLabels:
+          app: couchdb-4
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: couchdb-4
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fogchain-node-5
+          containers:
+            - name: couchdb
+              image: couchdb:3
+              ports:
+                - containerPort: 5984
+              env:
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+                - name: COUCHDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_SECRET
+                - name: ERL_FLAGS
+                  value: "-setcookie \"${ERLANG_COOKIE}\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200"
+                - name: NODENAME
+                  value: "couchdb-4.default.svc.cluster.local"
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/data
+              readinessProbe:
+                httpGet:
+                  path: /
+                  port: 5984
+                initialDelaySeconds: 5
+                periodSeconds: 10
+          volumes:
+            - name: couchdb-data
+              persistentVolumeClaim:
+                claimName: couchdb4-data
+
+  # --------------------------=== CouchDB Services ===---------------------------
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-0
+    spec:
+      clusterIP: None
+      selector:
+        app: couchdb-0
+      ports:
+        - port: 5984
+          targetPort: 5984
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-1
+    spec:
+      clusterIP: None
+      selector:
+        app: couchdb-1
+      ports:
+        - port: 5984
+          targetPort: 5984
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-2
+    spec:
+      clusterIP: None
+      selector:
+        app: couchdb-2
+      ports:
+        - port: 5984
+          targetPort: 5984
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-3
+    spec:
+      clusterIP: None
+      selector:
+        app: couchdb-3
+      ports:
+        - port: 5984
+          targetPort: 5984
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: couchdb-4
+    spec:
+      clusterIP: None
+      selector:
+        app: couchdb-4
+      ports:
+        - port: 5984
+          targetPort: 5984
+
+  # --------------------------=== CouchDB Cluster Setup Job ===-----------------
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: couchdb-setup
+    spec:
+      template:
+        metadata:
+          name: couchdb-setup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: couchdb-setup
+              image: curlimages/curl:latest
+              command:
+                - /bin/sh
+              args:
+                - -c
+                - |
+                  DB_NAME="resource_registry" &&
+                  echo "Starting CouchDB cluster setup" &&
+                  for i in 0 1 2 3 4; do
+                    echo "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984"
+                    until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984" > /dev/null; do
+                      echo "Waiting for CouchDB on couchdb-${i} to be ready..."
+                      sleep 5
+                    done
+                    echo "CouchDB on couchdb-${i} is ready"
+                  done &&
+                  echo "Adding nodes to the cluster" &&
+                  for num in 1 2 3 4; do
+                    response=$(curl -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"enable_cluster\", \"bind_address\":\"0.0.0.0\", \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\", \"port\": 5984, \"node_count\": \"5\", \"remote_node\": \"couchdb-${num}.default.svc.cluster.local\", \"remote_current_user\": \"${COUCHDB_USER}\", \"remote_current_password\": \"${COUCHDB_PASSWORD}\" }")
+                    echo "Enable cluster on sawtooth-${num} response: ${response}"
+                    response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"add_node\", \"host\":\"couchdb-${num}.default.svc.cluster.local\", \"port\": 5984, \"username\": \"${COUCHDB_USER}\", \"password\":\"${COUCHDB_PASSWORD}\"}")
+                    echo "Adding node couchdb-${num} response: ${response}"
+                  done &&
+                  echo "Finishing cluster setup" &&
+                  response=$(curl -s -X POST -H 'Content-Type: application/json' "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup" -d "{\"action\": \"finish_cluster\"}") &&
+                  echo "Finish cluster response: ${response}" &&
+                  echo "Checking cluster membership" &&
+                  membership=$(curl -s -X GET "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_membership") &&
+                  echo "Cluster membership: ${membership}" &&
+                  echo "Creating ${DB_NAME} database on all nodes" &&
+                  response=$(curl -s -X PUT "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/${DB_NAME}") &&
+                  echo "Creating ${DB_NAME} on couchdb-0 response: ${response}" &&                  
+                  echo "CouchDB cluster setup completed"
+              env:
+                - name: DB_NAME
+                  value: "resource_registry"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+
+  # --------------------------=== CouchDB Secrets ===---------------------------
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: couchdb-secrets
+    type: Opaque
+    stringData:
+      COUCHDB_USER: fogbus
+      COUCHDB_PASSWORD: mwg478jR04vAonMu2QnFYF3sVyVKUujYrGrzVsrq3I
+      COUCHDB_SECRET: LEv+K7x24ITqcAYp0R0e1GzBqiE98oSSarPD1sdeOyM=
+      ERLANG_COOKIE: jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA=
