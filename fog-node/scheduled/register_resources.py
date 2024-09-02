@@ -76,7 +76,7 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(e)}") from e
 
 
-def connect_to_couchdb(max_retries=5, retry_delay=1):
+def connect_to_couchdb(max_retries=5, retry_delay=5):
     logger.info('Connecting to couchdb at %s', COUCHDB_URL)
     for attempt in range(max_retries):
         try:
@@ -94,7 +94,7 @@ def connect_to_couchdb(max_retries=5, retry_delay=1):
             logger.error(f"Error connecting to CouchDB: {str(e)}")
             if attempt < max_retries - 1:
                 logger.warning(f"Retrying in {retry_delay} seconds. Attempt {attempt + 1}/{max_retries}")
-                time.sleep(retry_delay)
+                time.sleep(retry_delay**attempt)
             else:
                 logger.error(f"Failed to connect to CouchDB after {max_retries} attempts.")
                 return None
