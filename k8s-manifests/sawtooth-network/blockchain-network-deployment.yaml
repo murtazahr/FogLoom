@@ -116,8 +116,8 @@ items:
                   value: "tcp://localhost:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-0"
-                - name: COUCHDB_URL
-                  value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@couchdb-0.default.svc.cluster.local:5984"
+                - name: COUCHDB_HOST
+                  value: "couchdb-0.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
                   value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
@@ -329,8 +329,8 @@ items:
                   value: "tcp://localhost:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-1"
-                - name: COUCHDB_URL
-                  value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@couchdb-1.default.svc.cluster.local:5984"
+                - name: COUCHDB_HOST
+                  value: "couchdb-1.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
                   value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
@@ -531,8 +531,8 @@ items:
                   value: "tcp://localhost:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-2"
-                - name: COUCHDB_URL
-                  value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@couchdb-2.default.svc.cluster.local:5984"
+                - name: COUCHDB_HOST
+                  value: "couchdb-2.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
                   value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
@@ -734,8 +734,8 @@ items:
                   value: "tcp://localhost:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-3"
-                - name: COUCHDB_URL
-                  value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@couchdb-3.default.svc.cluster.local:5984"
+                - name: COUCHDB_HOST
+                  value: "couchdb-3.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
                   value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
@@ -937,8 +937,8 @@ items:
                   value: "tcp://localhost:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-4"
-                - name: COUCHDB_URL
-                  value: "http://$(COUCHDB_USER):$(COUCHDB_PASSWORD)@couchdb-4.default.svc.cluster.local:5984"
+                - name: COUCHDB_HOST
+                  value: "couchdb-4.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
                   value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE

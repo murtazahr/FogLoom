@@ -21,7 +21,7 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
 # Path to the private key file
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
-COUCHDB_URL = os.getenv('COUCHDB_URL', 'http://couch-db-0:5984')
+COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
 COUCHDB_DB = 'resource_registry'
 
 UPDATE_INTERVAL = int(os.getenv('RESOURCE_UPDATE_INTERVAL', 300))
