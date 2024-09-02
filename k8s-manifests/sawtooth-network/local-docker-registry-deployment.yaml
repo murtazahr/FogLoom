@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: List
+
+items:
+  # --------------------------=== Docker Registry Volume Claim ===----------------------
+
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: sawtooth-registry-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 20Gi
+
+  # --------------------------=== Docker Registry ===----------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: sawtooth-registry
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: sawtooth-registry
+      template:
+        metadata:
+          labels:
+            app: sawtooth-registry
+        spec:
+          containers:
+            - name: registry
+              image: registry:2
+              ports:
+                - containerPort: 5000
+              env:
+                - name: REGISTRY_HTTP_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: registry-secret
+                      key: http-secret
+              volumeMounts:
+                - name: registry-data
+                  mountPath: /var/lib/registry
+          volumes:
+            - name: registry-data
+              persistentVolumeClaim:
+                claimName: sawtooth-registry-data
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: sawtooth-registry
+    spec:
+      selector:
+        app: sawtooth-registry
+      ports:
+        - protocol: TCP
+          port: 5000
+          targetPort: 5000
