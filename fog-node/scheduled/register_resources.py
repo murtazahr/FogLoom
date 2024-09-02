@@ -77,6 +77,7 @@ def load_private_key(key_file):
 
 
 def connect_to_couchdb(max_retries=5, retry_delay=1):
+    logger.info('Connecting to couchdb at %s', COUCHDB_URL)
     for attempt in range(max_retries):
         try:
             couch = couchdb.Server(COUCHDB_URL)
