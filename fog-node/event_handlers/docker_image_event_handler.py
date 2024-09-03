@@ -1,9 +1,8 @@
 import hashlib
 import logging
 import os
-import docker
-from docker import errors
-
+from kubernetes import client, config
+from kubernetes.client.rest import ApiException
 from sawtooth_sdk.messaging.stream import Stream
 from sawtooth_sdk.protobuf.events_pb2 import EventSubscription, EventList
 from sawtooth_sdk.protobuf.client_event_pb2 import ClientEventsSubscribeRequest, ClientEventsSubscribeResponse
@@ -16,74 +15,104 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 REGISTRY_URL = os.getenv('REGISTRY_URL', 'sawtooth-registry:5000')
 
 
-def handle_event(event):
-    logger.info(f"Handling event: {event.event_type}")
-    if event.event_type == "docker-image-added":
-        image_hash = None
-        image_name = None
-        for attr in event.attributes:
-            if attr.key == "image_hash":
-                image_hash = attr.value
-            elif attr.key == "image_name":
-                image_name = attr.value
-        if image_hash and image_name:
-            logger.info(f"Processing image: {image_name} with hash: {image_hash}")
-            verify_and_run_container(image_hash, image_name)
+class KubernetesEventHandler:
+    def __init__(self):
+        # Load Kubernetes configuration
+        config.load_incluster_config()
+        self.v1 = client.CoreV1Api()
+        self.apps_v1 = client.AppsV1Api()
+
+    def handle_event(self, event):
+        logger.info(f"Handling event: {event.event_type}")
+        if event.event_type == "docker-image-action":
+            image_hash = None
+            image_name = None
+            app_id = None
+            action = None
+            for attr in event.attributes:
+                if attr.key == "image_hash":
+                    image_hash = attr.value
+                elif attr.key == "image_name":
+                    image_name = attr.value
+                elif attr.key == "app_id":
+                    app_id = attr.value
+                elif attr.key == "action":
+                    action = attr.value
+            if image_name and app_id and action:
+                logger.info(
+                    f"Processing image: {image_name} with hash: {image_hash}, app_id: {app_id}, action: {action}")
+                self.process_image_action(image_hash, image_name, app_id, action)
+            else:
+                logger.warning("Received docker-image-action event with incomplete data")
+        elif event.event_type == "sawtooth/block-commit":
+            logger.info("New block committed")
         else:
-            logger.warning("Received docker-image-added event with incomplete data")
-    elif event.event_type == "sawtooth/block-commit":
-        logger.info("New block committed")
-    else:
-        logger.info(f"Received unhandled event type: {event.event_type}")
+            logger.info(f"Received unhandled event type: {event.event_type}")
 
+    def process_image_action(self, image_hash, image_name, app_id, action):
+        if action == "deploy":
+            self.deploy_image(image_name, image_hash, app_id)
+        elif action == "remove":
+            self.remove_image(app_id)
+        else:
+            logger.warning(f"Unknown action: {action}")
 
-def hash_docker_image(image):
-    logger.info(f"Hashing Docker Image: {image.id}")
-    sha256_hash = hashlib.sha256()
-    for chunk in image.save():
-        sha256_hash.update(chunk)
-    image_hash = sha256_hash.hexdigest()
-    logger.info(f"Calculated image hash: {image_hash}")
-    return image_hash
+    def deploy_image(self, image_name, image_hash, app_id):
+        daemonset_name = f"sawtooth-{app_id}"
 
+        # Create a DaemonSet
+        daemonset = client.V1DaemonSet(
+            api_version="apps/v1",
+            kind="DaemonSet",
+            metadata=client.V1ObjectMeta(name=daemonset_name),
+            spec=client.V1DaemonSetSpec(
+                selector=client.V1LabelSelector(
+                    match_labels={"app": daemonset_name}
+                ),
+                template=client.V1PodTemplateSpec(
+                    metadata=client.V1ObjectMeta(
+                        labels={"app": daemonset_name}
+                    ),
+                    spec=client.V1PodSpec(
+                        containers=[
+                            client.V1Container(
+                                name=daemonset_name,
+                                image=f"{REGISTRY_URL}/{image_name}@sha256:{image_hash}",
+                                image_pull_policy="Always"
+                            )
+                        ]
+                    )
+                )
+            )
+        )
 
-def verify_and_run_container(stored_digest, image_name):
-    client = docker.from_env()
-    logger.info(f"Pulling Image: {image_name}")
-    try:
-        # Use the registry alias in the image name
-        image = client.images.pull(image_name)
-        logger.info(f"Image pulled successfully: {image.id}")
-    except docker.errors.ImageNotFound:
-        logger.error(f"Image {image_name} not found")
-        return
-    except Exception as e:
-        logger.error(f"Error pulling image: {str(e)}")
-        return
+        # Create DaemonSet
+        try:
+            self.apps_v1.create_namespaced_daemon_set(
+                body=daemonset,
+                namespace="default"
+            )
+            logger.info(f"DaemonSet {daemonset_name} created for app_id: {app_id}")
+        except ApiException as e:
+            logger.error(f"Exception when calling AppsV1Api->create_namespaced_daemon_set: {e}")
 
-    # Get the content digest of the pulled image
-    image_inspect = client.api.inspect_image(image.id)
-    pulled_digest = image_inspect['RepoDigests'][0].split('@')[1] if image_inspect['RepoDigests'] else None
+    def remove_image(self, app_id):
+        daemonset_name = f"sawtooth-{app_id}"
 
-    if not pulled_digest:
-        logger.error("Could not obtain content digest for pulled image")
-        return
-
-    if pulled_digest != stored_digest:
-        logger.error(f"Image digest mismatch. Expected: {stored_digest} Got: {pulled_digest}")
-        return
-
-    logger.info("Image digest verified successfully")
-
-    try:
-        container = client.containers.run(image, detach=True)
-        logger.info(f"Container started: {container.id}")
-    except docker.errors.ContainerError as e:
-        logger.error(f"Error starting container: {str(e)}")
+        # Delete DaemonSet
+        try:
+            self.apps_v1.delete_namespaced_daemon_set(
+                name=daemonset_name,
+                namespace="default"
+            )
+            logger.info(f"DaemonSet {daemonset_name} deleted for app_id: {app_id}")
+        except ApiException as e:
+            logger.error(f"Exception when calling AppsV1Api->delete_namespaced_daemon_set: {e}")
 
 
 def main():
     logger.info("Starting Docker Image Event Handler")
+    handler = KubernetesEventHandler()
     stream = Stream(url=os.getenv('VALIDATOR_URL', 'tcp://validator:4004'))
 
     block_commit_subscription = EventSubscription(
@@ -91,7 +120,7 @@ def main():
     )
 
     docker_image_subscription = EventSubscription(
-        event_type="docker-image-added"
+        event_type="docker-image-action"
     )
 
     request = ClientEventsSubscribeRequest(
@@ -120,7 +149,7 @@ def main():
                 event_list = EventList()
                 event_list.ParseFromString(msg.content)
                 for event in event_list.events:
-                    handle_event(event)
+                    handler.handle_event(event)
         except KeyboardInterrupt:
             break
         except Exception as e:
