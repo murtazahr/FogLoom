@@ -143,9 +143,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-0.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "300"
+                  value: "60"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "10"
+                  value: "2"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -206,6 +206,7 @@ items:
                     --scheduler parallel \
                     --peering static \
                     --maximum-peer-connectivity 10000
+
 
 
 
@@ -382,9 +383,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-1.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "300"
+                  value: "60"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "10"
+                  value: "2"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -435,6 +436,7 @@ items:
                     --peering static \
                     --maximum-peer-connectivity 10000 \
                     --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800
+
 
 
 
@@ -609,9 +611,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-2.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "300"
+                  value: "60"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "10"
+                  value: "2"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -663,6 +665,7 @@ items:
                     --maximum-peer-connectivity 10000 \
                     --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 \
                     --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800
+
 
 
 
@@ -837,9 +840,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-3.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "300"
+                  value: "60"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "10"
+                  value: "2"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -892,6 +895,7 @@ items:
                     --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 \
                     --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 \
                     --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800
+
 
 
   - apiVersion: v1
@@ -1065,9 +1069,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-4.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "300"
+                  value: "60"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "10"
+                  value: "2"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -1121,6 +1125,7 @@ items:
                     --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 \
                     --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800 \
                     --peers tcp://$SAWTOOTH_3_SERVICE_HOST:8800
+
 
 
   - apiVersion: v1
