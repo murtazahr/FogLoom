@@ -131,11 +131,6 @@ items:
                   value: "sawtooth-registry:5000"
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-0:4004"
-              command:
-                - tail
-              args:
-                - -f
-                - /dev/null
 
             - name: fog-node
               image: murtazahr/fog-node:latest

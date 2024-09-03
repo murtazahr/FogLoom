@@ -46,42 +46,41 @@ def handle_event(event):
 
 def process_docker_action(action, image_hash, image_name, app_id):
     client = docker.from_env()
-    full_image_name = f"{REGISTRY_URL}/{image_name}"
     container_name = f"sawtooth-{app_id}"
 
     if action == "deploy_image":
-        deploy_image(client, full_image_name, image_hash, container_name)
+        deploy_image(client, image_name, image_hash, container_name)
     elif action == "deploy_container":
-        deploy_container(client, full_image_name, container_name)
+        deploy_container(client, image_name, container_name)
     elif action == "remove_container":
         remove_container(client, container_name)
     elif action == "remove_image":
-        remove_image(client, full_image_name, container_name)
+        remove_image(client, image_name, container_name)
     else:
         logger.warning(f"Unknown action: {action}")
 
 
-def deploy_image(client, full_image_name, image_hash, container_name):
-    logger.info(f"Deploying image: {full_image_name}")
+def deploy_image(client, image_name, image_hash, container_name):
+    logger.info(f"Deploying image: {image_name}")
     try:
-        image = client.images.pull(full_image_name)
+        image = client.images.pull(image_name)
         if verify_image(client, image.id, image_hash):
-            deploy_container(client, full_image_name, container_name)
+            deploy_container(client, image_name, container_name)
         else:
             logger.error("Image verification failed")
     except docker.errors.ImageNotFound:
-        logger.error(f"Image {full_image_name} not found")
+        logger.error(f"Image {image_name} not found")
     except Exception as e:
         logger.error(f"Error deploying image: {str(e)}")
 
 
-def deploy_container(client, full_image_name, container_name):
+def deploy_container(client, image_name, container_name):
     logger.info(f"Deploying container: {container_name}")
     try:
         # Remove existing container if it exists
         remove_container(client, container_name)
 
-        container = client.containers.run(full_image_name, name=container_name, detach=True)
+        container = client.containers.run(image_name, name=container_name, detach=True)
         logger.info(f"Container started: {container.id}")
     except docker.errors.ContainerError as e:
         logger.error(f"Error starting container: {str(e)}")
@@ -99,14 +98,14 @@ def remove_container(client, container_name):
         logger.error(f"Error removing container: {str(e)}")
 
 
-def remove_image(client, full_image_name, container_name):
-    logger.info(f"Removing image: {full_image_name}")
+def remove_image(client, image_name, container_name):
+    logger.info(f"Removing image: {image_name}")
     remove_container(client, container_name)
     try:
-        client.images.remove(full_image_name, force=True)
-        logger.info(f"Image {full_image_name} removed")
+        client.images.remove(image_name, force=True)
+        logger.info(f"Image {image_name} removed")
     except docker.errors.ImageNotFound:
-        logger.info(f"Image {full_image_name} not found, no action needed")
+        logger.info(f"Image {image_name} not found, no action needed")
     except Exception as e:
         logger.error(f"Error removing image: {str(e)}")
 
