@@ -73,13 +73,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-0:4004"
 
             - name: docker-image-tp
               image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-0:4004"
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -137,7 +137,7 @@ items:
                 - name: REGISTRY_URL
                   value: "sawtooth-registry:5000"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-0:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-0"
                 - name: COUCHDB_HOST
@@ -313,13 +313,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-1:4004"
 
             - name: docker-image-tp
               image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-1:4004"
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -377,7 +377,7 @@ items:
                 - name: REGISTRY_URL
                   value: "sawtooth-registry:5000"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-1:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-1"
                 - name: COUCHDB_HOST
@@ -541,13 +541,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-2:4004"
 
             - name: docker-image-tp
               image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-2:4004"
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -605,7 +605,7 @@ items:
                 - name: REGISTRY_URL
                   value: "sawtooth-registry:5000"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-2:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-2"
                 - name: COUCHDB_HOST
@@ -770,13 +770,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-3:4004"
 
             - name: docker-image-tp
               image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-3:4004"
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -834,7 +834,7 @@ items:
                 - name: REGISTRY_URL
                   value: "sawtooth-registry:5000"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-3:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-3"
                 - name: COUCHDB_HOST
@@ -999,13 +999,13 @@ items:
                 - name: MAX_UPDATES_PER_NODE
                   value: "100"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-4:4004"
 
             - name: docker-image-tp
               image: murtazahr/docker-image-tp:latest
               env:
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-4:4004"
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -1063,7 +1063,7 @@ items:
                 - name: REGISTRY_URL
                   value: "sawtooth-registry:5000"
                 - name: VALIDATOR_URL
-                  value: "tcp://localhost:4004"
+                  value: "tcp://sawtooth-4:4004"
                 - name: NODE_ID
                   value: "sawtooth-fog-node-4"
                 - name: COUCHDB_HOST
