@@ -143,9 +143,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-0.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "60"
+                  value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "2"
+                  value: "10"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -383,9 +383,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-1.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "60"
+                  value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "2"
+                  value: "10"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -611,9 +611,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-2.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "60"
+                  value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "2"
+                  value: "10"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -840,9 +840,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-3.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "60"
+                  value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "2"
+                  value: "10"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -1069,9 +1069,9 @@ items:
                 - name: COUCHDB_HOST
                   value: "couchdb-4.default.svc.cluster.local:5984"
                 - name: RESOURCE_UPDATE_INTERVAL
-                  value: "60"
+                  value: "300"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
-                  value: "2"
+                  value: "10"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
