@@ -8,6 +8,7 @@ import uuid
 
 import docker
 from docker import errors
+from sawtooth_sdk.protobuf.client_batch_submit_pb2 import ClientBatchSubmitResponse
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
@@ -31,6 +32,37 @@ def load_private_key(key_file):
             return secp256k1.Secp256k1PrivateKey.from_hex(private_key_str)
     except IOError as e:
         raise IOError(f"Failed to load private key from {key_file}: {str(e)}") from e
+
+
+def process_future_result(future_result):
+    try:
+        result = future_result.result()
+        response = ClientBatchSubmitResponse()
+        response.ParseFromString(result.content)
+
+        if response.status == ClientBatchSubmitResponse.OK:
+            return {
+                "status": "SUCCESS",
+                "message": "Batch submitted successfully"
+            }
+        elif response.status == ClientBatchSubmitResponse.INVALID_BATCH:
+            return {
+                "status": "FAILURE",
+                "message": "Invalid batch submitted",
+                "error_details": response.error_message
+            }
+        else:
+            return {
+                "status": "FAILURE",
+                "message": f"Batch submission failed with status: {response.status}",
+                "error_details": response.error_message
+            }
+    except Exception as e:
+        return {
+            "status": "ERROR",
+            "message": "An error occurred while processing the submission result",
+            "error_details": str(e)
+        }
 
 
 def hash_and_push_docker_image(tar_path):
@@ -129,7 +161,7 @@ def submit_batch(batch):
         content=batch_list.SerializeToString()
     )
 
-    result = future.result()
+    result = process_future_result(future)
     logger.info(f"Submitted batch to validator: {result}")
     return result
 
@@ -200,8 +232,11 @@ def main():
         print(f"Unknown action: {action}")
         sys.exit(1)
 
-    print(f"Action submitted. Result: {result}")
-
+    print(f"Submission result:")
+    print(f"  Status: {result['status']}")
+    print(f"  Message: {result['message']}")
+    if 'error_details' in result:
+        print(f"  Error Details: {result['error_details']}")
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
