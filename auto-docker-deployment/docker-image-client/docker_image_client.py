@@ -186,7 +186,7 @@ def process_action(action, tar_path=None, image_name=None, app_id=None):
         if not image_name or not app_id:
             logger.error("Image name and app_id are required for this action")
             sys.exit(1)
-        image_hash = ""  # Not needed for these actions
+        image_hash = "N/A"  # Not needed for these actions
         registry_image_name = image_name
     else:
         logger.error(f"Unknown action: {action}")
@@ -237,6 +237,7 @@ def main():
     print(f"  Message: {result['message']}")
     if 'error_details' in result:
         print(f"  Error Details: {result['error_details']}")
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
