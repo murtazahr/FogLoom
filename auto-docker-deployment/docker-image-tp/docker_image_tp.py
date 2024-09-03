@@ -28,23 +28,27 @@ class DockerImageTransactionHandler(TransactionHandler):
 
     def apply(self, transaction, context):
         logger.info('Applying Docker Image Transaction')
-
         try:
-            image_hash, image_name = transaction.payload.decode().split(',')
-            logger.debug(f"Received image hash: {image_hash} for image: {image_name}")
+            image_hash, image_name, app_id, action = transaction.payload.decode().split(',')
+            logger.debug(f"Received action: {action} for image: {image_name}, "
+                         f"hash: {image_hash}, app_id: {app_id}")
 
-            # Store the image hash in the blockchain state
-            state_key = NAMESPACE + hashlib.sha512(image_name.encode()).hexdigest()[:64]
-            state_value = f"{image_hash},{image_name}".encode()
+            # Store the image information in the blockchain state
+            state_key = NAMESPACE + hashlib.sha512(app_id.encode()).hexdigest()[:64]
+            state_value = f"{image_hash},{image_name},{app_id},{action}".encode()
             context.set_state({state_key: state_value})
-            logger.info(f"Stored image hash in state: {state_key}")
+            logger.info(f"Stored image info in state: {state_key}")
 
             # Emit an event
             context.add_event(
-                event_type="docker-image-added",
-                attributes=[("image_hash", image_hash), ("image_name", image_name)]
+                event_type="docker-image-action",
+                attributes=[("image_hash", image_hash),
+                            ("image_name", image_name),
+                            ("app_id", app_id),
+                            ("action", action)]
             )
-            logger.info(f"Emitted event for image: {image_name} with hash: {image_hash}")
+            logger.info(f"Emitted event for action: {action}, image: {image_name}, "
+                        f"hash: {image_hash}, app_id: {app_id}")
 
         except ValueError as e:
             raise InvalidTransaction("Invalid payload format") from e

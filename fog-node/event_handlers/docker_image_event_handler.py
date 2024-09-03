@@ -18,68 +18,114 @@ REGISTRY_URL = os.getenv('REGISTRY_URL', 'sawtooth-registry:5000')
 
 def handle_event(event):
     logger.info(f"Handling event: {event.event_type}")
-    if event.event_type == "docker-image-added":
+    if event.event_type == "docker-image-action":
         image_hash = None
         image_name = None
+        app_id = None
+        action = None
         for attr in event.attributes:
             if attr.key == "image_hash":
                 image_hash = attr.value
             elif attr.key == "image_name":
                 image_name = attr.value
-        if image_hash and image_name:
-            logger.info(f"Processing image: {image_name} with hash: {image_hash}")
-            verify_and_run_container(image_hash, image_name)
+            elif attr.key == "app_id":
+                app_id = attr.value
+            elif attr.key == "action":
+                action = attr.value
+        if image_hash and image_name and app_id and action:
+            logger.info(
+                f"Processing action: {action} for image: {image_name} with hash: {image_hash}, app_id: {app_id}")
+            process_docker_action(action, image_hash, image_name, app_id)
         else:
-            logger.warning("Received docker-image-added event with incomplete data")
+            logger.warning("Received docker-image-action event with incomplete data")
     elif event.event_type == "sawtooth/block-commit":
         logger.info("New block committed")
     else:
         logger.info(f"Received unhandled event type: {event.event_type}")
 
 
-def hash_docker_image(image):
-    logger.info(f"Hashing Docker Image: {image.id}")
-    sha256_hash = hashlib.sha256()
-    for chunk in image.save():
-        sha256_hash.update(chunk)
-    image_hash = sha256_hash.hexdigest()
-    logger.info(f"Calculated image hash: {image_hash}")
-    return image_hash
-
-
-def verify_and_run_container(stored_digest, image_name):
+def process_docker_action(action, image_hash, image_name, app_id):
     client = docker.from_env()
-    logger.info(f"Pulling Image: {image_name}")
-    try:
-        # Use the registry alias in the image name
-        image = client.images.pull(image_name)
-        logger.info(f"Image pulled successfully: {image.id}")
-    except docker.errors.ImageNotFound:
-        logger.error(f"Image {image_name} not found")
-        return
-    except Exception as e:
-        logger.error(f"Error pulling image: {str(e)}")
-        return
+    full_image_name = f"{REGISTRY_URL}/{image_name}"
+    container_name = f"sawtooth-{app_id}"
 
-    # Get the content digest of the pulled image
-    image_inspect = client.api.inspect_image(image.id)
+    if action == "deploy_image":
+        deploy_image(client, full_image_name, image_hash, container_name)
+    elif action == "deploy_container":
+        deploy_container(client, full_image_name, container_name)
+    elif action == "remove_container":
+        remove_container(client, container_name)
+    elif action == "remove_image":
+        remove_image(client, full_image_name, container_name)
+    else:
+        logger.warning(f"Unknown action: {action}")
+
+
+def deploy_image(client, full_image_name, image_hash, container_name):
+    logger.info(f"Deploying image: {full_image_name}")
+    try:
+        image = client.images.pull(full_image_name)
+        if verify_image(client, image.id, image_hash):
+            deploy_container(client, full_image_name, container_name)
+        else:
+            logger.error("Image verification failed")
+    except docker.errors.ImageNotFound:
+        logger.error(f"Image {full_image_name} not found")
+    except Exception as e:
+        logger.error(f"Error deploying image: {str(e)}")
+
+
+def deploy_container(client, full_image_name, container_name):
+    logger.info(f"Deploying container: {container_name}")
+    try:
+        # Remove existing container if it exists
+        remove_container(client, container_name)
+
+        container = client.containers.run(full_image_name, name=container_name, detach=True)
+        logger.info(f"Container started: {container.id}")
+    except docker.errors.ContainerError as e:
+        logger.error(f"Error starting container: {str(e)}")
+
+
+def remove_container(client, container_name):
+    logger.info(f"Removing container: {container_name}")
+    try:
+        container = client.containers.get(container_name)
+        container.remove(force=True)
+        logger.info(f"Container {container_name} removed")
+    except docker.errors.NotFound:
+        logger.info(f"Container {container_name} not found, no action needed")
+    except Exception as e:
+        logger.error(f"Error removing container: {str(e)}")
+
+
+def remove_image(client, full_image_name, container_name):
+    logger.info(f"Removing image: {full_image_name}")
+    remove_container(client, container_name)
+    try:
+        client.images.remove(full_image_name, force=True)
+        logger.info(f"Image {full_image_name} removed")
+    except docker.errors.ImageNotFound:
+        logger.info(f"Image {full_image_name} not found, no action needed")
+    except Exception as e:
+        logger.error(f"Error removing image: {str(e)}")
+
+
+def verify_image(client, image_id, stored_digest):
+    logger.info(f"Verifying image: {image_id}")
+    image_inspect = client.api.inspect_image(image_id)
     pulled_digest = image_inspect['RepoDigests'][0].split('@')[1] if image_inspect['RepoDigests'] else None
 
     if not pulled_digest:
         logger.error("Could not obtain content digest for pulled image")
-        return
+        return False
 
     if pulled_digest != stored_digest:
         logger.error(f"Image digest mismatch. Expected: {stored_digest} Got: {pulled_digest}")
-        return
+        return False
 
     logger.info("Image digest verified successfully")
-
-    try:
-        container = client.containers.run(image, detach=True)
-        logger.info(f"Container started: {container.id}")
-    except docker.errors.ContainerError as e:
-        logger.error(f"Error starting container: {str(e)}")
+    return True
 
 
 def main():
@@ -91,7 +137,7 @@ def main():
     )
 
     docker_image_subscription = EventSubscription(
-        event_type="docker-image-added"
+        event_type="docker-image-action"
     )
 
     request = ClientEventsSubscribeRequest(

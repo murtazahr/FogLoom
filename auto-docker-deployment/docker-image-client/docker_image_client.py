@@ -2,12 +2,11 @@ import hashlib
 import json
 import logging
 import os
-import socket
 import sys
 import time
+import uuid
 
 import docker
-
 from docker import errors
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
@@ -34,14 +33,6 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(e)}") from e
 
 
-def debug_dns(hostname):
-    try:
-        ip = socket.gethostbyname(hostname)
-        logger.debug(f"DNS resolution for {hostname}: {ip}")
-    except socket.gaierror as e:
-        logger.error(f"DNS resolution failed for {hostname}: {e}")
-
-
 def hash_and_push_docker_image(tar_path):
     logger.info(f"Processing Docker image from tar: {tar_path}")
     client = docker.from_env()
@@ -57,7 +48,6 @@ def hash_and_push_docker_image(tar_path):
     logger.info(f"Pushing Docker image to local registry: {registry_image_name}")
 
     try:
-        debug_dns('sawtooth-registry')
         push_result = client.images.push(registry_image_name, stream=True, decode=True)
         content_digest = None
         for line in push_result:
@@ -81,9 +71,10 @@ def hash_and_push_docker_image(tar_path):
     return content_digest, registry_image_name
 
 
-def create_transaction(image_hash, image_name, signer):
-    logger.info(f"Creating transaction for image: {image_name} with hash: {image_hash}")
-    payload = f"{image_hash},{image_name}".encode()
+def create_transaction(image_hash, image_name, app_id, action, signer):
+    logger.info(
+        f"Creating transaction for image: {image_name} with hash: {image_hash}, app_id: {app_id}, action: {action}")
+    payload = f"{image_hash},{image_name},{app_id},{action}".encode()
 
     header = TransactionHeader(
         family_name=FAMILY_NAME,
@@ -140,19 +131,10 @@ def submit_batch(batch):
 
     result = future.result()
     logger.info(f"Submitted batch to validator: {result}")
+    return result
 
 
-def main():
-    if len(sys.argv) != 2:
-        print("Usage: python docker_image_client.py <path_to_docker_image.tar>")
-        sys.exit(1)
-
-    tar_path = sys.argv[1]
-
-    if not os.path.exists(tar_path):
-        print(f"Error: File {tar_path} does not exist")
-        sys.exit(1)
-
+def process_action(action, tar_path=None, image_name=None, app_id=None):
     try:
         private_key = load_private_key(PRIVATE_KEY_FILE)
     except IOError as e:
@@ -162,10 +144,63 @@ def main():
     context = create_context('secp256k1')
     signer = CryptoFactory(context).new_signer(private_key)
 
-    image_hash, registry_image_name = hash_and_push_docker_image(tar_path)
-    transaction = create_transaction(image_hash, registry_image_name, signer)
+    if action == "deploy_image":
+        if not tar_path:
+            logger.error("Tar path is required for deploy_image action")
+            sys.exit(1)
+        image_hash, registry_image_name = hash_and_push_docker_image(tar_path)
+        app_id = str(uuid.uuid4())  # Generate a unique application ID
+    elif action in ["deploy_container", "remove_container", "remove_image"]:
+        if not image_name or not app_id:
+            logger.error("Image name and app_id are required for this action")
+            sys.exit(1)
+        image_hash = ""  # Not needed for these actions
+        registry_image_name = image_name
+    else:
+        logger.error(f"Unknown action: {action}")
+        sys.exit(1)
+
+    transaction = create_transaction(image_hash, registry_image_name, app_id, action, signer)
     batch = create_batch([transaction], signer)
-    submit_batch(batch)
+    result = submit_batch(batch)
+
+    return app_id, result
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python docker_image_client.py <action> [<args>]")
+        print("Actions:")
+        print("  deploy_image <path_to_docker_image.tar>")
+        print("  deploy_container <image_name> <app_id>")
+        print("  remove_container <image_name> <app_id>")
+        print("  remove_image <image_name> <app_id>")
+        sys.exit(1)
+
+    action = sys.argv[1]
+
+    if action == "deploy_image":
+        if len(sys.argv) != 3:
+            print("Usage: python docker_image_client.py deploy_image <path_to_docker_image.tar>")
+            sys.exit(1)
+        tar_path = sys.argv[2]
+        if not os.path.exists(tar_path):
+            print(f"Error: File {tar_path} does not exist")
+            sys.exit(1)
+        app_id, result = process_action(action, tar_path=tar_path)
+        print(f"Deployment submitted. Application ID: {app_id}")
+    elif action in ["deploy_container", "remove_container", "remove_image"]:
+        if len(sys.argv) != 4:
+            print(f"Usage: python docker_image_client.py {action} <image_name> <app_id>")
+            sys.exit(1)
+        image_name = sys.argv[2]
+        app_id = sys.argv[3]
+        _, result = process_action(action, image_name=image_name, app_id=app_id)
+    else:
+        print(f"Unknown action: {action}")
+        sys.exit(1)
+
+    print(f"Action submitted. Result: {result}")
 
 
 if __name__ == '__main__':
