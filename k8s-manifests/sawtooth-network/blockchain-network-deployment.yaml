@@ -81,6 +81,12 @@ items:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-0:4004"
 
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
               command:
@@ -129,6 +135,12 @@ items:
               env:
                 - name: REGISTRY_URL
                   value: "sawtooth-registry:5000"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
+            - name: dependency-management-client
+              image: murtazahr/dependency-management-client:latest
+              env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-0:4004"
 
@@ -327,6 +339,12 @@ items:
 
             - name: docker-image-tp
               image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-1:4004"
@@ -555,6 +573,12 @@ items:
 
             - name: docker-image-tp
               image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-2:4004"
@@ -788,6 +812,12 @@ items:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-3:4004"
 
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
               command:
@@ -1013,6 +1043,12 @@ items:
 
             - name: docker-image-tp
               image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-4:4004"
+
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-4:4004"

@@ -23,6 +23,10 @@ docker build -t $DOCKER_USERNAME/peer-registry-tp:latest ./peer-registry/peer-re
 docker build -t $DOCKER_USERNAME/docker-image-tp:latest ./auto-docker-deployment/docker-image-tp
 # Build docker-image-client image
 docker build -t $DOCKER_USERNAME/docker-image-client:latest ./auto-docker-deployment/docker-image-client
+# Build dependency-management-tp image
+docker build -t $DOCKER_USERNAME/dependency-management-tp:latest ./manage-dependency-workflow/dependency-management-tp
+# Build dependency-management-client image
+docker build -t $DOCKER_USERNAME/dependency-management-client:latest ./manage-dependency-workflow/dependency-management-client
 # Build fog-node image
 docker build -t $DOCKER_USERNAME/fog-node:latest ./fog-node
 
@@ -30,9 +34,11 @@ docker build -t $DOCKER_USERNAME/fog-node:latest ./fog-node
 docker push $DOCKER_USERNAME/peer-registry-tp:latest
 docker push $DOCKER_USERNAME/docker-image-tp:latest
 docker push $DOCKER_USERNAME/docker-image-client:latest
+docker push $DOCKER_USERNAME/dependency-management-tp:latest
+docker push $DOCKER_USERNAME/dependency-management-client:latest
 docker push $DOCKER_USERNAME/fog-node:latest
 
-echo "Images built and imported into k3s successfully"
+echo "Images built and pushed to registry successfully"
 
 cd "$K8S_DIR" || exit
 
