@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 FAMILY_NAME = 'workflow-dependency'
 FAMILY_VERSION = '1.0'
-NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
+WORKFLOW_NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
+
+DOCKER_IMAGE_FAMILY = 'docker-image'
+DOCKER_IMAGE_NAMESPACE = hashlib.sha512(DOCKER_IMAGE_FAMILY.encode()).hexdigest()[:6]
 
 # Path to the private key file
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
@@ -83,11 +86,15 @@ def _create_transaction(payload, signer):
     logger.debug("Creating transaction")
     payload_bytes = json.dumps(payload).encode()
 
+    # Include both namespaces in inputs and outputs
+    inputs = [WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
+    outputs = [WORKFLOW_NAMESPACE]
+
     txn_header = TransactionHeader(
         family_name=FAMILY_NAME,
         family_version=FAMILY_VERSION,
-        inputs=[NAMESPACE],
-        outputs=[NAMESPACE],
+        inputs=inputs,
+        outputs=outputs,
         signer_public_key=signer.get_public_key().as_hex(),
         batcher_public_key=signer.get_public_key().as_hex(),
         dependencies=[],
