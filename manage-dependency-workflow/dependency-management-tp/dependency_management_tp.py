@@ -64,7 +64,7 @@ class WorkflowTransactionHandler(TransactionHandler):
                 logger.debug(f"Dependency graph for workflow {workflow_id}: {json.dumps(dependency_graph)}")
                 self._create_workflow(context, workflow_id, dependency_graph)
             elif action == 'get':
-                self._get_workflow(context, workflow_id)
+                return self._get_workflow(context, workflow_id)
             else:
                 logger.error(f"Unknown action: {action}")
                 raise InvalidTransaction(f'Unknown action: {action}')
@@ -82,7 +82,11 @@ class WorkflowTransactionHandler(TransactionHandler):
         try:
             self._validate_dependency_graph(context, dependency_graph)
 
-            state_data = json.dumps(dependency_graph).encode()
+            workflow_data = {
+                'workflow_id': workflow_id,
+                'dependency_graph': dependency_graph
+            }
+            state_data = json.dumps(workflow_data).encode()
             state_address = self._make_workflow_address(workflow_id)
             logger.debug(f"Storing workflow at address: {state_address}")
             context.set_state({state_address: state_data})

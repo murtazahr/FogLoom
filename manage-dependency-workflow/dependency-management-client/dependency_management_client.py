@@ -41,7 +41,8 @@ def create_workflow(dependency_graph):
     logger.info("Creating new workflow")
     workflow_id = str(uuid.uuid4())
     logger.debug(f"Generated workflow ID: {workflow_id}")
-    return _send_workflow_transaction(workflow_id, dependency_graph, "create")
+    result = _send_workflow_transaction(workflow_id, dependency_graph, "create")
+    return workflow_id, result
 
 
 def get_workflow(workflow_id):
@@ -150,9 +151,8 @@ def _process_validator_response(future_result, action):
             response = ClientStateGetResponse()
             response.ParseFromString(future_result.content)
             if response.status == ClientStateGetResponse.OK:
-                value = response.value
-                if value:
-                    return json.loads(value.decode())
+                if response.value:
+                    return json.loads(response.value.decode())
                 else:
                     return "Workflow not found"
             else:
