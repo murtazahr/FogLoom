@@ -7,12 +7,14 @@ import traceback
 from sawtooth_sdk.processor.handler import TransactionHandler
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.core import TransactionProcessor
+from sawtooth_sdk.processor.exceptions import AuthorizationException
 
 FAMILY_NAME = 'workflow-dependency'
 FAMILY_VERSION = '1.0'
 NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
-DOCKER_IMAGE_NAMESPACE = hashlib.sha512('docker-image'.encode()).hexdigest()[:6]
+DOCKER_IMAGE_FAMILY = 'docker-image'
+DOCKER_IMAGE_NAMESPACE = hashlib.sha512(DOCKER_IMAGE_FAMILY.encode()).hexdigest()[:6]
 
 logger = logging.getLogger(__name__)
 
@@ -28,23 +30,13 @@ class WorkflowTransactionHandler(TransactionHandler):
 
     @property
     def namespaces(self):
-        return [NAMESPACE]
+        return [NAMESPACE, DOCKER_IMAGE_NAMESPACE]
 
     def apply(self, transaction, context):
         try:
             logger.info("Applying transaction")
             logger.debug(f"Transaction details: {transaction}")
 
-            # Log all attributes of the transaction
-            for attr in dir(transaction):
-                if not attr.startswith('__'):
-                    try:
-                        value = getattr(transaction, attr)
-                        logger.debug(f"Transaction.{attr} = {value}")
-                    except Exception as e:
-                        logger.debug(f"Error accessing Transaction.{attr}: {str(e)}")
-
-            # Safely get the header_signature
             header_signature = getattr(transaction, 'header_signature', None)
             logger.info(f"Processing transaction: {header_signature}")
 
@@ -54,9 +46,6 @@ class WorkflowTransactionHandler(TransactionHandler):
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid payload: not a valid JSON. Error: {str(e)}")
                 raise InvalidTransaction('Invalid payload: not a valid JSON')
-            except Exception as e:
-                logger.error(f"Error decoding payload: {str(e)}")
-                raise InvalidTransaction(f'Error decoding payload: {str(e)}')
 
             action = payload.get('action')
             workflow_id = payload.get('workflow_id')
@@ -136,9 +125,12 @@ class WorkflowTransactionHandler(TransactionHandler):
                 logger.debug(f"Checking app_id {app_id} at address {app_address}")
                 state_entries = context.get_state([app_address])
                 if not state_entries or not state_entries[0].data:
-                    logger.error(f"Invalid app_id in dependency graph: {app_id}")
-                    raise InvalidTransaction(f'Invalid app_id in dependency graph: {app_id}')
+                    logger.error(f"Invalid or non-existent app_id in dependency graph: {app_id}")
+                    raise InvalidTransaction(f'Invalid or non-existent app_id in dependency graph: {app_id}')
             logger.info("Dependency graph validated successfully")
+        except AuthorizationException as e:
+            logger.error(f"Authorization error when validating dependency graph: {str(e)}")
+            raise InvalidTransaction(f"Authorization error: {str(e)}")
         except InvalidTransaction:
             raise
         except Exception as e:
