@@ -5,8 +5,6 @@ import os
 import sys
 import uuid
 
-from sawtooth_sdk.protobuf.client_batch_submit_pb2 import ClientBatchSubmitResponse
-from sawtooth_sdk.protobuf.client_state_pb2 import ClientStateGetResponse
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
@@ -81,7 +79,7 @@ def _send_workflow_transaction(workflow_id, dependency_graph, action):
     result = _send_request(batch_list)
     logger.info(f"Sent request to validator. Result: {result}")
 
-    return _process_validator_response(result, action)
+    return workflow_id, result
 
 
 def _create_transaction(payload, signer):
@@ -137,7 +135,7 @@ def _create_batch(transactions, signer):
 
 
 def _send_request(batch_list):
-    validator_url = os.getenv('VALIDATOR_URL', 'tcp://sawtooth-0:4004')
+    validator_url = os.getenv('VALIDATOR_URL', 'tcp://localhost:4004')
     logger.info(f"Sending request to validator at {validator_url}")
     stream = Stream(validator_url)
     future = stream.send(
@@ -147,31 +145,6 @@ def _send_request(batch_list):
     result = future.result()
     logger.debug(f"Received result from validator: {result}")
     return result
-
-
-def _process_validator_response(future_result, action):
-    try:
-        if action == "get":
-            response = ClientStateGetResponse()
-            response.ParseFromString(future_result.content)
-            if response.status == ClientStateGetResponse.OK:
-                value = response.value
-                if value:
-                    return json.loads(value.decode())
-                else:
-                    return "Workflow not found"
-            else:
-                return f"Error retrieving workflow: {response.status}"
-        else:
-            response = ClientBatchSubmitResponse()
-            response.ParseFromString(future_result.content)
-            if response.status == ClientBatchSubmitResponse.OK:
-                return "Transaction submitted successfully"
-            else:
-                return f"Error submitting transaction: {response.status}"
-    except Exception as e:
-        logger.error(f"Error processing validator response: {str(e)}")
-        return f"Error processing response: {str(e)}"
 
 
 def main():
@@ -216,8 +189,8 @@ def main():
 
         workflow_id = sys.argv[2]
         logger.info(f"Retrieving workflow with ID: {workflow_id}")
-        result = get_workflow(workflow_id)
-        print(f"Workflow data: {json.dumps(result, indent=2)}")
+        _, result = get_workflow(workflow_id)
+        print(f"Workflow data: {result}")
 
     else:
         logger.error(f"Unknown action: {action}")
