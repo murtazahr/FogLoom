@@ -1,6 +1,7 @@
 import hashlib
 import json
 import logging
+import os
 import traceback
 
 from sawtooth_sdk.processor.handler import TransactionHandler
@@ -168,7 +169,7 @@ class WorkflowTransactionHandler(TransactionHandler):
 def main():
     logger.info("Starting Workflow Transaction Processor")
     try:
-        processor = TransactionProcessor(url='tcp://validator:4004')
+        processor = TransactionProcessor(url=os.getenv('VALIDATOR_URL', 'tcp://validator:4004'))
         handler = WorkflowTransactionHandler()
         processor.add_handler(handler)
         logger.info("Workflow Transaction Handler added to processor")
