@@ -9,6 +9,8 @@ from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
 from sawtooth_sdk.messaging.stream import Stream
+from sawtooth_sdk.protobuf.client_batch_submit_pb2 import ClientBatchSubmitResponse
+from sawtooth_sdk.protobuf.client_state_pb2 import ClientStateGetResponse
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +21,7 @@ WORKFLOW_NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 DOCKER_IMAGE_FAMILY = 'docker-image'
 DOCKER_IMAGE_NAMESPACE = hashlib.sha512(DOCKER_IMAGE_FAMILY.encode()).hexdigest()[:6]
 
-# Path to the private key file
-PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
+PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/client.priv')
 
 
 def load_private_key(key_file):
@@ -79,22 +80,18 @@ def _send_workflow_transaction(workflow_id, dependency_graph, action):
     result = _send_request(batch_list)
     logger.info(f"Sent request to validator. Result: {result}")
 
-    return workflow_id, result
+    return _process_validator_response(result, action)
 
 
 def _create_transaction(payload, signer):
     logger.debug("Creating transaction")
     payload_bytes = json.dumps(payload).encode()
 
-    # Include both namespaces in inputs and outputs
-    inputs = [WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
-    outputs = [WORKFLOW_NAMESPACE]
-
     txn_header = TransactionHeader(
         family_name=FAMILY_NAME,
         family_version=FAMILY_VERSION,
-        inputs=inputs,
-        outputs=outputs,
+        inputs=[WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE],
+        outputs=[WORKFLOW_NAMESPACE],
         signer_public_key=signer.get_public_key().as_hex(),
         batcher_public_key=signer.get_public_key().as_hex(),
         dependencies=[],
@@ -135,7 +132,7 @@ def _create_batch(transactions, signer):
 
 
 def _send_request(batch_list):
-    validator_url = os.getenv('VALIDATOR_URL', 'tcp://localhost:4004')
+    validator_url = os.getenv('VALIDATOR_URL', 'tcp://sawtooth-0:4004')
     logger.info(f"Sending request to validator at {validator_url}")
     stream = Stream(validator_url)
     future = stream.send(
@@ -145,6 +142,31 @@ def _send_request(batch_list):
     result = future.result()
     logger.debug(f"Received result from validator: {result}")
     return result
+
+
+def _process_validator_response(future_result, action):
+    try:
+        if action == "get":
+            response = ClientStateGetResponse()
+            response.ParseFromString(future_result.content)
+            if response.status == ClientStateGetResponse.OK:
+                value = response.value
+                if value:
+                    return json.loads(value.decode())
+                else:
+                    return "Workflow not found"
+            else:
+                return f"Error retrieving workflow: {response.status}"
+        else:
+            response = ClientBatchSubmitResponse()
+            response.ParseFromString(future_result.content)
+            if response.status == ClientBatchSubmitResponse.OK:
+                return "Transaction submitted successfully"
+            else:
+                return f"Error submitting transaction: {response.status}"
+    except Exception as e:
+        logger.error(f"Error processing validator response: {str(e)}")
+        return f"Error processing response: {str(e)}"
 
 
 def main():
@@ -177,9 +199,9 @@ def main():
             sys.exit(1)
 
         workflow_id, result = create_workflow(dependency_graph)
-        logger.info(f"Workflow created with ID: {workflow_id}")
-        print(f"Workflow created with ID: {workflow_id}")
-        print(f"Result: {result}")
+        print(f"Workflow creation result:")
+        print(f"Workflow ID: {workflow_id}")
+        print(f"Status: {result}")
 
     elif action == "get":
         if len(sys.argv) != 3:
@@ -189,8 +211,9 @@ def main():
 
         workflow_id = sys.argv[2]
         logger.info(f"Retrieving workflow with ID: {workflow_id}")
-        _, result = get_workflow(workflow_id)
-        print(f"Workflow data: {result}")
+        result = get_workflow(workflow_id)
+        print("Workflow retrieval result:")
+        print(json.dumps(result, indent=2))
 
     else:
         logger.error(f"Unknown action: {action}")
