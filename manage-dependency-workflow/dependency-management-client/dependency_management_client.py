@@ -10,7 +10,6 @@ from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
 from sawtooth_sdk.messaging.stream import Stream
 from sawtooth_sdk.protobuf.client_batch_submit_pb2 import ClientBatchSubmitResponse
-from sawtooth_sdk.protobuf.client_state_pb2 import ClientStateGetResponse
 
 logger = logging.getLogger(__name__)
 
@@ -41,17 +40,12 @@ def create_workflow(dependency_graph):
     logger.info("Creating new workflow")
     workflow_id = str(uuid.uuid4())
     logger.debug(f"Generated workflow ID: {workflow_id}")
-    result = _send_workflow_transaction(workflow_id, dependency_graph, "create")
+    result = _send_workflow_transaction(workflow_id, dependency_graph)
     return workflow_id, result
 
 
-def get_workflow(workflow_id):
-    logger.info(f"Retrieving workflow with ID: {workflow_id}")
-    return _send_workflow_transaction(workflow_id, None, "get")
-
-
-def _send_workflow_transaction(workflow_id, dependency_graph, action):
-    logger.debug(f"Preparing to send workflow transaction. Action: {action}, Workflow ID: {workflow_id}")
+def _send_workflow_transaction(workflow_id, dependency_graph):
+    logger.debug(f"Preparing to send workflow transaction. Workflow ID: {workflow_id}")
     try:
         private_key = load_private_key(PRIVATE_KEY_FILE)
     except IOError as e:
@@ -63,11 +57,10 @@ def _send_workflow_transaction(workflow_id, dependency_graph, action):
     logger.debug(f"Created signer with public key: {signer.get_public_key().as_hex()}")
 
     payload = {
-        "action": action,
-        "workflow_id": workflow_id
+        "action": "create",
+        "workflow_id": workflow_id,
+        "dependency_graph": dependency_graph
     }
-    if dependency_graph:
-        payload["dependency_graph"] = dependency_graph
     logger.debug(f"Prepared payload: {json.dumps(payload)}")
 
     transaction = _create_transaction(payload, signer)
@@ -81,7 +74,7 @@ def _send_workflow_transaction(workflow_id, dependency_graph, action):
     result = _send_request(batch_list)
     logger.info(f"Sent request to validator. Result: {result}")
 
-    return _process_validator_response(result, action)
+    return _process_validator_response(result)
 
 
 def _create_transaction(payload, signer):
@@ -145,25 +138,14 @@ def _send_request(batch_list):
     return result
 
 
-def _process_validator_response(future_result, action):
+def _process_validator_response(future_result):
     try:
-        if action == "get":
-            response = ClientStateGetResponse()
-            response.ParseFromString(future_result.content)
-            if response.status == ClientStateGetResponse.OK:
-                if response.value:
-                    return json.loads(response.value.decode())
-                else:
-                    return "Workflow not found"
-            else:
-                return f"Error retrieving workflow: {response.status}"
+        response = ClientBatchSubmitResponse()
+        response.ParseFromString(future_result.content)
+        if response.status == ClientBatchSubmitResponse.OK:
+            return "Transaction submitted successfully"
         else:
-            response = ClientBatchSubmitResponse()
-            response.ParseFromString(future_result.content)
-            if response.status == ClientBatchSubmitResponse.OK:
-                return "Transaction submitted successfully"
-            else:
-                return f"Error submitting transaction: {response.status}"
+            return f"Error submitting transaction: {response.status}"
     except Exception as e:
         logger.error(f"Error processing validator response: {str(e)}")
         return f"Error processing response: {str(e)}"
@@ -171,54 +153,28 @@ def _process_validator_response(future_result, action):
 
 def main():
     logger.info("Workflow client started")
-    if len(sys.argv) < 2:
-        logger.error("Insufficient arguments provided")
-        print("Usage: python workflow_client.py <create|get> [<dependency_graph_file>|<workflow_id>]")
+    if len(sys.argv) != 2:
+        logger.error("Incorrect number of arguments")
+        print("Usage: python workflow_client.py <dependency_graph_file>")
         sys.exit(1)
 
-    action = sys.argv[1]
-    logger.info(f"Action requested: {action}")
-
-    if action == "create":
-        if len(sys.argv) != 3:
-            logger.error("Incorrect number of arguments for create action")
-            print("Usage: python workflow_client.py create <dependency_graph_file>")
-            sys.exit(1)
-
-        dependency_graph_file = sys.argv[2]
-        logger.info(f"Reading dependency graph from file: {dependency_graph_file}")
-        try:
-            with open(dependency_graph_file, 'r') as f:
-                dependency_graph = json.load(f)
-            logger.debug(f"Dependency graph loaded: {json.dumps(dependency_graph)}")
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse dependency graph file: {str(e)}")
-            sys.exit(1)
-        except IOError as e:
-            logger.error(f"Failed to read dependency graph file: {str(e)}")
-            sys.exit(1)
-
-        workflow_id, result = create_workflow(dependency_graph)
-        print(f"Workflow creation result:")
-        print(f"Workflow ID: {workflow_id}")
-        print(f"Status: {result}")
-
-    elif action == "get":
-        if len(sys.argv) != 3:
-            logger.error("Incorrect number of arguments for get action")
-            print("Usage: python workflow_client.py get <workflow_id>")
-            sys.exit(1)
-
-        workflow_id = sys.argv[2]
-        logger.info(f"Retrieving workflow with ID: {workflow_id}")
-        result = get_workflow(workflow_id)
-        print("Workflow retrieval result:")
-        print(json.dumps(result, indent=2))
-
-    else:
-        logger.error(f"Unknown action: {action}")
-        print(f"Unknown action: {action}")
+    dependency_graph_file = sys.argv[1]
+    logger.info(f"Reading dependency graph from file: {dependency_graph_file}")
+    try:
+        with open(dependency_graph_file, 'r') as f:
+            dependency_graph = json.load(f)
+        logger.debug(f"Dependency graph loaded: {json.dumps(dependency_graph)}")
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse dependency graph file: {str(e)}")
         sys.exit(1)
+    except IOError as e:
+        logger.error(f"Failed to read dependency graph file: {str(e)}")
+        sys.exit(1)
+
+    workflow_id, result = create_workflow(dependency_graph)
+    print(f"Workflow creation result:")
+    print(f"Workflow ID: {workflow_id}")
+    print(f"Status: {result}")
 
     logger.info("Workflow client finished")
 

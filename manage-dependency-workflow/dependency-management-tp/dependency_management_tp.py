@@ -49,25 +49,16 @@ class WorkflowTransactionHandler(TransactionHandler):
 
             action = payload.get('action')
             workflow_id = payload.get('workflow_id')
+            dependency_graph = payload.get('dependency_graph')
 
-            if not action or not workflow_id:
-                logger.error("Missing 'action' or 'workflow_id' in payload")
-                raise InvalidTransaction("Missing 'action' or 'workflow_id' in payload")
+            if action != 'create' or not workflow_id or not dependency_graph:
+                logger.error("Invalid payload: missing required fields")
+                raise InvalidTransaction("Invalid payload: missing required fields")
 
-            logger.info(f"Processing action: {action} for workflow ID: {workflow_id}")
+            logger.info(f"Processing create action for workflow ID: {workflow_id}")
+            logger.debug(f"Dependency graph for workflow {workflow_id}: {json.dumps(dependency_graph)}")
 
-            if action == 'create':
-                dependency_graph = payload.get('dependency_graph')
-                if not dependency_graph:
-                    logger.error("Missing 'dependency_graph' in payload for create action")
-                    raise InvalidTransaction("Missing 'dependency_graph' in payload for create action")
-                logger.debug(f"Dependency graph for workflow {workflow_id}: {json.dumps(dependency_graph)}")
-                self._create_workflow(context, workflow_id, dependency_graph)
-            elif action == 'get':
-                return self._get_workflow(context, workflow_id)
-            else:
-                logger.error(f"Unknown action: {action}")
-                raise InvalidTransaction(f'Unknown action: {action}')
+            self._create_workflow(context, workflow_id, dependency_graph)
 
         except InvalidTransaction as e:
             logger.error(f"Invalid transaction: {str(e)}")
@@ -96,26 +87,6 @@ class WorkflowTransactionHandler(TransactionHandler):
             raise
         except Exception as e:
             logger.error(f"Unexpected error in _create_workflow: {str(e)}")
-            logger.error(traceback.format_exc())
-            raise InvalidTransaction(str(e))
-
-    def _get_workflow(self, context, workflow_id):
-        logger.info(f"Retrieving workflow: {workflow_id}")
-        try:
-            state_address = self._make_workflow_address(workflow_id)
-            logger.debug(f"Fetching workflow from address: {state_address}")
-            state_entries = context.get_state([state_address])
-
-            if state_entries and state_entries[0].data:
-                workflow_data = json.loads(state_entries[0].data.decode())
-                logger.info(f"Workflow {workflow_id} retrieved successfully")
-                logger.debug(f"Workflow data: {json.dumps(workflow_data)}")
-                return workflow_data
-            else:
-                logger.error(f"Workflow not found: {workflow_id}")
-                raise InvalidTransaction(f'Workflow not found: {workflow_id}')
-        except Exception as e:
-            logger.error(f"Unexpected error in _get_workflow: {str(e)}")
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
 
