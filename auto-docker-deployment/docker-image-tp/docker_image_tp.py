@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import os
 
@@ -29,26 +30,27 @@ class DockerImageTransactionHandler(TransactionHandler):
     def apply(self, transaction, context):
         logger.info('Applying Docker Image Transaction')
         try:
-            image_hash, image_name, app_id, action = transaction.payload.decode().split(',')
-            logger.debug(f"Received action: {action} for image: {image_name}, "
-                         f"hash: {image_hash}, app_id: {app_id}")
+            payload = json.loads(transaction.payload.decode())
+            logger.debug(f"Received action: {payload.get('action')} for image: {payload.get('image_name')}, "
+                         f"hash: {payload.get('image_hash')}, app_id: {payload.get('app_id')}, "
+                         f"resource_requirements: {json.dumps(payload.get('resource_requirements')) if payload.get('resource_requirements') else None}")
 
             # Store the image information in the blockchain state
-            state_key = NAMESPACE + hashlib.sha512(app_id.encode()).hexdigest()[:64]
-            state_value = f"{image_hash},{image_name},{app_id},{action}".encode()
+            state_key = NAMESPACE + hashlib.sha512(payload.get('app_id').encode()).hexdigest()[:64]
+            state_value = json.dumps(payload).encode()
             context.set_state({state_key: state_value})
             logger.info(f"Stored image info in state: {state_key}")
 
             # Emit an event
             context.add_event(
                 event_type="docker-image-action",
-                attributes=[("image_hash", image_hash),
-                            ("image_name", image_name),
-                            ("app_id", app_id),
-                            ("action", action)]
+                attributes=[("image_hash", payload.get('image_hash')),
+                            ("image_name", payload.get('image_name')),
+                            ("app_id", payload.get('app_id')),
+                            ("action", payload.get('action')),]
             )
-            logger.info(f"Emitted event for action: {action}, image: {image_name}, "
-                        f"hash: {image_hash}, app_id: {app_id}")
+            logger.info(f"Emitted event for action: {payload.get('action')}, image: {payload.get('image_name')}, "
+                        f"hash: {payload.get('image_hash')}, app_id: {payload.get('app_id')}")
 
         except ValueError as e:
             raise InvalidTransaction("Invalid payload format") from e

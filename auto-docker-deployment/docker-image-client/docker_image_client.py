@@ -103,10 +103,19 @@ def hash_and_push_docker_image(tar_path):
     return content_digest, registry_image_name
 
 
-def create_transaction(image_hash, image_name, app_id, action, signer):
+def create_transaction(image_hash, image_name, resource_requirements, app_id, action, signer):
     logger.info(
         f"Creating transaction for image: {image_name} with hash: {image_hash}, app_id: {app_id}, action: {action}")
-    payload = f"{image_hash},{image_name},{app_id},{action}".encode()
+    payload = {
+        "action": action,
+        "app_id": app_id,
+        "image_hash": image_hash,
+        "image_name": image_name,
+        "resource_requirements": resource_requirements
+    }
+    logger.debug(f"Prepared payload: {json.dumps(payload)}")
+
+    payload = json.dumps(payload).encode()
 
     header = TransactionHeader(
         family_name=FAMILY_NAME,
@@ -166,7 +175,7 @@ def submit_batch(batch):
     return result
 
 
-def process_action(action, tar_path=None, image_name=None, app_id=None):
+def process_action(action, tar_path=None, image_name=None, app_id=None, resource_requirements=None):
     try:
         private_key = load_private_key(PRIVATE_KEY_FILE)
     except IOError as e:
@@ -192,7 +201,7 @@ def process_action(action, tar_path=None, image_name=None, app_id=None):
         logger.error(f"Unknown action: {action}")
         sys.exit(1)
 
-    transaction = create_transaction(image_hash, registry_image_name, app_id, action, signer)
+    transaction = create_transaction(image_hash, registry_image_name, resource_requirements, app_id, action, signer)
     batch = create_batch([transaction], signer)
     result = submit_batch(batch)
 
@@ -203,7 +212,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage: python docker_image_client.py <action> [<args>]")
         print("Actions:")
-        print("  deploy_image <path_to_docker_image.tar>")
+        print("  deploy_image <path_to_docker_image.tar> <application_resource_requirements.json>")
         print("  deploy_container <image_name> <app_id>")
         print("  remove_container <image_name> <app_id>")
         print("  remove_image <image_name> <app_id>")
@@ -212,14 +221,26 @@ def main():
     action = sys.argv[1]
 
     if action == "deploy_image":
-        if len(sys.argv) != 3:
-            print("Usage: python docker_image_client.py deploy_image <path_to_docker_image.tar>")
+        if len(sys.argv) != 4:
+            print("Usage: python docker_image_client.py deploy_image <path_to_docker_image.tar> <application_resource_requirements.json>")
             sys.exit(1)
         tar_path = sys.argv[2]
         if not os.path.exists(tar_path):
             print(f"Error: File {tar_path} does not exist")
             sys.exit(1)
-        app_id, result = process_action(action, tar_path=tar_path)
+        resource_requirements_file = sys.argv[3]
+        logger.info(f"Reading dependency graph from file: {resource_requirements_file}")
+        try:
+            with open(resource_requirements_file, 'r') as f:
+                resource_requirements = json.load(f)
+            logger.debug(f"Resource requirements loaded: {json.dumps(resource_requirements)}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse resource requirements file: {str(e)}")
+            sys.exit(1)
+        except IOError as e:
+            logger.error(f"Failed to read resource requirements file: {str(e)}")
+            sys.exit(1)
+        app_id, result = process_action(action, tar_path=tar_path, resource_requirements=resource_requirements)
         print(f"Deployment submitted. Application ID: {app_id}")
     elif action in ["deploy_container", "remove_container", "remove_image"]:
         if len(sys.argv) != 4:
