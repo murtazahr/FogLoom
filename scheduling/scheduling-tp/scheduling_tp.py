@@ -76,7 +76,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             # Initialize scheduler with blockchain data
             self.scheduler = self._initialize_scheduler(context, workflow_id)
 
-            # Schedule data processing
+            # Schedule data processing (only once per transaction)
             schedule_result = self._schedule_data_processing(iot_data, workflow_id)
 
             # Store the schedule result in state
@@ -85,7 +85,10 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 'schedule': schedule_result,
                 'timestamp': timestamp
             }).encode()
+
+            logger.info(f"Writing scheduling result to blockchain for workflow ID: {workflow_id}")
             context.set_state({schedule_address: schedule_state_data})
+            logger.info(f"Successfully wrote scheduling result to blockchain for workflow ID: {workflow_id}")
 
             logger.info(f"Scheduling completed for workflow ID: {workflow_id}")
 
@@ -150,13 +153,28 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
     def _schedule_data_processing(self, iot_data, workflow_id):
         try:
-            logger.info(f"Scheduling data processing for workflow ID: {workflow_id}")
+            logger.info(f"Starting scheduling process for workflow ID: {workflow_id}")
+
+            # Log the input data (be cautious with sensitive data)
+            logger.debug(f"IoT data for workflow {workflow_id}: {iot_data}")
+
+            # Perform the scheduling
             schedule_result = self.scheduler.schedule(iot_data)
-            logger.info(f"Scheduling result: {schedule_result}")
+
+            # Log the scheduling result
+            logger.info(f"Scheduling completed for workflow ID: {workflow_id}")
+            logger.debug(f"Scheduling result for workflow {workflow_id}: {schedule_result}")
+
+            # Validate the scheduling result
+            if not schedule_result or not isinstance(schedule_result, dict):
+                raise ValueError(f"Invalid scheduling result for workflow {workflow_id}")
+
             return schedule_result
+
         except Exception as e:
-            logger.error(f"Error in scheduling: {str(e)}")
-            raise
+            logger.error(f"Error in scheduling for workflow ID {workflow_id}: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise InvalidTransaction(f"Scheduling failed for workflow ID {workflow_id}: {str(e)}")
 
     def _make_workflow_address(self, workflow_id):
         return WORKFLOW_NAMESPACE + hashlib.sha512(workflow_id.encode()).hexdigest()[:64]
