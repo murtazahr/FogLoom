@@ -90,10 +90,10 @@ class LCDWRRScheduler(BaseScheduler):
         graph = defaultdict(list)
         in_degree = {node: 0 for node in self.dependency_graph['nodes']}
 
-        for edge in self.dependency_graph['edges']:
-            source, target = edge['source'], edge['target']
-            graph[source].append(target)
-            in_degree[target] += 1
+        for node, data in self.dependency_graph['nodes'].items():
+            for next_node in data.get('next', []):
+                graph[node].append(next_node)
+                in_degree[next_node] += 1
 
         # Initialize queue with nodes having no dependencies
         queue = [node for node in in_degree if in_degree[node] == 0]
