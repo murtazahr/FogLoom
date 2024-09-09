@@ -35,6 +35,9 @@ class DockerImageTransactionHandler(TransactionHandler):
                          f"hash: {payload.get('image_hash')}, app_id: {payload.get('app_id')}, "
                          f"resource_requirements: {json.dumps(payload.get('resource_requirements')) if payload.get('resource_requirements') else None}")
 
+            # Validate resource_requirements
+            self.validate_resource_requirements(payload.get('resource_requirements'))
+
             # Store the image information in the blockchain state
             state_key = NAMESPACE + hashlib.sha512(payload.get('app_id').encode()).hexdigest()[:64]
             state_value = json.dumps(payload).encode()
@@ -57,6 +60,26 @@ class DockerImageTransactionHandler(TransactionHandler):
         except Exception as e:
             logger.error(f"Error processing transaction: {str(e)}")
             raise InvalidTransaction(str(e))
+
+
+    def validate_resource_requirements(self, resource_requirements):
+        if resource_requirements is None:
+            return
+
+        if not isinstance(resource_requirements, dict):
+            raise InvalidTransaction("resource_requirements must be a dictionary")
+
+        required_fields = ['memory', 'cpu', 'disk']
+
+        # Check if only the required fields are present
+        if set(resource_requirements.keys()) != set(required_fields):
+            raise InvalidTransaction(f"resource_requirements must contain only these fields: {', '.join(required_fields)}")
+
+        # Validate each field
+        for field in required_fields:
+            value = resource_requirements.get(field)
+            if not isinstance(value, (int, float)):
+                raise InvalidTransaction(f"{field} in resource_requirements must be a number")
 
 
 def main():
