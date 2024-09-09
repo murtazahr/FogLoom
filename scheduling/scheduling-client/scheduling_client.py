@@ -1,3 +1,4 @@
+import uuid
 import hashlib
 import json
 import logging
@@ -34,10 +35,12 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(ex)}") from ex
 
 
-def create_iot_schedule_transaction(signer, iot_data, workflow_app_id):
+def create_iot_schedule_transaction(signer, iot_data, workflow_id):
+    schedule_id = str(uuid.uuid4())  # Generate a unique schedule_id
     payload = {
         "iot_data": iot_data,
-        "workflow_app_id": workflow_app_id,
+        "workflow_id": workflow_id,
+        "schedule_id": schedule_id,
         "timestamp": int(time.time())
     }
     payload_bytes = json.dumps(payload).encode()
@@ -111,17 +114,21 @@ except IOError as e:
 def submit_iot_data():
     try:
         data = request.json
-        if not data or 'iot_data' not in data or 'workflow_app_id' not in data:
-            return jsonify({"error": "Missing iot_data or workflow_app_id in request"}), 400
+        if not data or 'iot_data' not in data or 'workflow_id' not in data:
+            return jsonify({"error": "Missing iot_data or workflow_id in request"}), 400
 
         iot_data = data['iot_data']
-        workflow_app_id = data['workflow_app_id']
+        workflow_id = data['workflow_id']
 
-        transaction = create_iot_schedule_transaction(signer, iot_data, workflow_app_id)
+        transaction = create_iot_schedule_transaction(signer, iot_data, workflow_id)
         batch = create_batch([transaction], signer)
         result = submit_batch(batch)
 
-        return jsonify({"message": "Data submitted successfully", "result": str(result)}), 200
+        return jsonify({
+            "message": "Data submitted successfully",
+            "result": str(result),
+            "schedule_id": json.loads(transaction.payload.decode())['schedule_id']
+        }), 200
     except Exception as ex:
         logger.error(f"Error processing request: {str(ex)}")
         return jsonify({"error": str(ex)}), 500

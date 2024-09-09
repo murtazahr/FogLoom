@@ -8,7 +8,6 @@ from sawtooth_sdk.processor.core import TransactionProcessor
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
 
-# Import the LCDWRRScheduler
 from scheduler import create_scheduler
 
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
@@ -64,10 +63,11 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         try:
             payload = json.loads(transaction.payload.decode())
             iot_data = payload['iot_data']
-            workflow_id = payload['workflow_app_id']
+            workflow_id = payload['workflow_id']
+            schedule_id = payload['schedule_id']
             timestamp = payload['timestamp']
 
-            logger.info(f"Processing IoT data for workflow ID: {workflow_id}")
+            logger.info(f"Processing IoT data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
 
             # Validate workflow_id
             if not self._validate_workflow_id(context, workflow_id):
@@ -76,21 +76,22 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             # Initialize scheduler with blockchain data
             self.scheduler = self._initialize_scheduler(context, workflow_id)
 
-            # Schedule data processing (only once per transaction)
+            # Schedule data processing
             schedule_result = self._schedule_data_processing(iot_data, workflow_id)
 
-            # Store the schedule result in state
-            schedule_address = self._make_schedule_address(workflow_id)
+            # Store the schedule result in state using schedule_id
+            schedule_address = self._make_schedule_address(schedule_id)
             schedule_state_data = json.dumps({
                 'schedule': schedule_result,
+                'workflow_id': workflow_id,
                 'timestamp': timestamp
             }).encode()
 
-            logger.info(f"Writing scheduling result to blockchain for workflow ID: {workflow_id}")
+            logger.info(f"Writing scheduling result to blockchain for schedule ID: {schedule_id}")
             context.set_state({schedule_address: schedule_state_data})
-            logger.info(f"Successfully wrote scheduling result to blockchain for workflow ID: {workflow_id}")
+            logger.info(f"Successfully wrote scheduling result to blockchain for schedule ID: {schedule_id}")
 
-            logger.info(f"Scheduling completed for workflow ID: {workflow_id}")
+            logger.info(f"Scheduling completed for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
 
         except json.JSONDecodeError as e:
             raise InvalidTransaction("Invalid payload: not a valid JSON")
@@ -182,8 +183,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
     def _make_docker_image_address(self, app_id):
         return DOCKER_IMAGE_NAMESPACE + hashlib.sha512(app_id.encode()).hexdigest()[:64]
 
-    def _make_schedule_address(self, workflow_id):
-        return SCHEDULE_NAMESPACE + hashlib.sha512(workflow_id.encode()).hexdigest()[:64]
+    def _make_schedule_address(self, schedule_id):
+        return SCHEDULE_NAMESPACE + hashlib.sha512(schedule_id.encode()).hexdigest()[:64]
 
 
 def main():
