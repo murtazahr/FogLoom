@@ -87,6 +87,24 @@ items:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-0:4004"
 
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-0.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
               command:
@@ -144,11 +162,11 @@ items:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-0:4004"
 
-            - name: scheduler
-              image: murtazahr/scheduler:latest
+            - name: scheduling-client
+              image: murtazahr/scheduling-client:latest
               env:
-                - name: COUCHDB_HOST
-                  value: "couchdb-0.default.svc.cluster.local:5984"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
 
             - name: fog-node
               image: murtazahr/fog-node:latest
@@ -354,6 +372,24 @@ items:
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-1:4004"
+
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-1.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -588,6 +624,24 @@ items:
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-2:4004"
+
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-2.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -824,6 +878,24 @@ items:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-3:4004"
 
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-3.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
               command:
@@ -1058,6 +1130,24 @@ items:
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-4:4004"
+
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-4:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-4.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime

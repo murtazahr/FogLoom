@@ -27,12 +27,13 @@ docker build -t $DOCKER_USERNAME/docker-image-client:latest ./auto-docker-deploy
 docker build -t $DOCKER_USERNAME/dependency-management-tp:latest ./manage-dependency-workflow/dependency-management-tp
 # Build dependency-management-client image
 docker build -t $DOCKER_USERNAME/dependency-management-client:latest ./manage-dependency-workflow/dependency-management-client
+# Build scheduling-tp image
+docker build -t $DOCKER_USERNAME/scheduling-tp:latest ./scheduling/scheduling-tp
+# Build scheduling-client image
+docker build -t $DOCKER_USERNAME/scheduling-client:latest ./scheduling/scheduling-client
 # Build fog-node image
 docker build -t $DOCKER_USERNAME/fog-node:latest ./fog-node
 
-# REMOVE LATER
-docker build -t murtazahr/scheduler:latest ./scheduling/scheduling-tp
-docker push $DOCKER_USERNAME/scheduler:latest
 
 # Push images to Docker Hub
 docker push $DOCKER_USERNAME/peer-registry-tp:latest
@@ -40,6 +41,8 @@ docker push $DOCKER_USERNAME/docker-image-tp:latest
 docker push $DOCKER_USERNAME/docker-image-client:latest
 docker push $DOCKER_USERNAME/dependency-management-tp:latest
 docker push $DOCKER_USERNAME/dependency-management-client:latest
+docker push $DOCKER_USERNAME/scheduling-tp:latest
+docker push $DOCKER_USERNAME/scheduling-client:latest
 docker push $DOCKER_USERNAME/fog-node:latest
 
 echo "Images built and pushed to registry successfully"
