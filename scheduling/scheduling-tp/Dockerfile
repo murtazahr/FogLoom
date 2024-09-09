@@ -15,4 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY scheduling_tp.py .
 COPY scheduler.py .
 
-CMD ["python", "peer_registry_tp.py"]
+CMD ["python", "scheduling_tp.py"]
