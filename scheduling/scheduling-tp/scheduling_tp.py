@@ -4,21 +4,30 @@ import logging
 import os
 import traceback
 
-from sawtooth_sdk.processor.handler import TransactionHandler
-from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.core import TransactionProcessor
+from sawtooth_sdk.processor.exceptions import InvalidTransaction
+from sawtooth_sdk.processor.handler import TransactionHandler
 
-FAMILY_NAME = 'iot-data'
+# Import the LCDWRRScheduler
+from scheduler import create_scheduler
+
+COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
+COUCHDB_DB = 'resource_registry'
+
+FAMILY_NAME = 'iot-schedule'
 FAMILY_VERSION = '1.0'
-NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
 WORKFLOW_NAMESPACE = hashlib.sha512('workflow-dependency'.encode()).hexdigest()[:6]
 DOCKER_IMAGE_NAMESPACE = hashlib.sha512('docker-image'.encode()).hexdigest()[:6]
+SCHEDULE_NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
 logger = logging.getLogger(__name__)
 
 
-class IoTDataTransactionHandler(TransactionHandler):
+class IoTScheduleTransactionHandler(TransactionHandler):
+    def __init__(self):
+        self.scheduler = None
+
     @property
     def family_name(self):
         return FAMILY_NAME
@@ -29,35 +38,56 @@ class IoTDataTransactionHandler(TransactionHandler):
 
     @property
     def namespaces(self):
-        return [NAMESPACE]
+        return [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
+
+    def _initialize_scheduler(self, context, workflow_id):
+        try:
+            # Fetch dependency graph from blockchain
+            dependency_graph = self._get_dependency_graph(context, workflow_id)
+
+            # Fetch app requirements for each app in the dependency graph
+            app_requirements = {}
+            for app_id in dependency_graph['nodes']:
+                app_requirements[app_id] = self._get_app_requirements(context, app_id)
+
+            db_config = {
+                "url": COUCHDB_URL,
+                "name": COUCHDB_DB
+            }
+
+            return create_scheduler("lcdwrr", dependency_graph, app_requirements, db_config)
+        except Exception as e:
+            logger.error(f"Failed to initialize scheduler: {str(e)}")
+            raise
 
     def apply(self, transaction, context):
         try:
             payload = json.loads(transaction.payload.decode())
             iot_data = payload['iot_data']
-            workflow_app_id = payload['workflow_app_id']
+            workflow_id = payload['workflow_app_id']
             timestamp = payload['timestamp']
 
-            logger.info(f"Processing IoT data for workflow/app ID: {workflow_app_id}")
+            logger.info(f"Processing IoT data for workflow ID: {workflow_id}")
 
-            # Validate workflow_app_id
-            if not self._validate_workflow_app_id(context, workflow_app_id):
-                raise InvalidTransaction(f"Invalid workflow/app ID: {workflow_app_id}")
+            # Validate workflow_id
+            if not self._validate_workflow_id(context, workflow_id):
+                raise InvalidTransaction(f"Invalid workflow ID: {workflow_id}")
 
-            # Pass data to scheduler (skeleton function for now)
-            self._schedule_data_processing(iot_data, workflow_app_id)
+            # Initialize scheduler with blockchain data
+            self.scheduler = self._initialize_scheduler(context, workflow_id)
 
-            # Store the transaction in state
-            state_data = json.dumps({
-                'iot_data': iot_data,
-                'workflow_app_id': workflow_app_id,
-                'timestamp': timestamp,
-                'status': 'scheduled'
+            # Schedule data processing
+            schedule_result = self._schedule_data_processing(iot_data, workflow_id)
+
+            # Store the schedule result in state
+            schedule_address = self._make_schedule_address(workflow_id)
+            schedule_state_data = json.dumps({
+                'schedule': schedule_result,
+                'timestamp': timestamp
             }).encode()
-            state_address = self._make_iot_data_address(workflow_app_id)
-            context.set_state({state_address: state_data})
+            context.set_state({schedule_address: schedule_state_data})
 
-            logger.info(f"IoT data processed and scheduled for workflow/app ID: {workflow_app_id}")
+            logger.info(f"Scheduling completed for workflow ID: {workflow_id}")
 
         except json.JSONDecodeError as e:
             raise InvalidTransaction("Invalid payload: not a valid JSON")
@@ -68,36 +98,41 @@ class IoTDataTransactionHandler(TransactionHandler):
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
 
-    def _validate_workflow_app_id(self, context, workflow_app_id):
-        if workflow_app_id.startswith('workflow_'):
-            address = self._make_workflow_address(workflow_app_id)
-            family_namespace = WORKFLOW_NAMESPACE
-        else:
-            address = self._make_docker_image_address(workflow_app_id)
-            family_namespace = DOCKER_IMAGE_NAMESPACE
-
+    def _validate_workflow_id(self, context, workflow_id):
+        address = self._make_workflow_address(workflow_id)
         state_entries = context.get_state([address])
+        return len(state_entries) > 0
 
+    def _get_dependency_graph(self, context, workflow_id):
+        address = self._make_workflow_address(workflow_id)
+        state_entries = context.get_state([address])
         if state_entries:
-            try:
-                state_data = json.loads(state_entries[0].data.decode())
-                logger.info(f"Found state data for {workflow_app_id}: {state_data}")
-                return True
-            except json.JSONDecodeError:
-                logger.error(f"Invalid state data for {workflow_app_id}")
-                return False
+            return json.loads(state_entries[0].data.decode())
         else:
-            logger.warning(f"No state data found for {workflow_app_id} in {family_namespace} namespace")
-            return False
+            raise InvalidTransaction(f"No dependency graph found for workflow ID: {workflow_id}")
 
-    def _schedule_data_processing(self, iot_data, workflow_app_id):
-        # This is a skeleton function for now
-        # In the future, this will implement the actual scheduling logic
-        logger.info(f"Scheduling data processing for workflow/app ID: {workflow_app_id}")
-        # TODO: Implement actual scheduling logic
+    def _get_app_requirements(self, context, app_id):
+        address = self._make_docker_image_address(app_id)
+        state_entries = context.get_state([address])
+        if state_entries:
+            app_data = json.loads(state_entries[0].data.decode())
+            return {
+                "memory": app_data["resource_requirements"]["memory"],
+                "cpu": app_data["resource_requirements"]["cpu"],
+                "disk": app_data["resource_requirements"]["disk"]
+            }
+        else:
+            raise InvalidTransaction(f"No requirements found for app ID: {app_id}")
 
-    def _make_iot_data_address(self, workflow_app_id):
-        return NAMESPACE + hashlib.sha512(workflow_app_id.encode()).hexdigest()[:64]
+    def _schedule_data_processing(self, iot_data, workflow_id):
+        try:
+            logger.info(f"Scheduling data processing for workflow ID: {workflow_id}")
+            schedule_result = self.scheduler.schedule(iot_data)
+            logger.info(f"Scheduling result: {schedule_result}")
+            return schedule_result
+        except Exception as e:
+            logger.error(f"Error in scheduling: {str(e)}")
+            raise
 
     def _make_workflow_address(self, workflow_id):
         return WORKFLOW_NAMESPACE + hashlib.sha512(workflow_id.encode()).hexdigest()[:64]
@@ -105,10 +140,13 @@ class IoTDataTransactionHandler(TransactionHandler):
     def _make_docker_image_address(self, app_id):
         return DOCKER_IMAGE_NAMESPACE + hashlib.sha512(app_id.encode()).hexdigest()[:64]
 
+    def _make_schedule_address(self, workflow_id):
+        return SCHEDULE_NAMESPACE + hashlib.sha512(workflow_id.encode()).hexdigest()[:64]
+
 
 def main():
     processor = TransactionProcessor(url=os.getenv('VALIDATOR_URL', 'tcp://validator:4004'))
-    handler = IoTDataTransactionHandler()
+    handler = IoTScheduleTransactionHandler()
     processor.add_handler(handler)
     processor.start()
 

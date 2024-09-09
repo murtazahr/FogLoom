@@ -1,7 +1,0 @@
-{
-  "start": "7ade4ebc-adf8-4997-9aa6-d14c515c57ce",
-  "nodes": {
-    "7ade4ebc-adf8-4997-9aa6-d14c515c57ce": {"next": ["24000d2c-5adb-4353-a4d6-7fde4e7c4263"]},
-    "24000d2c-5adb-4353-a4d6-7fde4e7c4263": {"next": []}
-  }
-}

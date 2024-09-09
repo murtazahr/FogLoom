@@ -14,12 +14,12 @@ app = Flask(__name__)
 
 logger = logging.getLogger(__name__)
 
-FAMILY_NAME = 'iot-data'
+FAMILY_NAME = 'iot-schedule'
 FAMILY_VERSION = '1.0'
-NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
 WORKFLOW_NAMESPACE = hashlib.sha512('workflow-dependency'.encode()).hexdigest()[:6]
 DOCKER_IMAGE_NAMESPACE = hashlib.sha512('docker-image'.encode()).hexdigest()[:6]
+SCHEDULE_NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/client.priv')
 VALIDATOR_URL = os.getenv('VALIDATOR_URL', 'tcp://validator:4004')
@@ -34,7 +34,7 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(ex)}") from ex
 
 
-def create_iot_data_transaction(signer, iot_data, workflow_app_id):
+def create_iot_schedule_transaction(signer, iot_data, workflow_app_id):
     payload = {
         "iot_data": iot_data,
         "workflow_app_id": workflow_app_id,
@@ -43,9 +43,9 @@ def create_iot_data_transaction(signer, iot_data, workflow_app_id):
     payload_bytes = json.dumps(payload).encode()
 
     # Use all namespaces for input (for reading/validation)
-    inputs = [NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
-    # Use only IoT data namespace for output
-    outputs = [NAMESPACE]
+    inputs = [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
+    # Use only Schedule namespace for output
+    outputs = [SCHEDULE_NAMESPACE]
 
     txn_header = TransactionHeader(
         family_name=FAMILY_NAME,
@@ -117,7 +117,7 @@ def submit_iot_data():
         iot_data = data['iot_data']
         workflow_app_id = data['workflow_app_id']
 
-        transaction = create_iot_data_transaction(signer, iot_data, workflow_app_id)
+        transaction = create_iot_schedule_transaction(signer, iot_data, workflow_app_id)
         batch = create_batch([transaction], signer)
         result = submit_batch(batch)
 

@@ -1,0 +1,7 @@
+{
+  "start": "c491275e-d344-411f-81b1-6b323719cdbd",
+  "nodes": {
+    "c491275e-d344-411f-81b1-6b323719cdbd": {"next": ["fccb6fbc-3384-47b9-814d-3cabfe602725"]},
+    "fccb6fbc-3384-47b9-814d-3cabfe602725": {"next": []}
+  }
+}
