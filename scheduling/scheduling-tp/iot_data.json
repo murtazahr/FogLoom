@@ -1,0 +1,35 @@
+{
+  "workflow_id": "68fbff61-00dc-44ac-b0ed-30cce8f816da",
+  "iot_data": [
+    {
+      "temp": 37
+    },
+    {
+      "temp": 15
+    },
+    {
+      "temp": 37
+    },
+    {
+      "temp": 15
+    },
+    {
+      "temp": 37
+    },
+    {
+      "temp": 15
+    },
+    {
+      "temp": 37
+    },
+    {
+      "temp": 15
+    },
+    {
+      "temp": 37
+    },
+    {
+      "temp": 15
+    }
+  ]
+}

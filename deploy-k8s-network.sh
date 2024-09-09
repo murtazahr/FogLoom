@@ -30,6 +30,10 @@ docker build -t $DOCKER_USERNAME/dependency-management-client:latest ./manage-de
 # Build fog-node image
 docker build -t $DOCKER_USERNAME/fog-node:latest ./fog-node
 
+# REMOVE LATER
+docker build -t murtazahr/scheduler:latest ./scheduling/scheduling-tp
+docker push $DOCKER_USERNAME/scheduler:latest
+
 # Push images to Docker Hub
 docker push $DOCKER_USERNAME/peer-registry-tp:latest
 docker push $DOCKER_USERNAME/docker-image-tp:latest

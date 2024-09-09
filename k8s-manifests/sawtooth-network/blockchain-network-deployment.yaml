@@ -144,6 +144,12 @@ items:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-0:4004"
 
+            - name: scheduler
+              image: murtazahr/scheduler:latest
+              env:
+                - name: COUCHDB_HOST
+                  value: "couchdb-0.default.svc.cluster.local:5984"
+
             - name: fog-node
               image: murtazahr/fog-node:latest
               securityContext:
