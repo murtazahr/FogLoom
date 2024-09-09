@@ -7,6 +7,7 @@ import time
 import random
 import traceback
 import logging
+from collections import defaultdict
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -84,12 +85,44 @@ class LCDWRRScheduler(BaseScheduler):
         logging.debug(f"Selected node {selected_node['id']} for app {app_id}")
         return selected_node['id']
 
+    def topological_sort(self):
+        # Create a graph representation
+        graph = defaultdict(list)
+        in_degree = {node: 0 for node in self.dependency_graph['nodes']}
+
+        for edge in self.dependency_graph['edges']:
+            source, target = edge['source'], edge['target']
+            graph[source].append(target)
+            in_degree[target] += 1
+
+        # Initialize queue with nodes having no dependencies
+        queue = [node for node in in_degree if in_degree[node] == 0]
+        result = []
+
+        while queue:
+            node = queue.pop(0)
+            result.append(node)
+
+            for neighbor in graph[node]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+
+        if len(result) != len(self.dependency_graph['nodes']):
+            raise ValueError("Graph has a cycle")
+
+        return result
+
     def schedule(self, iot_data: List[Dict[str, Any]]) -> Dict[str, List[str]]:
         logging.info("Starting scheduling process")
         node_resources = self.get_latest_node_data()
         schedule = {node['id']: [] for node in node_resources['rows']}
 
-        for app_id in self.dependency_graph['nodes']:
+        # Get the topologically sorted order of apps
+        sorted_apps = self.topological_sort()
+        logging.debug(f"Topologically sorted apps: {sorted_apps}")
+
+        for app_id in sorted_apps:
             logging.debug(f"Scheduling app: {app_id}")
             selected_node = self.select_node(app_id, node_resources)
             schedule[selected_node].append(app_id)
