@@ -107,9 +107,33 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         address = self._make_workflow_address(workflow_id)
         state_entries = context.get_state([address])
         if state_entries:
-            return json.loads(state_entries[0].data.decode())
+            try:
+                workflow_data = json.loads(state_entries[0].data.decode())
+                logger.debug(f"Retrieved workflow data: {workflow_data}")
+
+                if 'dependency_graph' not in workflow_data:
+                    raise KeyError("'dependency_graph' not found in workflow data")
+
+                dependency_graph = workflow_data['dependency_graph']
+                logger.debug(f"Extracted dependency graph: {dependency_graph}")
+
+                if 'nodes' not in dependency_graph:
+                    raise KeyError("'nodes' not found in dependency graph")
+
+                return dependency_graph
+
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON in workflow data: {e}")
+                raise InvalidTransaction(f"Invalid workflow data for workflow ID: {workflow_id}")
+            except KeyError as e:
+                logger.error(f"Missing key in workflow data: {e}")
+                raise InvalidTransaction(f"Invalid workflow data structure for workflow ID: {workflow_id}")
+            except Exception as e:
+                logger.error(f"Unexpected error parsing workflow data: {e}")
+                raise InvalidTransaction(f"Error processing workflow data for workflow ID: {workflow_id}")
         else:
-            raise InvalidTransaction(f"No dependency graph found for workflow ID: {workflow_id}")
+            logger.error(f"No workflow data found for workflow ID: {workflow_id}")
+            raise InvalidTransaction(f"No workflow data found for workflow ID: {workflow_id}")
 
     def _get_app_requirements(self, context, app_id):
         address = self._make_docker_image_address(app_id)
