@@ -4,6 +4,7 @@ import logging
 import os
 import traceback
 
+import couchdb
 from sawtooth_sdk.processor.core import TransactionProcessor
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
@@ -12,6 +13,7 @@ from scheduler import create_scheduler
 
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
 COUCHDB_DB = 'resource_registry'
+COUCHDB_SCHEDULE_DB = 'schedules'
 
 FAMILY_NAME = 'iot-schedule'
 FAMILY_VERSION = '1.0'
@@ -26,6 +28,9 @@ logger = logging.getLogger(__name__)
 class IoTScheduleTransactionHandler(TransactionHandler):
     def __init__(self):
         self.scheduler = None
+        # CouchDB connection
+        self.couch = couchdb.Server(COUCHDB_URL)
+        self.db = self.couch[COUCHDB_SCHEDULE_DB]
 
     @property
     def family_name(self):
@@ -69,27 +74,28 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
             logger.info(f"Processing IoT data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
 
-            # Validate workflow_id
             if not self._validate_workflow_id(context, workflow_id):
                 raise InvalidTransaction(f"Invalid workflow ID: {workflow_id}")
 
-            # Initialize scheduler with blockchain data
             self.scheduler = self._initialize_scheduler(context, workflow_id)
 
-            # Schedule data processing
             schedule_result = self._schedule_data_processing(iot_data, workflow_id)
 
-            # Store the schedule result in state using schedule_id
+            # Store the full schedule result in CouchDB
+            self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
+
+            # Store minimal information in blockchain
             schedule_address = self._make_schedule_address(schedule_id)
             schedule_state_data = json.dumps({
-                'schedule': schedule_result,
+                'schedule_id': schedule_id,
                 'workflow_id': workflow_id,
-                'timestamp': timestamp
+                'timestamp': timestamp,
+                'status': 'COMPLETED'  # You might want to add more detailed status handling
             }).encode()
 
-            logger.info(f"Writing scheduling result to blockchain for schedule ID: {schedule_id}")
+            logger.info(f"Writing schedule status to blockchain for schedule ID: {schedule_id}")
             context.set_state({schedule_address: schedule_state_data})
-            logger.info(f"Successfully wrote scheduling result to blockchain for schedule ID: {schedule_id}")
+            logger.info(f"Successfully wrote schedule status to blockchain for schedule ID: {schedule_id}")
 
             logger.info(f"Scheduling completed for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
 
@@ -101,6 +107,20 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.error(f"Unexpected error in apply method: {str(e)}")
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
+
+    def _store_schedule_in_couchdb(self, schedule_id, schedule_result, workflow_id, timestamp):
+        try:
+            document = {
+                '_id': schedule_id,
+                'schedule': schedule_result,
+                'workflow_id': workflow_id,
+                'timestamp': timestamp
+            }
+            self.db.save(document)
+            logger.info(f"Successfully stored schedule in CouchDB for schedule ID: {schedule_id}")
+        except Exception as e:
+            logger.error(f"Failed to store schedule in CouchDB: {str(e)}")
+            raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
 
     def _validate_workflow_id(self, context, workflow_id):
         address = self._make_workflow_address(workflow_id)
