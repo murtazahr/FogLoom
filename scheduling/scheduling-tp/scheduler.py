@@ -52,8 +52,7 @@ class LCDWRRScheduler(BaseScheduler):
 
     def calculate_available_resources(self, node: Dict) -> Dict[str, float]:
         cpu_available = node['resource_data']['cpu']['total'] * (1 - node['resource_data']['cpu']['used_percent'] / 100)
-        memory_available = node['resource_data']['memory']['total'] * (
-                    1 - node['resource_data']['memory']['used_percent'] / 100)
+        memory_available = node['resource_data']['memory']['total'] * (1 - node['resource_data']['memory']['used_percent'] / 100)
         return {
             'cpu': cpu_available,
             'memory': memory_available
@@ -92,25 +91,29 @@ class LCDWRRScheduler(BaseScheduler):
                 return True
         return False
 
-    def schedule(self, iot_data: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    def schedule(self, iot_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         node_resources = self.get_latest_node_data()
-        schedule = {node['id']: [] for node in node_resources['rows']}
+        node_schedule = {node['id']: [] for node in node_resources['rows']}
         unscheduled_tasks = []
 
         sorted_apps, levels = self.topological_sort_with_levels()
         logger.debug(f"Topologically sorted apps with levels: {levels}")
 
-        for level in sorted(levels.keys()):
-            parallel_apps = levels[level]
-            logger.debug(f"Scheduling parallel apps at level {level}: {parallel_apps}")
-
-            for app_id in parallel_apps:
+        level_info = {}
+        for level, apps in levels.items():
+            level_info[level] = []
+            for app_id in apps:
                 scheduled = False
                 for attempt in range(self.max_retries):
                     try:
                         selected_node = self.select_node(app_id, node_resources)
-                        schedule[selected_node].append(app_id)
+                        node_schedule[selected_node].append(app_id)
                         self.update_node_resources(node_resources, selected_node, app_id)
+                        level_info[level].append({
+                            "app_id": app_id,
+                            "node": selected_node,
+                            "dependencies": self.dependency_graph['nodes'][app_id].get('next', [])
+                        })
                         logger.debug(f"Scheduled {app_id} on node {selected_node}")
                         scheduled = True
                         break
@@ -118,7 +121,7 @@ class LCDWRRScheduler(BaseScheduler):
                         logger.warning(f"Attempt {attempt + 1} failed for {app_id}: {str(e)}")
                         if attempt < self.max_retries - 1:
                             time.sleep(self.retry_delay)
-                            node_resources = self.get_latest_node_data()  # Refresh node data
+                            node_resources = self.get_latest_node_data()
                         else:
                             logger.error(f"Failed to schedule {app_id} after {self.max_retries} attempts")
 
@@ -126,10 +129,14 @@ class LCDWRRScheduler(BaseScheduler):
                     unscheduled_tasks.append(app_id)
 
         if unscheduled_tasks:
-            logger.error(f"Unable to schedule the following tasks due to resource constraints: {unscheduled_tasks}")
+            logger.error(f"Unable to schedule tasks: {unscheduled_tasks}")
             raise ResourceConstraintError(f"Failed to schedule {len(unscheduled_tasks)} tasks: {unscheduled_tasks}")
 
-        return schedule
+        return {
+            "node_schedule": node_schedule,
+            "level_info": level_info,
+            "timestamp": int(time.time())
+        }
 
     def get_latest_node_data(self):
         node_resources = {'rows': []}
