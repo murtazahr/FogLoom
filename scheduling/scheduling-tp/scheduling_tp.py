@@ -113,12 +113,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
     def _store_initial_input_data(self, workflow_id, schedule_id, iot_data, schedule_result):
         try:
-            # Check if 'schedule' key exists
-            if 'schedule' not in schedule_result:
-                raise KeyError("'schedule' key not found in schedule_result")
-
             # Access 'level_info' from the nested 'schedule' dictionary
-            level_info = schedule_result['schedule'].get('level_info')
+            level_info = schedule_result.get('level_info')
             if not level_info:
                 raise KeyError("'level_info' not found in schedule_result['schedule']")
 
