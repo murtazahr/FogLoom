@@ -113,11 +113,14 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
     def _store_initial_input_data(self, workflow_id, schedule_id, iot_data, schedule_result):
         try:
+            logger.info(f"Storing initial input data for workflow ID: {workflow_id} for schedule ID: {schedule_id}")
+            logger.info(f"Schedule Result: {schedule_result}")
             # Access 'level_info' from the nested 'schedule' dictionary
             level_info = schedule_result.get('level_info')
             if not level_info:
                 raise KeyError("'level_info' not found in schedule_result['schedule']")
 
+            logger.info(f"Level Info: {level_info}")
             # Get level 0 tasks
             level_0_tasks = level_info.get('0')
             if not level_0_tasks:
