@@ -113,15 +113,31 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
     def _store_initial_input_data(self, workflow_id, schedule_id, iot_data, schedule_result):
         try:
-            level_0_tasks = schedule_result['level_info']['0']
+            # Check if 'schedule' key exists
+            if 'schedule' not in schedule_result:
+                raise KeyError("'schedule' key not found in schedule_result")
+
+            # Access 'level_info' from the nested 'schedule' dictionary
+            level_info = schedule_result['schedule'].get('level_info')
+            if not level_info:
+                raise KeyError("'level_info' not found in schedule_result['schedule']")
+
+            # Get level 0 tasks
+            level_0_tasks = level_info.get('0')
+            if not level_0_tasks:
+                raise KeyError("No tasks found for level 0")
+
             for task in level_0_tasks:
                 data_id = self._generate_data_id(workflow_id, schedule_id, task['app_id'], 'input')
                 self._safe_store_data(data_id, iot_data, workflow_id, schedule_id)
+
             logger.info(f"Successfully processed initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
-        except Exception as e:
+        except KeyError as e:
             logger.error(f"Error processing initial input data: {str(e)}")
-            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule "
-                                     f"ID: {schedule_id}")
+            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}. Error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error processing initial input data: {str(e)}")
+            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
 
     def _generate_data_id(self, workflow_id, schedule_id, app_id, data_type):
         return f"{workflow_id}_{schedule_id}_{app_id}_{data_type}"
