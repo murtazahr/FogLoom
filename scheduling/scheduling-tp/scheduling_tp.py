@@ -65,8 +65,15 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             else:
                 self.scheduler = self._initialize_scheduler(context, workflow_id)
                 schedule_result = self._schedule_data_processing(iot_data, workflow_id)
-                self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
-                self._store_initial_input_data(workflow_id, schedule_id, iot_data, schedule_result)
+
+                # Scheduling may take some time if no node is available. So, we need to check again that no record
+                # already exists in couchdb
+                if self._check_schedule_in_couchdb(schedule_id):
+                    logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists in "
+                                f"CouchDB. Proceeding with blockchain update.")
+                else:
+                    self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
+                    self._store_initial_input_data(workflow_id, schedule_id, iot_data, schedule_result)
 
             schedule_address = self._make_schedule_address(schedule_id)
             schedule_state_data = json.dumps({
@@ -130,7 +137,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 data_id = self._generate_data_id(workflow_id, schedule_id, task['app_id'], 'input')
                 self._safe_store_data(data_id, iot_data, workflow_id, schedule_id)
 
-            logger.info(f"Successfully processed initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
+            logger.info(
+                f"Successfully processed initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
         except KeyError as e:
             logger.error(f"Error processing initial input data: {str(e)}")
             raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule "
