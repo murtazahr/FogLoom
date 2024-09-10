@@ -112,7 +112,7 @@ class LCDWRRScheduler(BaseScheduler):
                         level_info[level].append({
                             "app_id": app_id,
                             "node": selected_node,
-                            "dependencies": self.dependency_graph['nodes'][app_id].get('next', [])
+                            "next": self.dependency_graph['nodes'][app_id].get('next', [])
                         })
                         logger.debug(f"Scheduled {app_id} on node {selected_node}")
                         scheduled = True

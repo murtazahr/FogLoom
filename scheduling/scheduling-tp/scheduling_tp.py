@@ -11,10 +11,13 @@ from sawtooth_sdk.processor.handler import TransactionHandler
 
 from scheduler import create_scheduler
 
+# CouchDB configuration
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
 COUCHDB_DB = 'resource_registry'
 COUCHDB_SCHEDULE_DB = 'schedules'
+COUCHDB_DATA_DB = 'task_data'
 
+# Sawtooth configuration
 FAMILY_NAME = 'iot-schedule'
 FAMILY_VERSION = '1.0'
 
@@ -28,9 +31,9 @@ logger = logging.getLogger(__name__)
 class IoTScheduleTransactionHandler(TransactionHandler):
     def __init__(self):
         self.scheduler = None
-        # CouchDB connection
         self.couch = couchdb.Server(COUCHDB_URL)
-        self.db = self.couch[COUCHDB_SCHEDULE_DB]
+        self.schedule_db = self.couch[COUCHDB_SCHEDULE_DB]
+        self.data_db = self.couch[COUCHDB_DATA_DB]
 
     @property
     def family_name(self):
@@ -43,26 +46,6 @@ class IoTScheduleTransactionHandler(TransactionHandler):
     @property
     def namespaces(self):
         return [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
-
-    def _initialize_scheduler(self, context, workflow_id):
-        try:
-            # Fetch dependency graph from blockchain
-            dependency_graph = self._get_dependency_graph(context, workflow_id)
-
-            # Fetch app requirements for each app in the dependency graph
-            app_requirements = {}
-            for app_id in dependency_graph['nodes']:
-                app_requirements[app_id] = self._get_app_requirements(context, app_id)
-
-            db_config = {
-                "url": COUCHDB_URL,
-                "name": COUCHDB_DB
-            }
-
-            return create_scheduler("lcdwrr", dependency_graph, app_requirements, db_config)
-        except Exception as e:
-            logger.error(f"Failed to initialize scheduler: {str(e)}")
-            raise
 
     def apply(self, transaction, context):
         try:
@@ -77,31 +60,27 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             if not self._validate_workflow_id(context, workflow_id):
                 raise InvalidTransaction(f"Invalid workflow ID: {workflow_id}")
 
-            # Check if the schedule already exists in CouchDB
             if self._check_schedule_in_couchdb(schedule_id):
                 logger.info(f"Schedule {schedule_id} already exists in CouchDB. Proceeding with blockchain update.")
             else:
-                # Schedule doesn't exist, so we need to create it
                 self.scheduler = self._initialize_scheduler(context, workflow_id)
                 schedule_result = self._schedule_data_processing(iot_data, workflow_id)
                 self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
+                self._store_initial_input_data(workflow_id, schedule_id, iot_data, schedule_result)
 
-            # Store minimal information in blockchain
             schedule_address = self._make_schedule_address(schedule_id)
             schedule_state_data = json.dumps({
                 'schedule_id': schedule_id,
                 'workflow_id': workflow_id,
                 'timestamp': timestamp,
-                'status': 'COMPLETED'
+                'status': 'ACTIVE'
             }).encode()
 
             logger.info(f"Writing schedule status to blockchain for schedule ID: {schedule_id}")
             context.set_state({schedule_address: schedule_state_data})
             logger.info(f"Successfully wrote schedule status to blockchain for schedule ID: {schedule_id}")
 
-            logger.info(f"Scheduling completed for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
-
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError as _:
             raise InvalidTransaction("Invalid payload: not a valid JSON")
         except KeyError as e:
             raise InvalidTransaction(f"Invalid payload: missing {str(e)}")
@@ -112,7 +91,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
     def _check_schedule_in_couchdb(self, schedule_id):
         try:
-            _ = self.db[schedule_id]
+            _ = self.schedule_db[schedule_id]
             return True
         except couchdb.http.ResourceNotFound:
             return False
@@ -123,15 +102,61 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 '_id': schedule_id,
                 'schedule': schedule_result,
                 'workflow_id': workflow_id,
-                'timestamp': timestamp
+                'timestamp': timestamp,
+                'status': 'ACTIVE'
             }
-            self.db.save(document)
+            self.schedule_db.save(document)
             logger.info(f"Successfully stored schedule in CouchDB for schedule ID: {schedule_id}")
-        except couchdb.http.ResourceConflict:
-            logger.info(f"Schedule {schedule_id} already exists in CouchDB. Skipping save.")
         except Exception as e:
             logger.error(f"Failed to store schedule in CouchDB: {str(e)}")
             raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
+
+    def _store_initial_input_data(self, workflow_id, schedule_id, iot_data, schedule_result):
+        try:
+            level_0_tasks = schedule_result['level_info']['0']
+            for task in level_0_tasks:
+                data_id = self._generate_data_id(workflow_id, schedule_id, task['app_id'], 'input')
+                self._safe_store_data(data_id, iot_data, workflow_id, schedule_id)
+            logger.info(f"Successfully processed initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
+        except Exception as e:
+            logger.error(f"Error processing initial input data: {str(e)}")
+            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule "
+                                     f"ID: {schedule_id}")
+
+    def _generate_data_id(self, workflow_id, schedule_id, app_id, data_type):
+        return f"{workflow_id}_{schedule_id}_{app_id}_{data_type}"
+
+    def _safe_store_data(self, data_id, data, workflow_id, schedule_id):
+        try:
+            self.data_db.save({
+                '_id': data_id,
+                'data': data,
+                'workflow_id': workflow_id,
+                'schedule_id': schedule_id
+            })
+            logger.info(f"Successfully stored data for ID: {data_id}")
+        except couchdb.http.ResourceConflict:
+            logger.info(f"Data for ID: {data_id} already exists. Skipping storage.")
+        except Exception as e:
+            logger.error(f"Unexpected error while storing data for ID {data_id}: {str(e)}")
+            raise
+
+    def _initialize_scheduler(self, context, workflow_id):
+        try:
+            dependency_graph = self._get_dependency_graph(context, workflow_id)
+            app_requirements = {}
+            for app_id in dependency_graph['nodes']:
+                app_requirements[app_id] = self._get_app_requirements(context, app_id)
+
+            db_config = {
+                "url": COUCHDB_URL,
+                "name": COUCHDB_DB
+            }
+
+            return create_scheduler("lcdwrr", dependency_graph, app_requirements, db_config)
+        except Exception as e:
+            logger.error(f"Failed to initialize scheduler: {str(e)}")
+            raise
 
     def _validate_workflow_id(self, context, workflow_id):
         address = self._make_workflow_address(workflow_id)
@@ -144,30 +169,16 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         if state_entries:
             try:
                 workflow_data = json.loads(state_entries[0].data.decode())
-                logger.debug(f"Retrieved workflow data: {workflow_data}")
-
                 if 'dependency_graph' not in workflow_data:
                     raise KeyError("'dependency_graph' not found in workflow data")
-
                 dependency_graph = workflow_data['dependency_graph']
-                logger.debug(f"Extracted dependency graph: {dependency_graph}")
-
                 if 'nodes' not in dependency_graph:
                     raise KeyError("'nodes' not found in dependency graph")
-
                 return dependency_graph
-
-            except json.JSONDecodeError as e:
-                logger.error(f"Invalid JSON in workflow data: {e}")
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.error(f"Error parsing workflow data: {e}")
                 raise InvalidTransaction(f"Invalid workflow data for workflow ID: {workflow_id}")
-            except KeyError as e:
-                logger.error(f"Missing key in workflow data: {e}")
-                raise InvalidTransaction(f"Invalid workflow data structure for workflow ID: {workflow_id}")
-            except Exception as e:
-                logger.error(f"Unexpected error parsing workflow data: {e}")
-                raise InvalidTransaction(f"Error processing workflow data for workflow ID: {workflow_id}")
         else:
-            logger.error(f"No workflow data found for workflow ID: {workflow_id}")
             raise InvalidTransaction(f"No workflow data found for workflow ID: {workflow_id}")
 
     def _get_app_requirements(self, context, app_id):
@@ -186,26 +197,11 @@ class IoTScheduleTransactionHandler(TransactionHandler):
     def _schedule_data_processing(self, iot_data, workflow_id):
         try:
             logger.info(f"Starting scheduling process for workflow ID: {workflow_id}")
-
-            # Log the input data (be cautious with sensitive data)
-            logger.debug(f"IoT data for workflow {workflow_id}: {iot_data}")
-
-            # Perform the scheduling
             schedule_result = self.scheduler.schedule(iot_data)
-
-            # Log the scheduling result
             logger.info(f"Scheduling completed for workflow ID: {workflow_id}")
-            logger.debug(f"Scheduling result for workflow {workflow_id}: {schedule_result}")
-
-            # Validate the scheduling result
-            if not schedule_result or not isinstance(schedule_result, dict):
-                raise ValueError(f"Invalid scheduling result for workflow {workflow_id}")
-
             return schedule_result
-
         except Exception as e:
             logger.error(f"Error in scheduling for workflow ID {workflow_id}: {str(e)}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
             raise InvalidTransaction(f"Scheduling failed for workflow ID {workflow_id}: {str(e)}")
 
     def _make_workflow_address(self, workflow_id):

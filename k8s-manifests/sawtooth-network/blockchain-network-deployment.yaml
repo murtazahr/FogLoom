@@ -37,7 +37,7 @@ items:
                 - 'sh'
                 - '-c'
                 - |
-                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB}; do
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
                     for i in 0 1 2 3 4; do
                       until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
                         echo "Waiting for ${db} on couchdb-${i}..."
@@ -46,12 +46,14 @@ items:
                       echo "${db} is available on couchdb-${i}"
                     done
                   done &&
-                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} is available on all nodes"
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
               env:
                 - name: RESOURCE_REGISTRY_DB
                   value: "resource_registry"
                 - name: SCHEDULES_DB
                   value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -327,7 +329,7 @@ items:
                 - 'sh'
                 - '-c'
                 - |
-                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB}; do
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
                     for i in 0 1 2 3 4; do
                       until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
                         echo "Waiting for ${db} on couchdb-${i}..."
@@ -336,12 +338,14 @@ items:
                       echo "${db} is available on couchdb-${i}"
                     done
                   done &&
-                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} is available on all nodes"
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
               env:
                 - name: RESOURCE_REGISTRY_DB
                   value: "resource_registry"
                 - name: SCHEDULES_DB
                   value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -583,7 +587,7 @@ items:
                 - 'sh'
                 - '-c'
                 - |
-                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB}; do
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
                     for i in 0 1 2 3 4; do
                       until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
                         echo "Waiting for ${db} on couchdb-${i}..."
@@ -592,12 +596,14 @@ items:
                       echo "${db} is available on couchdb-${i}"
                     done
                   done &&
-                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} is available on all nodes"
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
               env:
                 - name: RESOURCE_REGISTRY_DB
                   value: "resource_registry"
                 - name: SCHEDULES_DB
                   value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -840,7 +846,7 @@ items:
                 - 'sh'
                 - '-c'
                 - |
-                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB}; do
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
                     for i in 0 1 2 3 4; do
                       until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
                         echo "Waiting for ${db} on couchdb-${i}..."
@@ -849,12 +855,14 @@ items:
                       echo "${db} is available on couchdb-${i}"
                     done
                   done &&
-                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} is available on all nodes"
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
               env:
                 - name: RESOURCE_REGISTRY_DB
                   value: "resource_registry"
                 - name: SCHEDULES_DB
                   value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -1097,7 +1105,7 @@ items:
                 - 'sh'
                 - '-c'
                 - |
-                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB}; do
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
                     for i in 0 1 2 3 4; do
                       until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
                         echo "Waiting for ${db} on couchdb-${i}..."
@@ -1106,12 +1114,14 @@ items:
                       echo "${db} is available on couchdb-${i}"
                     done
                   done &&
-                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} is available on all nodes"
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
               env:
                 - name: RESOURCE_REGISTRY_DB
                   value: "resource_registry"
                 - name: SCHEDULES_DB
                   value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
