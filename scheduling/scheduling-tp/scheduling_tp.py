@@ -122,7 +122,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
             logger.info(f"Level Info: {level_info}")
             # Get level 0 tasks
-            level_0_tasks = level_info.get('0')
+            level_0_tasks = level_info[0]
             if not level_0_tasks:
                 raise KeyError("No tasks found for level 0")
 
@@ -133,10 +133,12 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.info(f"Successfully processed initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
         except KeyError as e:
             logger.error(f"Error processing initial input data: {str(e)}")
-            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}. Error: {str(e)}")
+            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule "
+                                     f"ID: {schedule_id}. Error: {str(e)}")
         except Exception as e:
             logger.error(f"Unexpected error processing initial input data: {str(e)}")
-            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
+            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, schedule "
+                                     f"ID: {schedule_id}")
 
     def _generate_data_id(self, workflow_id, schedule_id, app_id, data_type):
         return f"{workflow_id}_{schedule_id}_{app_id}_{data_type}"
