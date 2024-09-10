@@ -77,12 +77,14 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             if not self._validate_workflow_id(context, workflow_id):
                 raise InvalidTransaction(f"Invalid workflow ID: {workflow_id}")
 
-            self.scheduler = self._initialize_scheduler(context, workflow_id)
-
-            schedule_result = self._schedule_data_processing(iot_data, workflow_id)
-
-            # Store the full schedule result in CouchDB
-            self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
+            # Check if the schedule already exists in CouchDB
+            if self._check_schedule_in_couchdb(schedule_id):
+                logger.info(f"Schedule {schedule_id} already exists in CouchDB. Proceeding with blockchain update.")
+            else:
+                # Schedule doesn't exist, so we need to create it
+                self.scheduler = self._initialize_scheduler(context, workflow_id)
+                schedule_result = self._schedule_data_processing(iot_data, workflow_id)
+                self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
 
             # Store minimal information in blockchain
             schedule_address = self._make_schedule_address(schedule_id)
@@ -90,7 +92,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 'schedule_id': schedule_id,
                 'workflow_id': workflow_id,
                 'timestamp': timestamp,
-                'status': 'COMPLETED'  # You might want to add more detailed status handling
+                'status': 'COMPLETED'
             }).encode()
 
             logger.info(f"Writing schedule status to blockchain for schedule ID: {schedule_id}")
@@ -108,6 +110,13 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
 
+    def _check_schedule_in_couchdb(self, schedule_id):
+        try:
+            _ = self.db[schedule_id]
+            return True
+        except couchdb.http.ResourceNotFound:
+            return False
+
     def _store_schedule_in_couchdb(self, schedule_id, schedule_result, workflow_id, timestamp):
         try:
             document = {
@@ -118,6 +127,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             }
             self.db.save(document)
             logger.info(f"Successfully stored schedule in CouchDB for schedule ID: {schedule_id}")
+        except couchdb.http.ResourceConflict:
+            logger.info(f"Schedule {schedule_id} already exists in CouchDB. Skipping save.")
         except Exception as e:
             logger.error(f"Failed to store schedule in CouchDB: {str(e)}")
             raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
