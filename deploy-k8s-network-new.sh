@@ -638,7 +638,7 @@ spec:
             - bash
           args:
             - -c
-            - "for i in {0..$(($num_fog_nodes-1))}; do sawadm keygen -q pbft\$i; done && cd /etc/sawtooth/keys/ && grep '' * | sed 's/\\.//' | sed 's/:/:\ /'"
+            - "for i in {0..$(($num_fog_nodes-1))}; do sawadm keygen -q pbft\${i}; done && cd /etc/sawtooth/keys/ && grep '' * | sed 's/\\\\.//' | sed 's/:/:\ /'"
       restartPolicy: Never
   backoffLimit: 4
 EOF
