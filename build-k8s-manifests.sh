@@ -657,6 +657,9 @@ pod_name=$(kubectl get pods --selector=job-name=pbft-keys --output=jsonpath='{.i
 # Fetch the keys from the pod logs
 generated_keys=$(kubectl logs "$pod_name")
 
+# Delete the job YAML
+kubectl delete -f kubernetes-manifests/generated/pbft-key-generation-job.yaml
+
 echo "PBFT key generation job has been deleted."
 
 # Process the generated keys to add proper indentation
