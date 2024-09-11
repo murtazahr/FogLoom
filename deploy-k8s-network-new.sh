@@ -140,7 +140,7 @@ items:"
                 - |
                   DB_NAME=\"resource_registry\" &&
                   echo \"Starting CouchDB cluster setup\" &&
-                  for i in {0..$((num_fog_nodes-1))}; do
+                  for i in \$(seq 0 $((num_fog_nodes-1))); do
                     echo \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984\"
                     until curl -s \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984\" > /dev/null; do
                       echo \"Waiting for CouchDB on couchdb-\${i} to be ready...\"
@@ -149,9 +149,9 @@ items:"
                     echo \"CouchDB on couchdb-\${i} is ready\"
                   done &&
                   echo \"Adding nodes to the cluster\" &&
-                  for num in {1..$((num_fog_nodes-1))}; do
+                  for num in \$(seq 1 $((num_fog_nodes-1))); do
                     response=\$(curl -X POST -H 'Content-Type: application/json' \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup\" -d \"{\\\"action\\\": \\\"enable_cluster\\\", \\\"bind_address\\\":\\\"0.0.0.0\\\", \\\"username\\\": \\\"\${COUCHDB_USER}\\\", \\\"password\\\":\\\"\${COUCHDB_PASSWORD}\\\", \\\"port\\\": 5984, \\\"node_count\\\": \\\"$num_fog_nodes\\\", \\\"remote_node\\\": \\\"couchdb-\${num}.default.svc.cluster.local\\\", \\\"remote_current_user\\\": \\\"\${COUCHDB_USER}\\\", \\\"remote_current_password\\\": \\\"\${COUCHDB_PASSWORD}\\\" }\")
-                    echo \"Enable cluster on sawtooth-\${num} response: \${response}\"
+                    echo \"Enable cluster on couchdb-\${num} response: \${response}\"
                     response=\$(curl -s -X POST -H 'Content-Type: application/json' \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup\" -d \"{\\\"action\\\": \\\"add_node\\\", \\\"host\\\":\\\"couchdb-\${num}.default.svc.cluster.local\\\", \\\"port\\\": 5984, \\\"username\\\": \\\"\${COUCHDB_USER}\\\", \\\"password\\\":\\\"\${COUCHDB_PASSWORD}\\\"}\")
                     echo \"Adding node couchdb-\${num} response: \${response}\"
                   done &&
@@ -170,7 +170,7 @@ items:"
                   echo \"Creating \${TASK_DATA_DB} on couchdb-0 response: \${response}\" &&
                   echo \"Waiting for \${RESOURCE_REGISTRY_DB}, \${TASK_DATA_DB} and \${SCHEDULES_DB} to be available on all nodes\" &&
                   for db in \${RESOURCE_REGISTRY_DB} \${SCHEDULES_DB} \${TASK_DATA_DB}; do
-                    for i in {0..$((num_fog_nodes-1))}; do
+                    for i in \$(seq 0 $((num_fog_nodes-1))); do
                       until curl -s \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984/\${db}\" | grep -q \"\${db}\"; do
                         echo \"Waiting for \${db} on couchdb-\${i}...\"
                         sleep 5
