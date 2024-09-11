@@ -119,6 +119,14 @@ items:
                 - -c
                 - "settings-tp -vv -C tcp://$HOSTNAME:4004"
 
+            - name: sawtooth-shell
+              image: hyperledger/sawtooth-shell:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "sawtooth keygen && tail -f /dev/null"
+
             - name: fog-node
               image: murtazahr/fog-node:latest
               securityContext:
@@ -163,17 +171,9 @@ items:
                   containerPort: 5050
                 - name: validators
                   containerPort: 8800
-              env:
-                - name: pbft0priv
-                  valueFrom:
-                    configMapKeyRef:
-                      name: keys-config
-                      key: pbft0priv
-                - name: pbft0pub
-                  valueFrom:
-                    configMapKeyRef:
-                      name: keys-config
-                      key: pbft0pub
+              envFrom:
+                - configMapRef:
+                    name: keys-config
               command:
                 - bash
               args:
@@ -190,9 +190,9 @@ items:
                     sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
                   fi &&
                   sleep 30 &&
-                  echo sawtooth.consensus.pbft.members=["$\{pbft0pub\}","$\{pbft1pub\}","$\{pbft2pub\}","$\{pbft3pub\}"] &&
+                  echo sawtooth.consensus.pbft.members=[\"$\{pbft0pub\}\",\"$\{pbft1pub\}\",\"$\{pbft2pub\}\",\"$\{pbft3pub\}\"] &&
                   if [ ! -e config.batch ]; then
-                    sawset proposal create                       -k /root/.sawtooth/keys/my_key.priv                       sawtooth.consensus.algorithm.name=pbft                       sawtooth.consensus.algorithm.version=1.0                       sawtooth.consensus.pbft.members=["$\{pbft0pub\}","$\{pbft1pub\}","$\{pbft2pub\}","$\{pbft3pub\}"]                       sawtooth.publisher.max_batches_per_block=1200                       -o config.batch
+                    sawset proposal create                       -k /root/.sawtooth/keys/my_key.priv                       sawtooth.consensus.algorithm.name=pbft                       sawtooth.consensus.algorithm.version=1.0                       sawtooth.consensus.pbft.members=[\"$\{pbft0pub\}\",\"$\{pbft1pub\}\",\"$\{pbft2pub\}\",\"$\{pbft3pub\}\"]                       sawtooth.publisher.max_batches_per_block=1200                       -o config.batch
                   fi &&                   if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
                     sawadm genesis config-genesis.batch config.batch
                   fi &&
@@ -339,6 +339,14 @@ items:
               args:
                 - -c
                 - "settings-tp -vv -C tcp://$HOSTNAME:4004"
+
+            - name: sawtooth-shell
+              image: hyperledger/sawtooth-shell:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "sawtooth keygen && tail -f /dev/null"
 
             - name: fog-node
               image: murtazahr/fog-node:latest
@@ -549,6 +557,14 @@ items:
                 - -c
                 - "settings-tp -vv -C tcp://$HOSTNAME:4004"
 
+            - name: sawtooth-shell
+              image: hyperledger/sawtooth-shell:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "sawtooth keygen && tail -f /dev/null"
+
             - name: fog-node
               image: murtazahr/fog-node:latest
               securityContext:
@@ -757,6 +773,14 @@ items:
               args:
                 - -c
                 - "settings-tp -vv -C tcp://$HOSTNAME:4004"
+
+            - name: sawtooth-shell
+              image: hyperledger/sawtooth-shell:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "sawtooth keygen && tail -f /dev/null"
 
             - name: fog-node
               image: murtazahr/fog-node:latest
