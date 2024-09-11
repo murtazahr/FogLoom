@@ -333,6 +333,23 @@ items:"
                 - -c
                 - \"settings-tp -vv -C tcp://\$HOSTNAME:4004\"
 
+            - name: sawtooth-rest-api
+              image: hyperledger/sawtooth-rest-api:chime
+              ports:
+                - name: api
+                  containerPort: 8008
+              command:
+                - bash
+              args:
+                - -c
+                - \"sawtooth-rest-api -vv -C tcp://\$HOSTNAME:4004 -B 0.0.0.0:8008\"
+              readinessProbe:
+                httpGet:
+                  path: /status
+                  port: 8008
+                initialDelaySeconds: 15
+                periodSeconds: 10
+
             - name: sawtooth-shell
               image: hyperledger/sawtooth-shell:chime
               command:
@@ -488,6 +505,10 @@ items:"
           protocol: TCP
           port: 5050
           targetPort: 5050
+        - name: \"8008\"
+          protocol: TCP
+          port: 8008
+          targetPort: 8008
         - name: \"8080\"
           protocol: TCP
           port: 8080
