@@ -5,47 +5,55 @@ generate_pbft_keys() {
     local num_fog_nodes=$1
     local keys=""
     for ((i=0; i<num_fog_nodes; i++)); do
-        priv=$(openssl ecparam -name secp256k1 -genkey -noout | openssl ec -text -noout | grep priv -A 3 | tail -n +2 | tr -d '\n[:space:]:' | sed 's/^00//')
-        pub=$(openssl ec -in <(echo "$priv" | xxd -r -p | openssl ec -inform d -text -noout | grep pub -A 5 | tail -n +2 | tr -d '\n[:space:]:') -pubout -outform DER | tail -c 65 | xxd -p -c 65)
-        keys="${keys}      pbft${i}priv: ${priv}\n      pbft${i}pub: ${pub}\n"
+        priv_key=$(openssl ecparam -name secp256k1 -genkey | openssl ec -text -noout | grep priv -A 3 | tail -n +2 | tr -d '\n[:space:]:' | sed 's/^00//')
+        pub_key=$(openssl ecparam -name secp256k1 -genkey | openssl ec -text -noout | grep pub -A 5 | tail -n +2 | tr -d '\n[:space:]:' | sed 's/^04//')
+        keys+="      pbft${i}priv: $priv_key"$'\n'
+        keys+="      pbft${i}pub: $pub_key"$'\n'
     done
-    echo -e "$keys"
+    echo "$keys"
 }
 
-# Get user inputs
-read -p "Enter the number of fog nodes: " num_fog_nodes
-read -p "Enter the number of IoT nodes: " num_iot_nodes
+# Function to check if a node exists in the cluster
+check_node_exists() {
+    local node_name=$1
+    kubectl get nodes | grep -q "$node_name"
+    return $?
+}
+
+# Main script starts here
+echo "Enter the number of fog nodes:"
+read num_fog_nodes
+echo "Enter the number of IoT nodes:"
+read num_iot_nodes
 
 # Part 1: Verify inputs and check node existence
 if [ "$num_fog_nodes" -lt 3 ]; then
-    echo "Error: Number of fog nodes must be at least 3."
+    echo "Error: The number of fog nodes must be at least 3."
     exit 1
 fi
 
-echo "Verifying node existence..."
+echo "Checking for fog nodes..."
 for ((i=1; i<=num_fog_nodes; i++)); do
-    if ! kubectl get node "fog-node-$i" &> /dev/null; then
+    if ! check_node_exists "fog-node-$i"; then
         echo "Error: fog-node-$i does not exist in the cluster."
         exit 1
     fi
 done
 
+echo "Checking for IoT nodes..."
 for ((i=1; i<=num_iot_nodes; i++)); do
-    if ! kubectl get node "iot-node-$i" &> /dev/null; then
+    if ! check_node_exists "iot-node-$i"; then
         echo "Error: iot-node-$i does not exist in the cluster."
         exit 1
     fi
 done
 
-echo "All required nodes exist in the cluster."
+echo "All required nodes are present in the cluster."
 
-# Part 2: Generate and apply YAML
-echo "Generating YAML file..."
+# Part 2: Generate YAML file and apply to cluster
+generated_keys=$(generate_pbft_keys "$num_fog_nodes")
 
-# Generate PBFT keys
-pbft_keys=$(generate_pbft_keys "$num_fog_nodes")
-
-cat << EOF > kubernetes-manifests/sawtooth-network/config-and-secrets.yaml
+cat << EOF > kubernetes-manifests/generated/config-and-secrets.yaml
 apiVersion: v1
 kind: List
 
@@ -56,7 +64,7 @@ items:
     metadata:
       name: keys-config
     data:
-$pbft_keys
+$generated_keys
   # --------------------------=== CouchDB Secrets ===---------------------------
   - apiVersion: v1
     kind: Secret
@@ -79,10 +87,9 @@ $pbft_keys
       http-secret: Y74bs7QpaHmI1NKDGO8I3JdquvVxL+5K15NupwxhSbc=
 EOF
 
-echo "YAML file generated and saved to kubernetes-manifests/sawtooth-network/config-and-secrets.yaml"
+echo "Generated YAML file has been saved to kubernetes-manifests/generated/config-and-secrets.yaml"
 
-# Apply the YAML file
-echo "Applying YAML file to the cluster..."
-kubectl apply -f kubernetes-manifests/sawtooth-network/config-and-secrets.yaml
+# Apply the generated YAML to the cluster
+kubectl apply -f kubernetes-manifests/generated/config-and-secrets.yaml
 
-echo "Deployment script completed successfully."
+echo "Configuration and secrets have been applied to the cluster."
