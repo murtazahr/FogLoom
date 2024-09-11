@@ -388,7 +388,7 @@ items:"
 
         if [ "$i" -eq 0 ]; then
             local pbft_members=$(for ((j=0; j<num_fog_nodes; j++)); do
-                echo -n "\\\"$\{pbft${j}pub\}\\\""
+                echo -n "\"\\$pbft${j}pub\""
                 if [ $j -lt $((num_fog_nodes-1)) ]; then
                     echo -n ","
                 fi
