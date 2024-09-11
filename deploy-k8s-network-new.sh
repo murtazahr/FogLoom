@@ -657,6 +657,11 @@ pod_name=$(kubectl get pods --selector=job-name=pbft-keys --output=jsonpath='{.i
 # Fetch the keys from the pod logs
 generated_keys=$(kubectl logs "$pod_name")
 
+echo "PBFT key generation job has been deleted."
+
+# Process the generated keys to add proper indentation
+indented_keys=$(echo "$generated_keys" | sed 's/^/      /')
+
 # Create the config and secrets YAML
 cat << EOF > kubernetes-manifests/generated/config-and-secrets.yaml
 apiVersion: v1
@@ -669,7 +674,7 @@ items:
     metadata:
       name: keys-config
     data:
-$generated_keys
+$indented_keys
   # --------------------------=== CouchDB Secrets ===---------------------------
   - apiVersion: v1
     kind: Secret
