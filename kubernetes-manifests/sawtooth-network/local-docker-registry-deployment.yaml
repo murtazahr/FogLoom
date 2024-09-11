@@ -31,6 +31,8 @@ items:
           labels:
             app: sawtooth-registry
         spec:
+          nodeSelector:
+            kubernetes.io/hostname: client-console
           containers:
             - name: registry
               image: registry:2
