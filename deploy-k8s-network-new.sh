@@ -439,27 +439,13 @@ items:"
                     sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
                   fi &&
                   sleep 30 &&
-                  echo sawtooth.consensus.pbft.members=[\"$pbft_members\"] &&
+                  echo sawtooth.consensus.pbft.members=[\"${pbft_members}\"] &&
                   if [ ! -e config.batch ]; then
-                    sawset proposal create \
-                      -k /root/.sawtooth/keys/my_key.priv \
-                      sawtooth.consensus.algorithm.name=pbft \
-                      sawtooth.consensus.algorithm.version=1.0 \
-                      sawtooth.consensus.pbft.members=[\"$pbft_members\"] \
-                      sawtooth.publisher.max_batches_per_block=1200 \
-                      -o config.batch
-                  fi && \
-                  if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
+                    sawset proposal create -k /root/.sawtooth/keys/my_key.priv sawtooth.consensus.algorithm.name=pbft sawtooth.consensus.algorithm.version=1.0 sawtooth.consensus.pbft.members=[\"${pbft_members}\"] sawtooth.publisher.max_batches_per_block=1200 -o config.batch
+                  fi && if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
                     sawadm genesis config-genesis.batch config.batch
                   fi &&
-                  sawtooth-validator -vv \
-                    --endpoint tcp://\$SAWTOOTH_0_SERVICE_HOST:8800 \
-                    --bind component:tcp://eth0:4004 \
-                    --bind consensus:tcp://eth0:5050 \
-                    --bind network:tcp://eth0:8800 \
-                    --scheduler parallel \
-                    --peering static \
-                    --maximum-peer-connectivity 10000"
+                  sawtooth-validator -vv --endpoint tcp://\$SAWTOOTH_0_SERVICE_HOST:8800 --bind component:tcp://eth0:4004 --bind consensus:tcp://eth0:5050 --bind network:tcp://eth0:8800 --scheduler parallel --peering static --maximum-peer-connectivity 10000"
         else
             yaml_content+="
               env:
@@ -483,15 +469,7 @@ items:"
                     echo \$pbft${i}pub > /etc/sawtooth/keys/validator.pub
                   fi &&
                   sawtooth keygen my_key &&
-                  sawtooth-validator -vv \
-                    --endpoint tcp://\$SAWTOOTH_${i}_SERVICE_HOST:8800 \
-                    --bind component:tcp://eth0:4004 \
-                    --bind consensus:tcp://eth0:5050 \
-                    --bind network:tcp://eth0:8800 \
-                    --scheduler parallel \
-                    --peering static \
-                    --maximum-peer-connectivity 10000 \
-                    $(for ((j=0; j<i; j++)); do echo -n "--peers tcp://\$SAWTOOTH_${j}_SERVICE_HOST:8800 "; done)"
+                  sawtooth-validator -vv --endpoint tcp://\$SAWTOOTH_${i}_SERVICE_HOST:8800 --bind component:tcp://eth0:4004 --bind consensus:tcp://eth0:5050 --bind network:tcp://eth0:8800 --scheduler parallel --peering static --maximum-peer-connectivity 10000 $(for ((j=0; j<i; j++)); do echo -n "--peers tcp://\$SAWTOOTH_${j}_SERVICE_HOST:8800 "; done)"
         fi
 
         yaml_content+="
