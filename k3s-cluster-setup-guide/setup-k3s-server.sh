@@ -12,5 +12,5 @@ echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
 source ~/.bashrc
 
 echo "============== K3S_TOKEN =============="
-cat /var/lib/rancher/k3s/server/node-token
+sudo cat /var/lib/rancher/k3s/server/node-token
 echo "======================================="
