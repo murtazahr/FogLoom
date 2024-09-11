@@ -1,0 +1,918 @@
+apiVersion: v1
+kind: List
+
+items:
+  # --------------------------=== fog-node-1 ===--------------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: pbft-0
+    spec:
+      selector:
+        matchLabels:
+          name: pbft-0
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            name: pbft-0
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fog-node-1
+          volumes:
+            - name: proc
+              hostPath:
+                path: /proc
+            - name: sys
+              hostPath:
+                path: /sys
+          initContainers:
+            - name: wait-for-registry
+              image: busybox
+              command: [ 'sh', '-c', 'until nc -z sawtooth-registry 5000; do echo waiting for sawtooth-registry; sleep 2; done;' ]
+            - name: wait-for-couchdb-setup
+              image: curlimages/curl:latest
+              command:
+                - 'sh'
+                - '-c'
+                - |
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
+                    for i in $(seq 0 3); do
+                      until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
+                        echo "Waiting for ${db} on couchdb-${i}..."
+                        sleep 5
+                      done
+                      echo "${db} is available on couchdb-${i}"
+                    done
+                  done &&
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
+              env:
+                - name: RESOURCE_REGISTRY_DB
+                  value: "resource_registry"
+                - name: SCHEDULES_DB
+                  value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+          containers:
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-0.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+            - name: sawtooth-pbft-engine
+              image: hyperledger/sawtooth-pbft-engine:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "pbft-engine -vv --connect tcp://$HOSTNAME:5050"
+
+            - name: sawtooth-settings-tp
+              image: hyperledger/sawtooth-settings-tp:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "settings-tp -vv -C tcp://$HOSTNAME:4004"
+
+            - name: fog-node
+              image: murtazahr/fog-node:latest
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: proc
+                  mountPath: /host/proc
+                  readOnly: true
+                - name: sys
+                  mountPath: /host/sys
+                  readOnly: true
+              env:
+                - name: REGISTRY_URL
+                  value: "sawtooth-registry:5000"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+                - name: NODE_ID
+                  value: "sawtooth-fog-node-0"
+                - name: COUCHDB_HOST
+                  value: "couchdb-0.default.svc.cluster.local:5984"
+                - name: RESOURCE_UPDATE_INTERVAL
+                  value: "300"
+                - name: RESOURCE_UPDATE_BATCH_SIZE
+                  value: "10"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+            - name: sawtooth-validator
+              image: hyperledger/sawtooth-validator:chime
+              ports:
+                - name: tp
+                  containerPort: 4004
+                - name: consensus
+                  containerPort: 5050
+                - name: validators
+                  containerPort: 8800
+              env:
+                - name: pbft0priv
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft0priv
+                - name: pbft0pub
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft0pub
+              command:
+                - bash
+              args:
+                - -c
+                - |
+                  if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+                    echo $pbft0priv > /etc/sawtooth/keys/validator.priv
+                    echo $pbft0pub > /etc/sawtooth/keys/validator.pub
+                  fi &&
+                  if [ ! -e /root/.sawtooth/keys/my_key.priv ]; then
+                    sawtooth keygen my_key
+                  fi &&
+                  if [ ! -e config-genesis.batch ]; then
+                    sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
+                  fi &&
+                  sleep 30 &&
+                  echo sawtooth.consensus.pbft.members=["$\{pbft0pub\}","$\{pbft1pub\}","$\{pbft2pub\}","$\{pbft3pub\}"] &&
+                  if [ ! -e config.batch ]; then
+                    sawset proposal create                       -k /root/.sawtooth/keys/my_key.priv                       sawtooth.consensus.algorithm.name=pbft                       sawtooth.consensus.algorithm.version=1.0                       sawtooth.consensus.pbft.members=["$\{pbft0pub\}","$\{pbft1pub\}","$\{pbft2pub\}","$\{pbft3pub\}"]                       sawtooth.publisher.max_batches_per_block=1200                       -o config.batch
+                  fi &&                   if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
+                    sawadm genesis config-genesis.batch config.batch
+                  fi &&
+                  sawtooth-validator -vv                     --endpoint tcp://$SAWTOOTH_0_SERVICE_HOST:8800                     --bind component:tcp://eth0:4004                     --bind consensus:tcp://eth0:5050                     --bind network:tcp://eth0:8800                     --scheduler parallel                     --peering static                     --maximum-peer-connectivity 10000
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: sawtooth-0
+    spec:
+      type: ClusterIP
+      selector:
+        name: pbft-0
+      ports:
+        - name: "4004"
+          protocol: TCP
+          port: 4004
+          targetPort: 4004
+        - name: "5050"
+          protocol: TCP
+          port: 5050
+          targetPort: 5050
+        - name: "8080"
+          protocol: TCP
+          port: 8080
+          targetPort: 8080
+        - name: "8800"
+          protocol: TCP
+          port: 8800
+          targetPort: 8800
+  # --------------------------=== fog-node-2 ===--------------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: pbft-1
+    spec:
+      selector:
+        matchLabels:
+          name: pbft-1
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            name: pbft-1
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fog-node-2
+          volumes:
+            - name: proc
+              hostPath:
+                path: /proc
+            - name: sys
+              hostPath:
+                path: /sys
+          initContainers:
+            - name: wait-for-registry
+              image: busybox
+              command: [ 'sh', '-c', 'until nc -z sawtooth-registry 5000; do echo waiting for sawtooth-registry; sleep 2; done;' ]
+            - name: wait-for-couchdb-setup
+              image: curlimages/curl:latest
+              command:
+                - 'sh'
+                - '-c'
+                - |
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
+                    for i in $(seq 0 3); do
+                      until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
+                        echo "Waiting for ${db} on couchdb-${i}..."
+                        sleep 5
+                      done
+                      echo "${db} is available on couchdb-${i}"
+                    done
+                  done &&
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
+              env:
+                - name: RESOURCE_REGISTRY_DB
+                  value: "resource_registry"
+                - name: SCHEDULES_DB
+                  value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+          containers:
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-1.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+            - name: sawtooth-pbft-engine
+              image: hyperledger/sawtooth-pbft-engine:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "pbft-engine -vv --connect tcp://$HOSTNAME:5050"
+
+            - name: sawtooth-settings-tp
+              image: hyperledger/sawtooth-settings-tp:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "settings-tp -vv -C tcp://$HOSTNAME:4004"
+
+            - name: fog-node
+              image: murtazahr/fog-node:latest
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: proc
+                  mountPath: /host/proc
+                  readOnly: true
+                - name: sys
+                  mountPath: /host/sys
+                  readOnly: true
+              env:
+                - name: REGISTRY_URL
+                  value: "sawtooth-registry:5000"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+                - name: NODE_ID
+                  value: "sawtooth-fog-node-1"
+                - name: COUCHDB_HOST
+                  value: "couchdb-1.default.svc.cluster.local:5984"
+                - name: RESOURCE_UPDATE_INTERVAL
+                  value: "300"
+                - name: RESOURCE_UPDATE_BATCH_SIZE
+                  value: "10"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+            - name: sawtooth-validator
+              image: hyperledger/sawtooth-validator:chime
+              ports:
+                - name: tp
+                  containerPort: 4004
+                - name: consensus
+                  containerPort: 5050
+                - name: validators
+                  containerPort: 8800
+              env:
+                - name: pbft1priv
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft1priv
+                - name: pbft1pub
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft1pub
+              command:
+                - bash
+              args:
+                - -c
+                - |
+                  if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+                    echo $pbft1priv > /etc/sawtooth/keys/validator.priv
+                    echo $pbft1pub > /etc/sawtooth/keys/validator.pub
+                  fi &&
+                  sawtooth keygen my_key &&
+                  sawtooth-validator -vv                     --endpoint tcp://$SAWTOOTH_1_SERVICE_HOST:8800                     --bind component:tcp://eth0:4004                     --bind consensus:tcp://eth0:5050                     --bind network:tcp://eth0:8800                     --scheduler parallel                     --peering static                     --maximum-peer-connectivity 10000                     --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: sawtooth-1
+    spec:
+      type: ClusterIP
+      selector:
+        name: pbft-1
+      ports:
+        - name: "4004"
+          protocol: TCP
+          port: 4004
+          targetPort: 4004
+        - name: "5050"
+          protocol: TCP
+          port: 5050
+          targetPort: 5050
+        - name: "8080"
+          protocol: TCP
+          port: 8080
+          targetPort: 8080
+        - name: "8800"
+          protocol: TCP
+          port: 8800
+          targetPort: 8800
+  # --------------------------=== fog-node-3 ===--------------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: pbft-2
+    spec:
+      selector:
+        matchLabels:
+          name: pbft-2
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            name: pbft-2
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fog-node-3
+          volumes:
+            - name: proc
+              hostPath:
+                path: /proc
+            - name: sys
+              hostPath:
+                path: /sys
+          initContainers:
+            - name: wait-for-registry
+              image: busybox
+              command: [ 'sh', '-c', 'until nc -z sawtooth-registry 5000; do echo waiting for sawtooth-registry; sleep 2; done;' ]
+            - name: wait-for-couchdb-setup
+              image: curlimages/curl:latest
+              command:
+                - 'sh'
+                - '-c'
+                - |
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
+                    for i in $(seq 0 3); do
+                      until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
+                        echo "Waiting for ${db} on couchdb-${i}..."
+                        sleep 5
+                      done
+                      echo "${db} is available on couchdb-${i}"
+                    done
+                  done &&
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
+              env:
+                - name: RESOURCE_REGISTRY_DB
+                  value: "resource_registry"
+                - name: SCHEDULES_DB
+                  value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+          containers:
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-2.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+            - name: sawtooth-pbft-engine
+              image: hyperledger/sawtooth-pbft-engine:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "pbft-engine -vv --connect tcp://$HOSTNAME:5050"
+
+            - name: sawtooth-settings-tp
+              image: hyperledger/sawtooth-settings-tp:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "settings-tp -vv -C tcp://$HOSTNAME:4004"
+
+            - name: fog-node
+              image: murtazahr/fog-node:latest
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: proc
+                  mountPath: /host/proc
+                  readOnly: true
+                - name: sys
+                  mountPath: /host/sys
+                  readOnly: true
+              env:
+                - name: REGISTRY_URL
+                  value: "sawtooth-registry:5000"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+                - name: NODE_ID
+                  value: "sawtooth-fog-node-2"
+                - name: COUCHDB_HOST
+                  value: "couchdb-2.default.svc.cluster.local:5984"
+                - name: RESOURCE_UPDATE_INTERVAL
+                  value: "300"
+                - name: RESOURCE_UPDATE_BATCH_SIZE
+                  value: "10"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+            - name: sawtooth-validator
+              image: hyperledger/sawtooth-validator:chime
+              ports:
+                - name: tp
+                  containerPort: 4004
+                - name: consensus
+                  containerPort: 5050
+                - name: validators
+                  containerPort: 8800
+              env:
+                - name: pbft2priv
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft2priv
+                - name: pbft2pub
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft2pub
+              command:
+                - bash
+              args:
+                - -c
+                - |
+                  if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+                    echo $pbft2priv > /etc/sawtooth/keys/validator.priv
+                    echo $pbft2pub > /etc/sawtooth/keys/validator.pub
+                  fi &&
+                  sawtooth keygen my_key &&
+                  sawtooth-validator -vv                     --endpoint tcp://$SAWTOOTH_2_SERVICE_HOST:8800                     --bind component:tcp://eth0:4004                     --bind consensus:tcp://eth0:5050                     --bind network:tcp://eth0:8800                     --scheduler parallel                     --peering static                     --maximum-peer-connectivity 10000                     --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: sawtooth-2
+    spec:
+      type: ClusterIP
+      selector:
+        name: pbft-2
+      ports:
+        - name: "4004"
+          protocol: TCP
+          port: 4004
+          targetPort: 4004
+        - name: "5050"
+          protocol: TCP
+          port: 5050
+          targetPort: 5050
+        - name: "8080"
+          protocol: TCP
+          port: 8080
+          targetPort: 8080
+        - name: "8800"
+          protocol: TCP
+          port: 8800
+          targetPort: 8800
+  # --------------------------=== fog-node-4 ===--------------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: pbft-3
+    spec:
+      selector:
+        matchLabels:
+          name: pbft-3
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            name: pbft-3
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: fog-node-4
+          volumes:
+            - name: proc
+              hostPath:
+                path: /proc
+            - name: sys
+              hostPath:
+                path: /sys
+          initContainers:
+            - name: wait-for-registry
+              image: busybox
+              command: [ 'sh', '-c', 'until nc -z sawtooth-registry 5000; do echo waiting for sawtooth-registry; sleep 2; done;' ]
+            - name: wait-for-couchdb-setup
+              image: curlimages/curl:latest
+              command:
+                - 'sh'
+                - '-c'
+                - |
+                  for db in ${RESOURCE_REGISTRY_DB} ${SCHEDULES_DB} ${TASK_DATA_DB}; do
+                    for i in $(seq 0 3); do
+                      until curl -s "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984/${db}" | grep -q "${db}"; do
+                        echo "Waiting for ${db} on couchdb-${i}..."
+                        sleep 5
+                      done
+                      echo "${db} is available on couchdb-${i}"
+                    done
+                  done &&
+                  echo "CouchDB cluster setup completed and ${RESOURCE_REGISTRY_DB}, ${SCHEDULES_DB} & ${TASK_DATA_DB} is available on all nodes"
+              env:
+                - name: RESOURCE_REGISTRY_DB
+                  value: "resource_registry"
+                - name: SCHEDULES_DB
+                  value: "schedules"
+                - name: TASK_DATA_DB
+                  value: "task_data"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+          containers:
+            - name: peer-registry-tp
+              image: murtazahr/peer-registry-tp:latest
+              env:
+                - name: MAX_UPDATES_PER_NODE
+                  value: "100"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+
+            - name: docker-image-tp
+              image: murtazahr/docker-image-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+
+            - name: dependency-management-tp
+              image: murtazahr/dependency-management-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+
+            - name: scheduling-tp
+              image: murtazahr/scheduling-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-3.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+            - name: sawtooth-pbft-engine
+              image: hyperledger/sawtooth-pbft-engine:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "pbft-engine -vv --connect tcp://$HOSTNAME:5050"
+
+            - name: sawtooth-settings-tp
+              image: hyperledger/sawtooth-settings-tp:chime
+              command:
+                - bash
+              args:
+                - -c
+                - "settings-tp -vv -C tcp://$HOSTNAME:4004"
+
+            - name: fog-node
+              image: murtazahr/fog-node:latest
+              securityContext:
+                privileged: true
+              volumeMounts:
+                - name: proc
+                  mountPath: /host/proc
+                  readOnly: true
+                - name: sys
+                  mountPath: /host/sys
+                  readOnly: true
+              env:
+                - name: REGISTRY_URL
+                  value: "sawtooth-registry:5000"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+                - name: NODE_ID
+                  value: "sawtooth-fog-node-3"
+                - name: COUCHDB_HOST
+                  value: "couchdb-3.default.svc.cluster.local:5984"
+                - name: RESOURCE_UPDATE_INTERVAL
+                  value: "300"
+                - name: RESOURCE_UPDATE_BATCH_SIZE
+                  value: "10"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
+
+            - name: sawtooth-validator
+              image: hyperledger/sawtooth-validator:chime
+              ports:
+                - name: tp
+                  containerPort: 4004
+                - name: consensus
+                  containerPort: 5050
+                - name: validators
+                  containerPort: 8800
+              env:
+                - name: pbft3priv
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft3priv
+                - name: pbft3pub
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft3pub
+              command:
+                - bash
+              args:
+                - -c
+                - |
+                  if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+                    echo $pbft3priv > /etc/sawtooth/keys/validator.priv
+                    echo $pbft3pub > /etc/sawtooth/keys/validator.pub
+                  fi &&
+                  sawtooth keygen my_key &&
+                  sawtooth-validator -vv                     --endpoint tcp://$SAWTOOTH_3_SERVICE_HOST:8800                     --bind component:tcp://eth0:4004                     --bind consensus:tcp://eth0:5050                     --bind network:tcp://eth0:8800                     --scheduler parallel                     --peering static                     --maximum-peer-connectivity 10000                     --peers tcp://$SAWTOOTH_0_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_1_SERVICE_HOST:8800 --peers tcp://$SAWTOOTH_2_SERVICE_HOST:8800 
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: sawtooth-3
+    spec:
+      type: ClusterIP
+      selector:
+        name: pbft-3
+      ports:
+        - name: "4004"
+          protocol: TCP
+          port: 4004
+          targetPort: 4004
+        - name: "5050"
+          protocol: TCP
+          port: 5050
+          targetPort: 5050
+        - name: "8080"
+          protocol: TCP
+          port: 8080
+          targetPort: 8080
+        - name: "8800"
+          protocol: TCP
+          port: 8800
+          targetPort: 8800
+
+  # -------------------------=== iot-node-1 ===------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: iot-0
+    spec:
+      selector:
+        matchLabels:
+          name: iot-0
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            name: iot-0
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: iot-node-1
+          containers:
+            - name: scheduling-client
+              image: murtazahr/scheduling-client:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
+  # -------------------------=== client-console ===------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: network-management-console
+    spec:
+      selector:
+        matchLabels:
+          name: network-management-console
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            name: network-management-console
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: client-console
+          containers:
+            - name: application-deployment-client
+              image: murtazahr/docker-image-client:latest
+              securityContext:
+                privileged: true
+              env:
+                - name: REGISTRY_URL
+                  value: "sawtooth-registry:5000"
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
+            - name: dependency-management-client
+              image: murtazahr/dependency-management-client:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
+            - name: scheduling-client
+              image: murtazahr/scheduling-client:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
