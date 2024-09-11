@@ -57,7 +57,7 @@ items:
             app: couchdb-0
         spec:
           nodeSelector:
-            kubernetes.io/hostname: fogchain-node-1
+            kubernetes.io/hostname: fog-node-1
           containers:
             - name: couchdb
               image: couchdb:3
@@ -111,7 +111,7 @@ items:
             app: couchdb-1
         spec:
           nodeSelector:
-            kubernetes.io/hostname: fogchain-node-2
+            kubernetes.io/hostname: fog-node-2
           containers:
             - name: couchdb
               image: couchdb:3
@@ -165,7 +165,7 @@ items:
             app: couchdb-2
         spec:
           nodeSelector:
-            kubernetes.io/hostname: fogchain-node-3
+            kubernetes.io/hostname: fog-node-3
           containers:
             - name: couchdb
               image: couchdb:3
@@ -219,7 +219,7 @@ items:
             app: couchdb-3
         spec:
           nodeSelector:
-            kubernetes.io/hostname: fogchain-node-4
+            kubernetes.io/hostname: fog-node-4
           containers:
             - name: couchdb
               image: couchdb:3
