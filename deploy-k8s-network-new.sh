@@ -1,16 +1,20 @@
 #!/bin/bash
 
-# Function to generate PBFT keys
-generate_pbft_keys() {
-    local num_fog_nodes=$1
-    local keys=""
-    for ((i=0; i<num_fog_nodes; i++)); do
-        priv_key=$(openssl ecparam -name secp256k1 -genkey | openssl ec -text -noout | grep priv -A 3 | tail -n +2 | tr -d '\n[:space:]:' | sed 's/^00//')
-        pub_key=$(openssl ecparam -name secp256k1 -genkey | openssl ec -text -noout | grep pub -A 5 | tail -n +2 | tr -d '\n[:space:]:' | sed 's/^04//')
-        keys+="      pbft${i}priv: $priv_key"$'\n'
-        keys+="      pbft${i}pub: $pub_key"$'\n'
+# Function to wait for a job to complete
+wait_for_job() {
+    local job_prefix=$1
+    echo "Waiting for job $job_prefix to complete..."
+    while true; do
+        job_name=$(kubectl get jobs --selector=job-name=$job_prefix -o jsonpath='{.items[*].metadata.name}')
+        if [ -n "$job_name" ]; then
+            status=$(kubectl get job $job_name -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')
+            if [ "$status" == "True" ]; then
+                echo "Job $job_name completed successfully."
+                break
+            fi
+        fi
+        sleep 5
     done
-    echo "$keys"
 }
 
 # Function to check if a node exists in the cluster
@@ -613,10 +617,47 @@ done
 echo "All required nodes are present in the cluster."
 
 # Part 2: Generate YAML file for config and secrets
-generated_keys=$(generate_pbft_keys "$num_fog_nodes")
-
 mkdir -p kubernetes-manifests/generated
 
+# Create the PBFT key generation job YAML
+cat << EOF > kubernetes-manifests/generated/pbft-key-generation-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pbft-keys
+spec:
+  template:
+    metadata:
+      labels:
+        job-name: pbft-keys
+    spec:
+      containers:
+        - name: pbft-keys-generator
+          image: hyperledger/sawtooth-shell
+          command:
+            - bash
+          args:
+            - -c
+            - "for i in {0..$(($num_fog_nodes-1))}; do sawadm keygen -q pbft\$i; done && cd /etc/sawtooth/keys/ && grep '' * | sed 's/\\.//' | sed 's/:/:\ /'"
+      restartPolicy: Never
+  backoffLimit: 4
+EOF
+
+echo "Generated PBFT key generation job YAML has been saved to kubernetes-manifests/generated/pbft-key-generation-job.yaml"
+
+# Apply the job YAML
+kubectl apply -f kubernetes-manifests/generated/pbft-key-generation-job.yaml
+
+# Wait for the job to complete
+wait_for_job pbft-keys
+
+# Get the pod name
+pod_name=$(kubectl get pods --selector=job-name=pbft-keys --output=jsonpath='{.items[*].metadata.name}')
+
+# Fetch the keys from the pod logs
+generated_keys=$(kubectl logs "$pod_name")
+
+# Create the config and secrets YAML
 cat << EOF > kubernetes-manifests/generated/config-and-secrets.yaml
 apiVersion: v1
 kind: List
