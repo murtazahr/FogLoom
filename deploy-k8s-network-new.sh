@@ -333,6 +333,14 @@ items:"
                 - -c
                 - \"settings-tp -vv -C tcp://\$HOSTNAME:4004\"
 
+            - name: sawtooth-shell
+              image: hyperledger/sawtooth-shell:chime
+              command:
+                - bash
+              args:
+                - -c
+                - \"sawtooth keygen && tail -f /dev/null\"
+
             - name: fog-node
               image: murtazahr/fog-node:latest
               securityContext:
@@ -376,29 +384,28 @@ items:"
                 - name: consensus
                   containerPort: 5050
                 - name: validators
-                  containerPort: 8800
-              env:
-                - name: pbft${i}priv
-                  valueFrom:
-                    configMapKeyRef:
-                      name: keys-config
-                      key: pbft${i}priv
-                - name: pbft${i}pub
-                  valueFrom:
-                    configMapKeyRef:
-                      name: keys-config
-                      key: pbft${i}pub"
+                  containerPort: 8800"
 
         if [ "$i" -eq 0 ]; then
+            local pbft_members=$(for ((j=0; j<num_fog_nodes; j++)); do
+                echo -n "\\\"$\{pbft${j}pub\}\\\""
+                if [ $j -lt $((num_fog_nodes-1)) ]; then
+                    echo -n ","
+                fi
+            done)
+
             yaml_content+="
+              envFrom:
+                - configMapRef:
+                    name: keys-config
               command:
                 - bash
               args:
                 - -c
                 - |
                   if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
-                    echo \$pbft${i}priv > /etc/sawtooth/keys/validator.priv
-                    echo \$pbft${i}pub > /etc/sawtooth/keys/validator.pub
+                    echo \$pbft0priv > /etc/sawtooth/keys/validator.priv
+                    echo \$pbft0pub > /etc/sawtooth/keys/validator.pub
                   fi &&
                   if [ ! -e /root/.sawtooth/keys/my_key.priv ]; then
                     sawtooth keygen my_key
@@ -407,13 +414,13 @@ items:"
                     sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
                   fi &&
                   sleep 30 &&
-                  echo sawtooth.consensus.pbft.members=[$(for ((j=0; j<num_fog_nodes; j++)); do echo -n "\"$\{pbft${j}pub\}\""; if [ $j -lt $((num_fog_nodes-1)) ]; then echo -n ","; fi; done)] &&
+                  echo sawtooth.consensus.pbft.members=[$pbft_members] &&
                   if [ ! -e config.batch ]; then
                     sawset proposal create \
                       -k /root/.sawtooth/keys/my_key.priv \
                       sawtooth.consensus.algorithm.name=pbft \
                       sawtooth.consensus.algorithm.version=1.0 \
-                      sawtooth.consensus.pbft.members=[$(for ((j=0; j<num_fog_nodes; j++)); do echo -n "\"$\{pbft${j}pub\}\""; if [ $j -lt $((num_fog_nodes-1)) ]; then echo -n ","; fi; done)] \
+                      sawtooth.consensus.pbft.members=[$pbft_members] \
                       sawtooth.publisher.max_batches_per_block=1200 \
                       -o config.batch
                   fi && \
@@ -430,6 +437,17 @@ items:"
                     --maximum-peer-connectivity 10000"
         else
             yaml_content+="
+              env:
+                - name: pbft${i}priv
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft${i}priv
+                - name: pbft${i}pub
+                  valueFrom:
+                    configMapKeyRef:
+                      name: keys-config
+                      key: pbft${i}pub
               command:
                 - bash
               args:
