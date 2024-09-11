@@ -388,7 +388,7 @@ items:"
 
         if [ "$i" -eq 0 ]; then
             local pbft_members=$(for ((j=0; j<num_fog_nodes; j++)); do
-                echo -n "\"\\\"\$pbft${j}pub\\\""
+                echo -n "\\\"\$pbft${j}pub\\\""
                 if [ $j -lt $((num_fog_nodes-1)) ]; then
                     echo -n ","
                 fi
@@ -414,13 +414,13 @@ items:"
                     sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
                   fi &&
                   sleep 30 &&
-                  echo sawtooth.consensus.pbft.members=[$pbft_members] &&
+                  echo sawtooth.consensus.pbft.members=[\"$pbft_members\"] &&
                   if [ ! -e config.batch ]; then
                     sawset proposal create \
                       -k /root/.sawtooth/keys/my_key.priv \
                       sawtooth.consensus.algorithm.name=pbft \
                       sawtooth.consensus.algorithm.version=1.0 \
-                      sawtooth.consensus.pbft.members=[$pbft_members] \
+                      sawtooth.consensus.pbft.members=[\"$pbft_members\"] \
                       sawtooth.publisher.max_batches_per_block=1200 \
                       -o config.batch
                   fi && \
