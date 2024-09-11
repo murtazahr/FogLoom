@@ -4,7 +4,7 @@
 
 WORK_DIR=$(pwd)
 TEST_APP_DIR=$(pwd)/example-application
-K8S_DIR=$(pwd)/k8s-manifests/sawtooth-network
+K8S_DIR=$(pwd)/kubernetes-manifests/sawtooth-network
 DOCKER_USERNAME=murtazahr
 
 # Building docker image for test docker application

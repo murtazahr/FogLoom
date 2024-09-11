@@ -14,16 +14,12 @@ Fogbus v3 is a decentralized fog computing framework that offers Byzantine Fault
 - Smart context switching between fog and cloud
 - Integration with Hyperledger Sawtooth for on-chain communication
 
-## Architecture
-
-![Screenshot 2024-08-20 at 12 46 33 PM](https://github.com/user-attachments/assets/4bb37c01-9377-4508-af85-2a00b8c6b331)
-
 ## Prerequisites
 
 The framework has been extensively tested on Ubuntu machines but should support macOS and Windows. For the development environment, you'll need:
 
 - Docker
-- Docker Compose
+- K3S Kubernetes Cluster
 - Python 3.8
 
 ## Installation
