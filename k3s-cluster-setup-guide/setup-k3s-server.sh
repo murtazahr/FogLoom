@@ -6,8 +6,9 @@ curl -sfL https://get.k3s.io | K3S_NODE_NAME=$K3S_NODE_NAME sh -
 
 # Gain access to kubectl command without using sudo
 mkdir ~/.kube
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config && chown "$USER"
-~/.kube/config && chmod 600 ~/.kube/config
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+chown "$USER" ~/.kube/config
+chmod 600 ~/.kube/config
 echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
 # shellcheck disable=SC1090
 source ~/.bashrc
