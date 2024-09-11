@@ -23,7 +23,8 @@
 
 ## 2. K3S Agent Setup
 
-1. Set the following environment variables:
+1. Locate the `setup-k3s-agent.sh` script in the current directory.
+2. Update the following environment variables in the script:
 
    ```bash
    export K3S_TOKEN=<Token from server setup>
@@ -36,8 +37,6 @@
     - IoT nodes: `iot-node-1`, `iot-node-2`, etc.
 
    > **Note:** Ensure you follow the naming convention in a serialized manner.
-
-2. Locate the `setup-k3s-agent.sh` script in the current directory.
 
 3. Grant execution permission to the script:
    ```bash
