@@ -50,8 +50,10 @@ done
 
 echo "All required nodes are present in the cluster."
 
-# Part 2: Generate YAML file and apply to cluster
+# Part 2: Generate YAML file
 generated_keys=$(generate_pbft_keys "$num_fog_nodes")
+
+mkdir -p kubernetes-manifests/generated
 
 cat << EOF > kubernetes-manifests/generated/config-and-secrets.yaml
 apiVersion: v1
@@ -88,8 +90,3 @@ $generated_keys
 EOF
 
 echo "Generated YAML file has been saved to kubernetes-manifests/generated/config-and-secrets.yaml"
-
-# Apply the generated YAML to the cluster
-kubectl apply -f kubernetes-manifests/generated/config-and-secrets.yaml
-
-echo "Configuration and secrets have been applied to the cluster."
