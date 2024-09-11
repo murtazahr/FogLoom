@@ -61,7 +61,7 @@ items:"
             app: couchdb-${i}
         spec:
           nodeSelector:
-            kubernetes.io/hostname: fogchain-node-$((i+1))
+            kubernetes.io/hostname: fog-node-$((i+1))
           containers:
             - name: couchdb
               image: couchdb:3
