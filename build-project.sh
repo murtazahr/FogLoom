@@ -4,7 +4,6 @@
 
 WORK_DIR=$(pwd)
 TEST_APP_DIR=$(pwd)/example-application
-K8S_DIR=$(pwd)/kubernetes-manifests/sawtooth-network
 DOCKER_USERNAME=murtazahr
 
 # Building docker image for test docker application
@@ -46,17 +45,3 @@ docker push $DOCKER_USERNAME/scheduling-client:latest
 docker push $DOCKER_USERNAME/fog-node:latest
 
 echo "Images built and pushed to registry successfully"
-
-cd "$K8S_DIR" || exit
-
-# Cleanup kubernetes environment if it exists.
-kubectl delete -f blockchain-network-deployment.yaml
-kubectl delete -f local-docker-registry-deployment.yaml
-kubectl delete -f couchdb-cluster-deployment.yaml
-kubectl delete -f config-and-secrets.yaml
-
-# Bring up network
-kubectl apply -f config-and-secrets.yaml
-kubectl apply -f local-docker-registry-deployment.yaml
-kubectl apply -f couchdb-cluster-deployment.yaml
-kubectl apply -f blockchain-network-deployment.yaml
