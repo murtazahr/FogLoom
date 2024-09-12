@@ -283,14 +283,6 @@ items:"
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
           containers:
-            - name: sawtooth-intkey-tp-python
-              image: hyperledger/sawtooth-intkey-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - \"intkey-tp-python -vv -C tcp://\$HOSTNAME:4004\"
-
             - name: peer-registry-tp
               image: murtazahr/peer-registry-tp:latest
               env:
