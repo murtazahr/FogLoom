@@ -40,7 +40,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY docker_image_client.py .
 
 # Copy tar file
-COPY temp-anomaly-detection.tar .
+COPY yolo-object-detection.tar .
+COPY bounding-box-image-generation.tar .
 
 ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/client.priv
 

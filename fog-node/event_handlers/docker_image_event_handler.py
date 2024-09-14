@@ -15,6 +15,23 @@ FAMILY_NAME = "docker-image"
 NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 REGISTRY_URL = os.getenv('REGISTRY_URL', 'sawtooth-registry:5000')
 
+# Port management
+START_PORT = 12345
+END_PORT = 13345
+used_ports = set()
+
+
+def get_next_available_port():
+    for port in range(START_PORT, END_PORT):
+        if port not in used_ports:
+            used_ports.add(port)
+            return port
+    raise Exception("No available ports")
+
+
+def release_port(port):
+    used_ports.remove(port)
+
 
 def handle_event(event):
     logger.info(f"Handling event: {event.event_type}")
@@ -76,22 +93,41 @@ def deploy_image(client, image_name, image_hash, container_name):
 
 def deploy_container(client, image_name, container_name):
     logger.info(f"Deploying container: {container_name}")
+    host_port = None
     try:
         # Remove existing container if it exists
         remove_container(client, container_name)
 
-        container = client.containers.run(image_name, name=container_name, detach=True)
-        logger.info(f"Container started: {container.id}")
+        # Get the next available port
+        host_port = get_next_available_port()
+
+        container = client.containers.run(
+            image_name,
+            name=container_name,
+            detach=True,
+            ports={'12345/tcp': host_port}  # Map container's 12345 to host's dynamic port
+        )
+        logger.info(f"Container started: {container.id}, mapped to host port: {host_port}")
     except docker.errors.ContainerError as e:
         logger.error(f"Error starting container: {str(e)}")
+        if 'host_port' in locals():
+            release_port(host_port)
 
 
 def remove_container(client, container_name):
     logger.info(f"Removing container: {container_name}")
     try:
         container = client.containers.get(container_name)
+        # Get the host port before removing the container
+        container_info = client.api.inspect_container(container.id)
+        host_port = int(container_info['NetworkSettings']['Ports']['12345/tcp'][0]['HostPort'])
+
         container.remove(force=True)
         logger.info(f"Container {container_name} removed")
+
+        # Release the port
+        release_port(host_port)
+        logger.info(f"Released host port: {host_port}")
     except docker.errors.NotFound:
         logger.info(f"Container {container_name} not found, no action needed")
     except Exception as e:
