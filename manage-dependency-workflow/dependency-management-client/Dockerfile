@@ -1,5 +1,5 @@
 # Now, use the Sawtooth shell image as the main base
-FROM hyperledger/sawtooth-shell:chime as sawtooth-shell
+FROM hyperledger/sawtooth-shell:chime AS sawtooth-shell
 
 # Generate Sawtooth keys
 RUN sawtooth keygen # root keys
