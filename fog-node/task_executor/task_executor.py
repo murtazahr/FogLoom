@@ -15,7 +15,7 @@ COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD'
 SCHEDULE_DB = 'schedules'
 DATA_DB = 'task_data'
 
-NODE_ID = os.getenv('NODE_ID')
+NODE_ID = os.getenv('HOSTNAME')
 
 
 class TaskExecutor:
@@ -30,8 +30,8 @@ class TaskExecutor:
     async def initialize(self):
         try:
             self.couch = aiocouch.CouchDB(COUCHDB_URL)
-            self.schedule_db = await self.couch.get_or_create_database(SCHEDULE_DB)
-            self.data_db = await self.couch.get_or_create_database(DATA_DB)
+            self.schedule_db = await self.get_or_create_database(SCHEDULE_DB)
+            self.data_db = await self.get_or_create_database(DATA_DB)
             self.docker_client = docker.from_env()
             self.session = aiohttp.ClientSession()
             await self.setup_views()
@@ -39,6 +39,12 @@ class TaskExecutor:
             logger.error(f"Initialization error: {str(e)}")
             await self.cleanup()
             raise
+
+    async def get_or_create_database(self, db_name):
+        try:
+            return await self.couch.database(db_name)
+        except aiocouch.exceptions.NotFoundError:
+            return await self.couch.create_database(db_name)
 
     async def cleanup(self):
         logger.info("Cleaning up resources...")
