@@ -1,20 +1,37 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+# Build stage
+FROM python:3.9-slim AS builder
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Copy only the requirements file first to leverage Docker cache
+COPY requirements.txt .
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install build dependencies and Python packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y --auto-remove build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Runtime stage
+FROM python:3.9-slim
+
+# Set the working directory
+WORKDIR /app
+
+# Copy installed packages from builder stage
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy only necessary files
+COPY process.py .
 
 # Make port 12345 available to the world outside this container
 EXPOSE 12345
