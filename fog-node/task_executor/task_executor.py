@@ -43,7 +43,7 @@ class TaskExecutor:
     async def get_or_create_database(self, db_name):
         try:
             return await self.couch.database(db_name)
-        except aiocouch.exceptions.NotFoundError:
+        except Exception:
             return await self.couch.create_database(db_name)
 
     async def cleanup(self):
@@ -76,10 +76,13 @@ class TaskExecutor:
         }
         try:
             await self.schedule_db.create_document(design_doc)
-        except aiocouch.exceptions.DocumentConflictError:
-            existing_doc = await self.schedule_db.get_document('_design/tasks')
-            existing_doc.update(design_doc)
-            await existing_doc.save()
+        except Exception as e:
+            if 'conflict' in str(e).lower():
+                existing_doc = await self.schedule_db.get_document('_design/tasks')
+                existing_doc.update(design_doc)
+                await existing_doc.save()
+            else:
+                raise
 
     async def run(self):
         try:
@@ -148,7 +151,7 @@ class TaskExecutor:
         try:
             doc = await self.data_db.get_document(data_id)
             return doc['data']
-        except aiocouch.exceptions.DocumentNotFoundError:
+        except Exception:
             logger.warning(f"Input data not found for task {app_id} in workflow {workflow_id}, schedule {schedule_id}")
             return {}
 
@@ -162,10 +165,13 @@ class TaskExecutor:
         }
         try:
             await self.data_db.create_document(document)
-        except aiocouch.exceptions.DocumentConflictError:
-            existing_doc = await self.data_db.get_document(data_id)
-            existing_doc.update(document)
-            await existing_doc.save()
+        except Exception as e:
+            if 'conflict' in str(e).lower():
+                existing_doc = await self.data_db.get_document(data_id)
+                existing_doc.update(document)
+                await existing_doc.save()
+            else:
+                raise
 
     async def update_task_status(self, workflow_id: str, schedule_id: str, app_id: str, status: str):
         try:
@@ -179,8 +185,6 @@ class TaskExecutor:
                 await schedule_doc.save()
             else:
                 logger.error(f"Invalid schedule structure for workflow {workflow_id}, schedule {schedule_id}")
-        except aiocouch.exceptions.DocumentNotFoundError:
-            logger.error(f"Schedule document not found for workflow {workflow_id}, schedule {schedule_id}")
         except Exception as e:
             logger.error(
                 f"Error updating task status for {app_id} in workflow {workflow_id}, schedule {schedule_id}: {str(e)}")
@@ -193,7 +197,7 @@ class TaskExecutor:
                 try:
                     existing_doc = await self.data_db.get_document(next_input_data_id)
                     existing_input = existing_doc['data']
-                except aiocouch.exceptions.DocumentNotFoundError:
+                except Exception:
                     existing_input = {}
 
                 existing_input.update(output_data)
