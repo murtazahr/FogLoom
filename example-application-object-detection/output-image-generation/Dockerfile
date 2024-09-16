@@ -10,8 +10,6 @@ COPY requirements.txt .
 # Install build dependencies and Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
     && pip install --no-cache-dir -r requirements.txt \
     && apt-get purge -y --auto-remove build-essential \
     && rm -rf /var/lib/apt/lists/*
