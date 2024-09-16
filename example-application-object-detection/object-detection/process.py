@@ -2,47 +2,108 @@ import json
 import cv2
 import numpy as np
 import base64
-from ultralytics import YOLO
 import asyncio
 import logging
+import onnx
+import traceback
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Load the YOLO model globally
-model = YOLO('yolov8n.pt')  # Load the nano model
+model_path = "yolov8n.onnx"
+try:
+    net = cv2.dnn.readNet(model_path)
+    logger.info(f"Successfully loaded model from {model_path}")
+except Exception as e:
+    logger.error(f"Failed to load model: {str(e)}")
+    raise
+
+# Extract class names from ONNX model
+try:
+    onnx_model = onnx.load(model_path)
+    metadata = onnx_model.metadata_props
+    for prop in metadata:
+        if prop.key == 'names':
+            class_names = eval(prop.value)
+            logger.info(f"Successfully extracted {len(class_names)} class names from model metadata")
+            break
+    else:
+        raise ValueError("Class names not found in ONNX model metadata")
+except Exception as e:
+    logger.error(f"Failed to extract class names: {str(e)}")
+    raise
 
 
 def process_image(base64_image):
-    # Decode base64 image
-    image_data = base64.b64decode(base64_image)
-    nparr = np.frombuffer(image_data, np.uint8)
-    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    try:
+        # Decode base64 image
+        image_data = base64.b64decode(base64_image)
+        nparr = np.frombuffer(image_data, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    if image is None:
-        logger.error("Unable to decode image")
-        return None
+        if image is None:
+            logger.error("Unable to decode image")
+            return None
 
-    # Perform object detection
-    results = model(image)
+        logger.debug(f"Successfully decoded image, shape: {image.shape}")
 
-    # Process results
-    detections = []
-    for r in results:
-        boxes = r.boxes
-        for box in boxes:
-            x1, y1, x2, y2 = box.xyxy[0]
-            confidence = box.conf[0]
-            class_id = box.cls[0]
-            class_name = model.names[int(class_id)]
+        # Prepare image for inference
+        input_height, input_width = 640, 640
+        blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (input_width, input_height), swapRB=True, crop=False)
+        net.setInput(blob)
 
+        # Perform inference
+        outputs = net.forward(net.getUnconnectedOutLayersNames())[0]
+        logger.debug(f"Model output shape: {outputs.shape}")
+
+        # Process results
+        outputs = outputs.transpose((1, 2, 0))
+        rows = outputs.shape[1]
+        boxes = []
+        scores = []
+        class_ids = []
+
+        image_height, image_width = image.shape[:2]
+        x_factor = image_width / input_width
+        y_factor = image_height / input_height
+
+        for i in range(rows):
+            classes_scores = outputs[4:, i, 0]
+            max_score = np.amax(classes_scores)
+            if max_score >= 0.5:
+                class_id = np.argmax(classes_scores)
+                x, y, w, h = outputs[0:4, i, 0]
+                left = int((x - 0.5 * w) * x_factor)
+                top = int((y - 0.5 * h) * y_factor)
+                width = int(w * x_factor)
+                height = int(h * y_factor)
+                box = np.array([left, top, width, height])
+                boxes.append(box)
+                scores.append(max_score)
+                class_ids.append(class_id)
+
+        # Apply NMS
+        indices = cv2.dnn.NMSBoxes(boxes, scores, 0.1, 0.5)
+
+        detections = []
+        for i in indices:
+            box = boxes[i]
+            left, top, width, height = box
             detections.append({
-                "class": class_name,
-                "confidence": float(confidence),
-                "bbox": [float(x1), float(y1), float(x2), float(y2)]
+                "class": class_names[class_ids[i]],
+                "confidence": float(scores[i]),
+                "bbox": [float(left), float(top), float(left + width), float(top + height)]
             })
 
-    return detections
+        logger.debug(f"Processed image, found {len(detections)} detections")
+        logger.debug(detections)
+        return detections
+
+    except Exception as e:
+        logger.error(f"Error in process_image: {str(e)}")
+        logger.error(traceback.format_exc())
+        return None
 
 
 async def read_json(reader):
@@ -70,22 +131,24 @@ async def handle_client(reader, writer):
             raise ValueError("'data' field (as a list) is required in the JSON input")
 
         results = []
-        for base64_image in input_data['data']:
-            result = {'original_image': base64_image, 'detections': process_image(base64_image)}
+        for i, base64_image in enumerate(input_data['data']):
+            logger.debug(f"Processing image {i + 1}/{len(input_data['data'])}")
+            result = process_image(base64_image)
             if result is not None:
-                results.append(result)
+                results.append({'original_image': base64_image, 'detections': result})
 
         output = {"data": results}
         output_json = json.dumps(output)
         writer.write(output_json.encode())
         await writer.drain()
-        logger.info("Processed request successfully")
+        logger.info(f"Processed request successfully, returned {len(results)} results")
     except ValueError as ve:
         logger.error(str(ve))
         error_msg = json.dumps({"error": str(ve)})
         writer.write(error_msg.encode())
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
+        logger.error(traceback.format_exc())
         error_msg = json.dumps({"error": f"An internal error occurred: {str(e)}"})
         writer.write(error_msg.encode())
     finally:
