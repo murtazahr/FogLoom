@@ -29,7 +29,7 @@ RUN apt-get update && rm -rf /var/lib/apt/lists/*
 
 # Copy only necessary files
 COPY process.py .
-COPY yolov8n.pt .
+COPY yolov8n.onnx .
 
 # Make port 12345 available to the world outside this container
 EXPOSE 12345
