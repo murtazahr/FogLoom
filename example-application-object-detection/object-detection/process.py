@@ -97,7 +97,6 @@ def process_image(base64_image):
             })
 
         logger.debug(f"Processed image, found {len(detections)} detections")
-        logger.debug(detections)
         return detections
 
     except Exception as e:
