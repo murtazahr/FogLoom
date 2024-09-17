@@ -9,22 +9,16 @@ import couchdb
 import docker
 from docker import errors
 
-# Logging setup remains the same
-# Enhance logging setup
-logging.basicConfig(level=logging.DEBUG,  # Change to DEBUG for more detailed logs
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
 
-# Environment variables remain the same
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
 COUCHDB_DB = 'resource_registry'
 COUCHDB_SCHEDULE_DB = 'schedules'
 COUCHDB_DATA_DB = 'task_data'
-
-# Get the current node's name from environment variable
 CURRENT_NODE = os.getenv('NODE_NAME')
-
 
 class TaskExecutor:
     def __init__(self):
@@ -33,34 +27,27 @@ class TaskExecutor:
         self.data_db = None
         self.task_queue = asyncio.PriorityQueue()
         self.docker_client = docker.from_env()
-        self.change_feed_task = None
-        self.process_tasks_task = None
         self.thread_pool = ThreadPoolExecutor()
         self.loop = asyncio.get_event_loop()
+        self.change_feed_task = None
+        self.process_tasks_task = None
         logger.info("TaskExecutor initialized")
 
     async def initialize(self):
         logger.info("Initializing TaskExecutor")
-
-        # Connect to CouchDB
         await self.connect_to_couchdb()
 
-        # Start the change feed listener and task processor
+        # Start the change feed listener and task processor as background tasks
         self.change_feed_task = self.loop.create_task(self.listen_for_changes())
         self.process_tasks_task = self.loop.create_task(self.process_tasks())
-
-        # Wait for both tasks to start
-        await asyncio.gather(self.change_feed_task, self.process_tasks_task)
 
         logger.info("TaskExecutor initialization complete")
 
     async def connect_to_couchdb(self):
         try:
             self.couch_server = await self.loop.run_in_executor(self.thread_pool, couchdb.Server, COUCHDB_URL)
-            self.schedule_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__,
-                                                               COUCHDB_SCHEDULE_DB)
-            self.data_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__,
-                                                           COUCHDB_DATA_DB)
+            self.schedule_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__, COUCHDB_SCHEDULE_DB)
+            self.data_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__, COUCHDB_DATA_DB)
             logger.info("Connected to CouchDB successfully")
         except Exception as e:
             logger.error(f"Failed to connect to CouchDB: {str(e)}")
@@ -75,11 +62,8 @@ class TaskExecutor:
                 logger.debug("Initiated changes feed")
                 async for change in AsyncIterator(changes):
                     logger.debug(f"Received change: {change}")
-                    if not isinstance(change, dict):
-                        logger.warning(f"Unexpected change data structure (not a dict): {change}")
-                        continue
-                    if 'doc' not in change:
-                        logger.warning(f"Change does not contain 'doc' field: {change}")
+                    if not isinstance(change, dict) or 'doc' not in change:
+                        logger.warning(f"Unexpected change data structure: {change}")
                         continue
                     doc = change['doc']
                     logger.debug(f"Processing document: {doc}")
@@ -155,22 +139,28 @@ class TaskExecutor:
     async def process_tasks(self):
         logger.info("Starting task processing loop")
         while True:
-            timestamp, workflow_id, schedule_id, app_id = await self.task_queue.get()
-            logger.info(f"Processing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
             try:
-                await self.execute_task(workflow_id, schedule_id, app_id)
+                timestamp, workflow_id, schedule_id, app_id = await self.task_queue.get()
+                logger.info(f"Processing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
+                try:
+                    await self.execute_task(workflow_id, schedule_id, app_id)
 
-                # Check if all final tasks are completed
-                if await self.check_all_final_tasks_completed(schedule_id):
-                    logger.info(f"All final tasks completed for schedule: {schedule_id}")
-                    await self.update_schedule_status(schedule_id, "FINALIZED")
-                else:
-                    logger.info(f"Not all final tasks completed yet for schedule: {schedule_id}")
+                    if await self.check_all_final_tasks_completed(schedule_id):
+                        logger.info(f"All final tasks completed for schedule: {schedule_id}")
+                        await self.update_schedule_status(schedule_id, "FINALIZED")
+                    else:
+                        logger.info(f"Not all final tasks completed yet for schedule: {schedule_id}")
+                except Exception as e:
+                    logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
+                    await self.update_schedule_status(schedule_id, "FAILED")
+                finally:
+                    self.task_queue.task_done()
+            except asyncio.CancelledError:
+                logger.info("Task processing loop cancelled")
+                break
             except Exception as e:
-                logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
-                await self.update_schedule_status(schedule_id, "FAILED")
-            finally:
-                self.task_queue.task_done()
+                logger.error(f"Unexpected error in task processing loop: {str(e)}", exc_info=True)
+                await asyncio.sleep(5)  # Wait before continuing the loop
 
     async def check_all_final_tasks_completed(self, schedule_id):
         logger.info(f"Checking if all final tasks are completed for schedule {schedule_id}")
@@ -321,21 +311,18 @@ async def main():
     executor = TaskExecutor()
     await executor.initialize()
 
-    try:
-        logger.info(f"TaskExecutor initialized and running. Waiting for changes on node: {CURRENT_NODE}")
+    logger.info(f"TaskExecutor initialized and running. Waiting for changes on node: {CURRENT_NODE}")
 
-        # Keep the main coroutine running until interrupted
+    try:
         while True:
             await asyncio.sleep(10)
             logger.debug("Main loop still running...")
     except asyncio.CancelledError:
         logger.info("Received cancellation signal. Shutting down...")
     finally:
-        # Perform any necessary cleanup
         await executor.cleanup()
 
     logger.info("Main application shutdown complete")
-
 
 if __name__ == "__main__":
     try:
