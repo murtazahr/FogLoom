@@ -84,7 +84,6 @@ def process_docker_action(action, image_hash, image_name, app_id):
         logger.warning(f"Unknown action: {action}")
 
 
-@retry(stop_max_attempt_number=MAX_RETRIES, wait_fixed=RETRY_WAIT_MS)
 def deploy_image(client, image_name, image_hash, container_name):
     logger.info(f"Deploying image: {image_name}")
     try:
@@ -125,7 +124,6 @@ def deploy_container(client, image_name, container_name):
         raise
 
 
-@retry(stop_max_attempt_number=MAX_RETRIES, wait_fixed=RETRY_WAIT_MS)
 def remove_container(client, container_name):
     logger.info(f"Removing container: {container_name}")
     try:
@@ -147,7 +145,6 @@ def remove_container(client, container_name):
         raise
 
 
-@retry(stop_max_attempt_number=MAX_RETRIES, wait_fixed=RETRY_WAIT_MS)
 def remove_image(client, image_name, container_name):
     logger.info(f"Removing image: {image_name}")
     remove_container(client, container_name)
