@@ -18,7 +18,8 @@ COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD'
 COUCHDB_DB = 'resource_registry'
 COUCHDB_SCHEDULE_DB = 'schedules'
 COUCHDB_DATA_DB = 'task_data'
-CURRENT_NODE = os.getenv('NODE_NAME')
+CURRENT_NODE = os.getenv('NODE_ID')
+
 
 class TaskExecutor:
     def __init__(self):
@@ -46,8 +47,10 @@ class TaskExecutor:
     async def connect_to_couchdb(self):
         try:
             self.couch_server = await self.loop.run_in_executor(self.thread_pool, couchdb.Server, COUCHDB_URL)
-            self.schedule_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__, COUCHDB_SCHEDULE_DB)
-            self.data_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__, COUCHDB_DATA_DB)
+            self.schedule_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__,
+                                                               COUCHDB_SCHEDULE_DB)
+            self.data_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__,
+                                                           COUCHDB_DATA_DB)
             logger.info("Connected to CouchDB successfully")
         except Exception as e:
             logger.error(f"Failed to connect to CouchDB: {str(e)}")
@@ -323,6 +326,7 @@ async def main():
         await executor.cleanup()
 
     logger.info("Main application shutdown complete")
+
 
 if __name__ == "__main__":
     try:
