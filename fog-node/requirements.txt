@@ -1,6 +1,6 @@
 aiocouch==3.0.1
 aiohttp==3.10.5
-docker_py==1.10.6
+docker==7.1.0
 CouchDB==1.2
 psutil==6.0.0
 sawtooth_sdk==1.2.5
