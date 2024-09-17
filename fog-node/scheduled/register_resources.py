@@ -104,7 +104,7 @@ def connect_to_couchdb(max_retries=5, retry_delay=5):
 
 def store_resource_data(db, node_id, resource_data):
     try:
-        doc_id = f"resource_{node_id}"
+        doc_id = node_id
         timestamp = int(time.time())
         data_hash = hashlib.sha256(json.dumps(resource_data, sort_keys=True).encode()).hexdigest()
 

@@ -141,7 +141,7 @@ class LCDWRRScheduler(BaseScheduler):
     def get_latest_node_data(self):
         node_resources = {'rows': []}
         for row in self.db.view('_all_docs', include_docs=True):
-            if row.id.startswith('resource_'):
+            if row.id.startswith('sawtooth-'):
                 node_resources['rows'].append({'id': row.id, 'doc': row.doc})
         return node_resources
 
