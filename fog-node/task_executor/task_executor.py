@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
+
 import aiohttp
 import couchdb
 import docker
@@ -14,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Environment variables remain the same
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
+COUCHDB_DB = 'resource_registry'
 COUCHDB_SCHEDULE_DB = 'schedules'
 COUCHDB_DATA_DB = 'task_data'
 
@@ -30,6 +33,8 @@ class TaskExecutor:
         self.docker_client = docker.from_env()
         self.change_feed_task = None
         self.process_tasks_task = None
+        self.thread_pool = ThreadPoolExecutor()
+        self.loop = asyncio.get_event_loop()
         logger.info("TaskExecutor initialized")
 
     async def initialize(self):
@@ -39,8 +44,8 @@ class TaskExecutor:
         await self.connect_to_couchdb()
 
         # Start the change feed listener and task processor
-        self.change_feed_task = asyncio.create_task(self.listen_for_changes())
-        self.process_tasks_task = asyncio.create_task(self.process_tasks())
+        self.change_feed_task = self.loop.create_task(self.listen_for_changes())
+        self.process_tasks_task = self.loop.create_task(self.process_tasks())
 
         # Wait for both tasks to start
         await asyncio.gather(self.change_feed_task, self.process_tasks_task)
@@ -49,9 +54,11 @@ class TaskExecutor:
 
     async def connect_to_couchdb(self):
         try:
-            self.couch_server = await asyncio.to_thread(couchdb.Server, COUCHDB_URL)
-            self.schedule_db = await asyncio.to_thread(self.couch_server.__getitem__, COUCHDB_SCHEDULE_DB)
-            self.data_db = await asyncio.to_thread(self.couch_server.__getitem__, COUCHDB_DATA_DB)
+            self.couch_server = await self.loop.run_in_executor(self.thread_pool, couchdb.Server, COUCHDB_URL)
+            self.schedule_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__,
+                                                               COUCHDB_SCHEDULE_DB)
+            self.data_db = await self.loop.run_in_executor(self.thread_pool, self.couch_server.__getitem__,
+                                                           COUCHDB_DATA_DB)
             logger.info("Connected to CouchDB successfully")
         except Exception as e:
             logger.error(f"Failed to connect to CouchDB: {str(e)}")
@@ -61,8 +68,8 @@ class TaskExecutor:
         logger.info("Starting to listen for changes in the schedule database")
         while True:
             try:
-                changes = await asyncio.to_thread(self.schedule_db.changes, feed='continuous', include_docs=True,
-                                                  heartbeat=1000)
+                changes = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.changes,
+                                                          feed='continuous', include_docs=True, heartbeat=1000)
                 async for change in AsyncIterator(changes):
                     if change.get('deleted', False):
                         continue
@@ -118,7 +125,7 @@ class TaskExecutor:
     async def check_task_completed(self, app_id):
         logger.info(f"Checking if task completed for app_id: {app_id}")
         try:
-            doc = await asyncio.to_thread(self.data_db.get, f"{app_id}_output")
+            doc = await self.loop.run_in_executor(self.thread_pool, self.data_db.get, f"{app_id}_output")
             logger.info(f"Task completed for app_id: {app_id}")
             return doc is not None
         except couchdb.http.ResourceNotFound:
@@ -148,7 +155,7 @@ class TaskExecutor:
     async def check_all_final_tasks_completed(self, schedule_id):
         logger.info(f"Checking if all final tasks are completed for schedule {schedule_id}")
         try:
-            schedule_doc = await asyncio.to_thread(self.schedule_db.get, schedule_id)
+            schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
             schedule = schedule_doc['schedule']
             level_info = schedule['level_info']
 
@@ -175,7 +182,7 @@ class TaskExecutor:
         # Fetch input data
         input_key = f"{workflow_id}_{schedule_id}_{app_id}_input"
         try:
-            input_doc = await asyncio.to_thread(self.data_db.get, input_key)
+            input_doc = await self.loop.run_in_executor(self.thread_pool, self.data_db.get, input_key)
             input_data = input_doc['data']
         except Exception as e:
             logger.error(f"Error fetching input data for {input_key}: {str(e)}", exc_info=True)
@@ -192,7 +199,7 @@ class TaskExecutor:
         # Store the output
         output_key = f"{workflow_id}_{schedule_id}_{app_id}_output"
         try:
-            await asyncio.to_thread(self.data_db.save, {
+            await self.loop.run_in_executor(self.thread_pool, self.data_db.save, {
                 '_id': output_key,
                 'data': output_data,
                 'workflow_id': workflow_id,
@@ -243,9 +250,9 @@ class TaskExecutor:
     async def update_schedule_status(self, schedule_id, status):
         logger.info(f"Updating schedule status: schedule_id={schedule_id}, status={status}")
         try:
-            doc = await asyncio.to_thread(self.schedule_db.get, schedule_id)
+            doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
             doc['status'] = status
-            await asyncio.to_thread(self.schedule_db.save, doc)
+            await self.loop.run_in_executor(self.thread_pool, self.schedule_db.save, doc)
             logger.info(f"Schedule status updated: schedule_id={schedule_id}, status={status}")
         except Exception as e:
             logger.error(f"Error updating schedule status for {schedule_id}: {str(e)}", exc_info=True)
@@ -267,6 +274,7 @@ class TaskExecutor:
                 pass
         if self.docker_client:
             self.docker_client.close()
+        self.thread_pool.shutdown()
         logger.info("TaskExecutor cleanup complete")
 
 
@@ -279,7 +287,7 @@ class AsyncIterator:
 
     async def __anext__(self):
         try:
-            return await asyncio.to_thread(next, self.sync_iterator)
+            return await asyncio.get_event_loop().run_in_executor(None, next, self.sync_iterator)
         except StopIteration:
             raise StopAsyncIteration
 
