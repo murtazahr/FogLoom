@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 import aiohttp
 import couchdb
@@ -68,12 +69,15 @@ class TaskExecutor:
         logger.info("Starting to listen for changes in the schedule database")
         while True:
             try:
-                changes = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.changes,
-                                                          feed='continuous', include_docs=True, heartbeat=1000)
+                changes_func = partial(self.schedule_db.changes, feed='continuous', include_docs=True, heartbeat=1000)
+                changes = await self.loop.run_in_executor(self.thread_pool, changes_func)
                 async for change in AsyncIterator(changes):
-                    if change.get('deleted', False):
+                    # Await the change object
+                    change_data = await change
+                    if not isinstance(change_data, dict) or 'doc' not in change_data:
+                        logger.warning(f"Unexpected change data structure: {change_data}")
                         continue
-                    doc = change['doc']
+                    doc = change_data['doc']
                     if doc.get('status') == 'ACTIVE':
                         logger.info(f"New active schedule detected: {doc['_id']}")
                         await self.handle_new_schedule(doc)
@@ -81,18 +85,21 @@ class TaskExecutor:
                 logger.info("Change feed listener cancelled")
                 break
             except Exception as e:
-                logger.error(f"Error in change feed listener: {str(e)}")
+                logger.error(f"Error in change feed listener: {str(e)}", exc_info=True)
                 await asyncio.sleep(5)  # Wait before trying to reconnect
 
     async def handle_new_schedule(self, schedule_doc):
         logger.info(f"Handling new schedule: {schedule_doc['_id']}")
-        schedule = schedule_doc['schedule']
-        node_schedule = schedule['node_schedule']
+        schedule = schedule_doc.get('schedule')
+        if not schedule:
+            logger.warning(f"Schedule document {schedule_doc['_id']} does not contain a 'schedule' field")
+            return
+        node_schedule = schedule.get('node_schedule', {})
 
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
-                timestamp = schedule_doc['timestamp']
-                workflow_id = schedule_doc['workflow_id']
+                timestamp = schedule_doc.get('timestamp')
+                workflow_id = schedule_doc.get('workflow_id')
                 schedule_id = schedule_doc['_id']
 
                 logger.info(f"Checking dependencies for app_id: {app_id}")
@@ -287,7 +294,8 @@ class AsyncIterator:
 
     async def __anext__(self):
         try:
-            return await asyncio.get_event_loop().run_in_executor(None, next, self.sync_iterator)
+            next_func = partial(next, self.sync_iterator)
+            return await asyncio.get_event_loop().run_in_executor(None, next_func)
         except StopIteration:
             raise StopAsyncIteration
 
