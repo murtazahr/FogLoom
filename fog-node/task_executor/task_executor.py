@@ -72,12 +72,10 @@ class TaskExecutor:
                 changes_func = partial(self.schedule_db.changes, feed='continuous', include_docs=True, heartbeat=1000)
                 changes = await self.loop.run_in_executor(self.thread_pool, changes_func)
                 async for change in AsyncIterator(changes):
-                    # Await the change object
-                    change_data = await change
-                    if not isinstance(change_data, dict) or 'doc' not in change_data:
-                        logger.warning(f"Unexpected change data structure: {change_data}")
+                    if not isinstance(change, dict) or 'doc' not in change:
+                        logger.warning(f"Unexpected change data structure: {change}")
                         continue
-                    doc = change_data['doc']
+                    doc = change['doc']
                     if doc.get('status') == 'ACTIVE':
                         logger.info(f"New active schedule detected: {doc['_id']}")
                         await self.handle_new_schedule(doc)
