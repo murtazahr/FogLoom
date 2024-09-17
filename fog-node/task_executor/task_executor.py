@@ -10,7 +10,8 @@ import docker
 from docker import errors
 
 # Logging setup remains the same
-logging.basicConfig(level=logging.INFO,
+# Enhance logging setup
+logging.basicConfig(level=logging.DEBUG,  # Change to DEBUG for more detailed logs
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger(__name__)
@@ -71,20 +72,29 @@ class TaskExecutor:
             try:
                 changes_func = partial(self.schedule_db.changes, feed='continuous', include_docs=True, heartbeat=1000)
                 changes = await self.loop.run_in_executor(self.thread_pool, changes_func)
+                logger.debug("Initiated changes feed")
                 async for change in AsyncIterator(changes):
-                    if not isinstance(change, dict) or 'doc' not in change:
-                        logger.warning(f"Unexpected change data structure: {change}")
+                    logger.debug(f"Received change: {change}")
+                    if not isinstance(change, dict):
+                        logger.warning(f"Unexpected change data structure (not a dict): {change}")
+                        continue
+                    if 'doc' not in change:
+                        logger.warning(f"Change does not contain 'doc' field: {change}")
                         continue
                     doc = change['doc']
+                    logger.debug(f"Processing document: {doc}")
                     if doc.get('status') == 'ACTIVE':
                         logger.info(f"New active schedule detected: {doc['_id']}")
                         await self.handle_new_schedule(doc)
+                    else:
+                        logger.debug(f"Skipping non-active document: {doc['_id']}, status: {doc.get('status')}")
             except asyncio.CancelledError:
                 logger.info("Change feed listener cancelled")
                 break
             except Exception as e:
                 logger.error(f"Error in change feed listener: {str(e)}", exc_info=True)
                 await asyncio.sleep(5)  # Wait before trying to reconnect
+            logger.info("Restarting change feed listener after error or completion")
 
     async def handle_new_schedule(self, schedule_doc):
         logger.info(f"Handling new schedule: {schedule_doc['_id']}")
@@ -93,6 +103,9 @@ class TaskExecutor:
             logger.warning(f"Schedule document {schedule_doc['_id']} does not contain a 'schedule' field")
             return
         node_schedule = schedule.get('node_schedule', {})
+
+        logger.debug(f"Node schedule: {node_schedule}")
+        logger.debug(f"Current node: {CURRENT_NODE}")
 
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
@@ -106,6 +119,8 @@ class TaskExecutor:
                     await self.task_queue.put((timestamp, workflow_id, schedule_id, app_id))
                 else:
                     logger.info(f"Dependencies not met for app_id: {app_id}. Task not added to queue.")
+        else:
+            logger.info(f"No tasks for current node {CURRENT_NODE} in this schedule")
 
     async def check_dependencies(self, schedule, app_id):
         logger.info(f"Checking dependencies for app_id: {app_id}")
@@ -293,8 +308,11 @@ class AsyncIterator:
     async def __anext__(self):
         try:
             next_func = partial(next, self.sync_iterator)
-            return await asyncio.get_event_loop().run_in_executor(None, next_func)
+            item = await asyncio.get_event_loop().run_in_executor(None, next_func)
+            logger.debug(f"AsyncIterator yielded: {item}")
+            return item
         except StopIteration:
+            logger.debug("AsyncIterator completed")
             raise StopAsyncIteration
 
 
@@ -304,9 +322,12 @@ async def main():
     await executor.initialize()
 
     try:
+        logger.info(f"TaskExecutor initialized and running. Waiting for changes on node: {CURRENT_NODE}")
+
         # Keep the main coroutine running until interrupted
         while True:
-            await asyncio.sleep(1)
+            await asyncio.sleep(10)
+            logger.debug("Main loop still running...")
     except asyncio.CancelledError:
         logger.info("Received cancellation signal. Shutting down...")
     finally:
