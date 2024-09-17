@@ -4,14 +4,12 @@ import json
 import logging
 import os
 import time
+import argparse
 
-from flask import Flask, request, jsonify
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
 from sawtooth_sdk.messaging.stream import Stream
-
-app = Flask(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -100,22 +98,13 @@ def submit_batch(batch):
     return result
 
 
-# Load the private key and create a signer when the server starts
-try:
-    private_key = load_private_key(PRIVATE_KEY_FILE)
-    context = create_context('secp256k1')
-    signer = CryptoFactory(context).new_signer(private_key)
-except IOError as e:
-    logger.error(f"Failed to load private key: {str(e)}")
-    raise
-
-
-@app.route('/submit_iot_data', methods=['POST'])
-def submit_iot_data():
+def submit_iot_data_from_file(json_file):
     try:
-        data = request.json
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+
         if not data or 'iot_data' not in data or 'workflow_id' not in data:
-            return jsonify({"error": "Missing iot_data or workflow_id in request"}), 400
+            raise ValueError("Missing iot_data or workflow_id in the JSON file")
 
         iot_data = data['iot_data']
         workflow_id = data['workflow_id']
@@ -124,16 +113,32 @@ def submit_iot_data():
         batch = create_batch([transaction], signer)
         result = submit_batch(batch)
 
-        return jsonify({
+        print({
             "message": "Data submitted successfully",
             "result": str(result),
             "schedule_id": json.loads(transaction.payload.decode())['schedule_id']
-        }), 200
+        })
     except Exception as ex:
-        logger.error(f"Error processing request: {str(ex)}")
-        return jsonify({"error": str(ex)}), 500
+        logger.error(f"Error processing file: {str(ex)}")
+        raise
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    app.run(host='0.0.0.0', port=8080)
+
+    # Argument parsing
+    parser = argparse.ArgumentParser(description='Submit IoT data to Sawtooth blockchain.')
+    parser.add_argument('json_file', help='Path to the JSON file containing IoT data and workflow_id')
+    args = parser.parse_args()
+
+    # Load private key and signer
+    try:
+        private_key = load_private_key(PRIVATE_KEY_FILE)
+        context = create_context('secp256k1')
+        signer = CryptoFactory(context).new_signer(private_key)
+    except IOError as e:
+        logger.error(f"Failed to load private key: {str(e)}")
+        raise
+
+    # Submit IoT data from the provided JSON file
+    submit_iot_data_from_file(args.json_file)

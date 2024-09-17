@@ -36,4 +36,4 @@ COPY scheduling_client.py .
 ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/client.priv
 
 # Keep the container running
-CMD ["python", "scheduling_client.py"]
+CMD ["tail", "-f", "/dev/null"]
