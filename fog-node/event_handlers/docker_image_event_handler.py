@@ -3,7 +3,6 @@ import logging
 import os
 import docker
 from docker import errors
-from retrying import retry
 
 from sawtooth_sdk.messaging.stream import Stream
 from sawtooth_sdk.protobuf.events_pb2 import EventSubscription, EventList
@@ -21,9 +20,8 @@ START_PORT = 12345
 END_PORT = 13345
 used_ports = set()
 
-# Retry configuration
-MAX_RETRIES = 3
-RETRY_WAIT_MS = 3000
+# Increased timeout (in seconds)
+DOCKER_TIMEOUT = 180
 
 
 def get_next_available_port():
@@ -38,7 +36,6 @@ def release_port(port):
     used_ports.remove(port)
 
 
-@retry(stop_max_attempt_number=MAX_RETRIES, wait_fixed=RETRY_WAIT_MS)
 def handle_event(event):
     logger.info(f"Handling event: {event.event_type}")
     if event.event_type == "docker-image-action":
@@ -67,9 +64,8 @@ def handle_event(event):
         logger.info(f"Received unhandled event type: {event.event_type}")
 
 
-@retry(stop_max_attempt_number=MAX_RETRIES, wait_fixed=RETRY_WAIT_MS)
 def process_docker_action(action, image_hash, image_name, app_id):
-    client = docker.from_env()
+    client = docker.from_env(timeout=DOCKER_TIMEOUT)
     container_name = f"sawtooth-{app_id}"
 
     if action == "deploy_image":
@@ -96,10 +92,8 @@ def deploy_image(client, image_name, image_hash, container_name):
         logger.error(f"Image {image_name} not found")
     except Exception as e:
         logger.error(f"Error deploying image: {str(e)}")
-        raise
 
 
-@retry(stop_max_attempt_number=MAX_RETRIES, wait_fixed=RETRY_WAIT_MS)
 def deploy_container(client, image_name, container_name):
     logger.info(f"Deploying container: {container_name}")
     host_port = None
@@ -119,9 +113,8 @@ def deploy_container(client, image_name, container_name):
         logger.info(f"Container started: {container.id}, mapped to host port: {host_port}")
     except docker.errors.ContainerError as e:
         logger.error(f"Error starting container: {str(e)}")
-        if 'host_port' in locals():
+        if host_port is not None:
             release_port(host_port)
-        raise
 
 
 def remove_container(client, container_name):
@@ -142,7 +135,6 @@ def remove_container(client, container_name):
         logger.info(f"Container {container_name} not found, no action needed")
     except Exception as e:
         logger.error(f"Error removing container: {str(e)}")
-        raise
 
 
 def remove_image(client, image_name, container_name):
@@ -155,10 +147,8 @@ def remove_image(client, image_name, container_name):
         logger.info(f"Image {image_name} not found, no action needed")
     except Exception as e:
         logger.error(f"Error removing image: {str(e)}")
-        raise
 
 
-@retry(stop_max_attempt_number=MAX_RETRIES, wait_fixed=RETRY_WAIT_MS)
 def verify_image(client, image_id, stored_digest):
     logger.info(f"Verifying image: {image_id}")
     image_inspect = client.api.inspect_image(image_id)
