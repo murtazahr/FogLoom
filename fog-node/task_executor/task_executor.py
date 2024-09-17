@@ -305,7 +305,7 @@ class TaskExecutor:
 
             # Use the exposed port to communicate with the container
             async with aiohttp.ClientSession() as session:
-                async with session.post(f'http://{container_name}:{exposed_port}',
+                async with session.post(f'http://localhost:{exposed_port}',
                                         json={'data': input_data}) as response:
                     result = await response.json()
                     logger.info(f"Received response from container {container_name}")

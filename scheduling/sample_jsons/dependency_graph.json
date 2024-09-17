@@ -1,11 +1,7 @@
 {
-  "start": "38983aac-2678-44ad-b185-5ef53465e967",
+  "start": "cb27fc81-13f5-4e2d-bbcf-cc1fd2ae7492",
   "nodes": {
-    "6c8cb0ef-c57d-4514-9a75-0d041a8da7f6": {"next": []},
-    "38983aac-2678-44ad-b185-5ef53465e967": {"next": ["6c8cb0ef-c57d-4514-9a75-0d041a8da7f6"]}
+    "46c91056-7e15-4def-a25a-eebd7d95cfd3": {"next": []},
+    "cb27fc81-13f5-4e2d-bbcf-cc1fd2ae7492": {"next": ["46c91056-7e15-4def-a25a-eebd7d95cfd3"]}
   }
 }
-
-8296d819-9717-4c7c-9967-99eb2b86e66f_eb69f9e3-dca0-4584-afe3-a8e88fb62f81_38983aac-2678-44ad-b185-5ef53465e967_input
-
-8296d819-9717-4c7c-9967-99eb2b86e66f_eb69f9e3-dca0-4584-afe3-a8e88fb62f81_38983aac-2678-44ad-b185-5ef53465e967_input
