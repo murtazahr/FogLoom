@@ -139,32 +139,6 @@ class TaskExecutor:
             logger.info(f"Task not completed for app_id: {app_id}")
             return False
 
-    async def process_tasks(self):
-        logger.info("Starting task processing loop")
-        while True:
-            try:
-                timestamp, workflow_id, schedule_id, app_id = await self.task_queue.get()
-                logger.info(f"Processing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
-                try:
-                    await self.execute_task(workflow_id, schedule_id, app_id)
-
-                    if await self.check_all_final_tasks_completed(schedule_id):
-                        logger.info(f"All final tasks completed for schedule: {schedule_id}")
-                        await self.update_schedule_status(schedule_id, "FINALIZED")
-                    else:
-                        logger.info(f"Not all final tasks completed yet for schedule: {schedule_id}")
-                except Exception as e:
-                    logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
-                    await self.update_schedule_status(schedule_id, "FAILED")
-                finally:
-                    self.task_queue.task_done()
-            except asyncio.CancelledError:
-                logger.info("Task processing loop cancelled")
-                break
-            except Exception as e:
-                logger.error(f"Unexpected error in task processing loop: {str(e)}", exc_info=True)
-                await asyncio.sleep(5)  # Wait before continuing the loop
-
     async def check_all_final_tasks_completed(self, schedule_id):
         logger.info(f"Checking if all final tasks are completed for schedule {schedule_id}")
         try:
@@ -192,14 +166,54 @@ class TaskExecutor:
 
     async def execute_task(self, workflow_id, schedule_id, app_id):
         logger.info(f"Executing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
+
+        # Fetch the schedule document to get dependency information
+        schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
+        if not schedule_doc:
+            raise Exception(f"Schedule document not found for schedule_id: {schedule_id}")
+
+        schedule = schedule_doc.get('schedule', {})
+        level_info = schedule.get('level_info', {})
+
+        # Determine the current task's level and its dependencies
+        current_level = None
+        dependencies = []
+        for level, tasks in level_info.items():
+            for task in tasks:
+                if task['app_id'] == app_id:
+                    current_level = int(level)
+                    break
+            if current_level is not None:
+                break
+
+        if current_level is None:
+            raise Exception(f"Task {app_id} not found in schedule level_info")
+
+        if current_level > 0:
+            prev_level_tasks = level_info.get(str(current_level - 1), [])
+            for task in prev_level_tasks:
+                if 'next' in task and app_id in task['next']:
+                    dependencies.append(task['app_id'])
+
+        logger.info(f"Dependencies for task {app_id}: {dependencies}")
+
         # Fetch input data
-        input_key = f"{workflow_id}_{schedule_id}_{app_id}_input"
-        try:
-            input_doc = await self.loop.run_in_executor(self.thread_pool, self.data_db.get, input_key)
-            input_data = input_doc['data']
-        except Exception as e:
-            logger.error(f"Error fetching input data for {input_key}: {str(e)}", exc_info=True)
-            raise
+        input_data = []
+        for dep_app_id in dependencies:
+            dep_key = f"{workflow_id}_{schedule_id}_{dep_app_id}_output"
+            input_doc = await self.fetch_data_with_retry(dep_key)
+            if input_doc and 'data' in input_doc:
+                input_data.extend(input_doc['data'])
+
+        if not dependencies:
+            # If there are no dependencies, fetch the original input
+            input_key = f"{workflow_id}_{schedule_id}_{app_id}_input"
+            input_doc = await self.fetch_data_with_retry(input_key)
+            if input_doc and 'data' in input_doc:
+                input_data = input_doc['data']
+
+        if not input_data:
+            raise Exception(f"No input data found for task: {app_id}")
 
         # Execute the task using the Docker container
         container_name = f"sawtooth-{app_id}"
@@ -222,6 +236,53 @@ class TaskExecutor:
         except Exception as e:
             logger.error(f"Error storing task output for {output_key}: {str(e)}", exc_info=True)
             raise
+
+    async def fetch_data_with_retry(self, key):
+        max_retries = 3
+        retry_delay = 1  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                doc = await self.loop.run_in_executor(self.thread_pool, self.data_db.get, key)
+                logger.debug(f"Retrieved document for key {key}: {doc}")
+                return doc
+            except couchdb.http.ResourceNotFound:
+                logger.warning(f"Document not found for key: {key}")
+            except Exception as e:
+                logger.error(f"Error fetching data for {key}: {str(e)}", exc_info=True)
+
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying in {retry_delay} seconds... (Attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(retry_delay)
+
+        logger.error(f"Failed to retrieve document after {max_retries} attempts for key: {key}")
+        return None
+
+    async def process_tasks(self):
+        logger.info("Starting task processing loop")
+        while True:
+            try:
+                timestamp, workflow_id, schedule_id, app_id = await self.task_queue.get()
+                logger.info(f"Processing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
+                try:
+                    await self.execute_task(workflow_id, schedule_id, app_id)
+
+                    if await self.check_all_final_tasks_completed(schedule_id):
+                        logger.info(f"All final tasks completed for schedule: {schedule_id}")
+                        await self.update_schedule_status(schedule_id, "FINALIZED")
+                    else:
+                        logger.info(f"Not all final tasks completed yet for schedule: {schedule_id}")
+                except Exception as e:
+                    logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
+                    await self.update_schedule_status(schedule_id, "FAILED")
+                finally:
+                    self.task_queue.task_done()
+            except asyncio.CancelledError:
+                logger.info("Task processing loop cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Unexpected error in task processing loop: {str(e)}", exc_info=True)
+                await asyncio.sleep(5)  # Wait before continuing the loop
 
     async def run_docker_task(self, container_name, input_data):
         logger.info(f"Running Docker task for container: {container_name}")
