@@ -35,6 +35,7 @@ class TaskExecutor:
         self.change_feed_task = None
         self.process_tasks_task = None
         self.processed_changes = TTLCache(maxsize=1000, ttl=60)
+        self.completed_tasks = set()  # Set to keep track of completed tasks
         logger.info("TaskExecutor initialized")
 
     async def initialize(self):
@@ -154,22 +155,30 @@ class TaskExecutor:
             logger.warning(f"No completed_app_id found in schedule document: {schedule_id}")
             return
 
+        # Mark the task as completed
+        self.completed_tasks.add((schedule_id, completed_app_id))
+
         schedule = schedule_doc.get('schedule')
         if not schedule:
             logger.warning(f"Schedule document {schedule_id} does not contain a 'schedule' field")
             return
 
         workflow_id = schedule_doc.get('workflow_id')
-        schedule_id = schedule_doc['_id']
-
         node_schedule = schedule.get('node_schedule', {})
+
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
+                # Skip if this task has already been completed
+                if (schedule_id, app_id) in self.completed_tasks:
+                    logger.debug(f"Skipping already completed task: {app_id} for schedule {schedule_id}")
+                    continue
+
                 if await self.check_dependencies(workflow_id, schedule_id, app_id):
                     logger.info(f"Dependencies now met for app_id: {app_id}. Adding to task queue.")
                     timestamp = schedule_doc.get('timestamp')
-                    workflow_id = schedule_doc.get('workflow_id')
                     await self.task_queue.put((timestamp, workflow_id, schedule_id, app_id))
+                else:
+                    logger.debug(f"Dependencies not yet met for app_id: {app_id}")
 
     async def fetch_data_with_retry(self, db, key, max_retries=5, initial_delay=0.1):
         delay = initial_delay
@@ -227,7 +236,7 @@ class TaskExecutor:
 
         for task in dependencies:
             dep_app_id = task['app_id']
-            if not await self.check_task_completed(workflow_id, schedule_id, dep_app_id):
+            if (schedule_id, dep_app_id) not in self.completed_tasks:
                 logger.info(f"Dependency {dep_app_id} not completed for app_id {app_id}")
                 return False
 
@@ -285,11 +294,12 @@ class TaskExecutor:
                 logger.info(f"Processing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
                 try:
                     await self.execute_task(workflow_id, schedule_id, app_id)
+                    # Mark the task as completed after successful execution
+                    self.completed_tasks.add((schedule_id, app_id))
                     # Check if this was the final task in the schedule
                     if await self.is_final_task(schedule_id, app_id):
                         await self.update_schedule_status(schedule_id, "FINALIZED")
-                    else:
-                        await self.update_schedule_status(schedule_id, "IN_PROGRESS")
+
                 except Exception as e:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
                     await self.update_schedule_status(schedule_id, "FAILED")
