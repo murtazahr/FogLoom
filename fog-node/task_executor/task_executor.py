@@ -77,25 +77,37 @@ class TaskExecutor:
                     change_id = change['id']
                     seq = change.get('seq')
 
-                    # Check if we've already processed this change
-                    if change_id in self.processed_changes:
-                        logger.debug(f"Skipping already processed change: {change_id}")
-                        continue
-
-                    # Mark this change as processed
-                    self.processed_changes[change_id] = time.time()
-
                     if 'doc' not in change:
                         logger.warning(f"Change does not contain 'doc' field: {change}")
                         continue
 
                     doc = change['doc']
-                    if doc.get('status') == 'ACTIVE':
-                        logger.info(f"New active schedule detected: {doc['_id']}")
+                    current_status = doc.get('status')
+
+                    # Check if we've already processed this change and if the status is the same
+                    if change_id in self.processed_changes:
+                        prev_status = self.processed_changes[change_id]['status']
+                        if prev_status == current_status:
+                            logger.debug(f"Skipping already processed change with unchanged status: {change_id}")
+                            continue
+                        else:
+                            logger.info(f"Re-processing change {change_id} due to status change: {prev_status} -> {current_status}")
+
+                    # Process the change
+                    if current_status == 'ACTIVE':
+                        logger.info(f"Active schedule detected: {doc['_id']}")
                         await self.handle_new_schedule(doc)
-                    elif doc.get('status') == 'TASK_COMPLETED':
+                    elif current_status == 'TASK_COMPLETED':
                         logger.info(f"Task completion update detected for schedule: {doc['_id']}")
                         await self.handle_task_completion(doc)
+                    else:
+                        logger.info(f"Unhandled status {current_status} for schedule: {doc['_id']}")
+
+                    # Mark this change as processed with its current status
+                    self.processed_changes[change_id] = {
+                        'timestamp': time.time(),
+                        'status': current_status
+                    }
 
                     # Update the last processed sequence number
                     if seq:
