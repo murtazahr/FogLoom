@@ -2,12 +2,13 @@ import asyncio
 import json
 import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
-import aiohttp
 import couchdb
 import docker
+from cachetools import TTLCache
 from docker import errors
 
 logging.basicConfig(level=logging.DEBUG,
@@ -33,6 +34,7 @@ class TaskExecutor:
         self.loop = asyncio.get_event_loop()
         self.change_feed_task = None
         self.process_tasks_task = None
+        self.processed_changes = TTLCache(maxsize=1000, ttl=300)
         logger.info("TaskExecutor initialized")
 
     async def initialize(self):
@@ -59,16 +61,34 @@ class TaskExecutor:
 
     async def listen_for_changes(self):
         logger.info("Starting to listen for changes in the schedule database")
+        last_seq = None
         while True:
             try:
-                changes_func = partial(self.schedule_db.changes, feed='continuous', include_docs=True, heartbeat=1000)
+                changes_func = partial(self.schedule_db.changes, feed='continuous', include_docs=True,
+                                       heartbeat=1000, since=last_seq)
                 changes = await self.loop.run_in_executor(self.thread_pool, changes_func)
                 logger.debug("Initiated changes feed")
                 async for change in AsyncIterator(changes):
                     logger.debug(f"Received change: {change}")
-                    if not isinstance(change, dict) or 'doc' not in change:
+                    if not isinstance(change, dict) or 'id' not in change:
                         logger.warning(f"Unexpected change data structure: {change}")
                         continue
+
+                    change_id = change['id']
+                    seq = change.get('seq')
+
+                    # Check if we've already processed this change
+                    if change_id in self.processed_changes:
+                        logger.debug(f"Skipping already processed change: {change_id}")
+                        continue
+
+                    # Mark this change as processed
+                    self.processed_changes[change_id] = time.time()
+
+                    if 'doc' not in change:
+                        logger.warning(f"Change does not contain 'doc' field: {change}")
+                        continue
+
                     doc = change['doc']
                     if doc.get('status') == 'ACTIVE':
                         logger.info(f"New active schedule detected: {doc['_id']}")
@@ -76,6 +96,11 @@ class TaskExecutor:
                     elif doc.get('status') == 'TASK_COMPLETED':
                         logger.info(f"Task completion update detected for schedule: {doc['_id']}")
                         await self.handle_task_completion(doc)
+
+                    # Update the last processed sequence number
+                    if seq:
+                        last_seq = seq
+
             except asyncio.CancelledError:
                 logger.info("Change feed listener cancelled")
                 break
