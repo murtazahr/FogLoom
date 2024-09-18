@@ -34,8 +34,8 @@ class TaskExecutor:
         self.loop = asyncio.get_event_loop()
         self.change_feed_task = None
         self.process_tasks_task = None
-        self.processed_changes = TTLCache(maxsize=1000, ttl=60)
-        self.completed_tasks = set()  # Set to keep track of completed tasks
+        self.processed_changes = TTLCache(maxsize=1000, ttl=300)  # Cache for 5 minutes
+        self.task_status = {}  # Dictionary to keep track of task statuses
         logger.info("TaskExecutor initialized")
 
     async def initialize(self):
@@ -65,8 +65,8 @@ class TaskExecutor:
         last_seq = None
         while True:
             try:
-                changes_func = partial(self.schedule_db.changes, feed='continuous', include_docs=True,
-                                       heartbeat=1000, since=last_seq)
+                changes_func = partial(self.schedule_db.changes, feed='continuous', include_docs=True, heartbeat=1000,
+                                       since=last_seq)
                 changes = await self.loop.run_in_executor(self.thread_pool, changes_func)
                 logger.debug("Initiated changes feed")
                 async for change in AsyncIterator(changes):
@@ -92,7 +92,8 @@ class TaskExecutor:
                             logger.debug(f"Skipping already processed change with unchanged status: {change_id}")
                             continue
                         else:
-                            logger.info(f"Re-processing change {change_id} due to status change: {prev_status} -> {current_status}")
+                            logger.info(
+                                f"Re-processing change {change_id} due to status change: {prev_status} -> {current_status}")
 
                     # Process the change
                     if current_status == 'ACTIVE':
@@ -136,13 +137,18 @@ class TaskExecutor:
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
                 timestamp = schedule_doc.get('timestamp')
+                task_key = (schedule_id, app_id)
 
-                logger.info(f"Checking dependencies for app_id: {app_id}")
+                logger.info(f"Checking dependencies for app_id: {app_id} in schedule {schedule_id}")
                 if await self.check_dependencies(workflow_id, schedule_id, app_id):
-                    logger.info(f"Dependencies met for app_id: {app_id}. Adding to task queue.")
+                    logger.info(
+                        f"Dependencies met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
                     await self.task_queue.put((timestamp, workflow_id, schedule_id, app_id))
+                    self.task_status[task_key] = 'QUEUED'
                 else:
-                    logger.info(f"Dependencies not met for app_id: {app_id}. Will be checked again on task completions.")
+                    logger.info(
+                        f"Dependencies not met for app_id: {app_id} in schedule {schedule_id}. Will be checked again on task completions.")
+                    self.task_status[task_key] = 'WAITING'
         else:
             logger.info(f"No tasks for current node {CURRENT_NODE} in this schedule")
 
@@ -156,7 +162,8 @@ class TaskExecutor:
             return
 
         # Mark the task as completed
-        self.completed_tasks.add((schedule_id, completed_app_id))
+        task_key = (schedule_id, completed_app_id)
+        self.task_status[task_key] = 'COMPLETED'
 
         schedule = schedule_doc.get('schedule')
         if not schedule:
@@ -168,59 +175,23 @@ class TaskExecutor:
 
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
-                # Skip if this task has already been completed
-                if (schedule_id, app_id) in self.completed_tasks:
-                    logger.debug(f"Skipping already completed task: {app_id} for schedule {schedule_id}")
+                task_key = (schedule_id, app_id)
+                current_status = self.task_status.get(task_key)
+
+                # Skip if this task has already been completed or is in progress
+                if current_status in ['COMPLETED', 'IN_PROGRESS', 'QUEUED']:
+                    logger.debug(f"Skipping task: {app_id} for schedule {schedule_id}. Status: {current_status}")
                     continue
 
                 if await self.check_dependencies(workflow_id, schedule_id, app_id):
-                    logger.info(f"Dependencies now met for app_id: {app_id}. Adding to task queue.")
+                    logger.info(
+                        f"Dependencies now met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
                     timestamp = schedule_doc.get('timestamp')
                     await self.task_queue.put((timestamp, workflow_id, schedule_id, app_id))
+                    self.task_status[task_key] = 'QUEUED'
                 else:
-                    logger.debug(f"Dependencies not yet met for app_id: {app_id}")
-
-    async def fetch_data_with_retry(self, db, key, max_retries=5, initial_delay=0.1):
-        delay = initial_delay
-        for attempt in range(max_retries):
-            try:
-                doc = await self.loop.run_in_executor(self.thread_pool, db.get, key)
-                if doc is None:
-                    raise couchdb.http.ResourceNotFound()
-                return doc
-            except couchdb.http.ResourceNotFound:
-                if attempt == max_retries - 1:
-                    logger.error(f"Data not found for key {key} after {max_retries} attempts")
-                    raise
-                logger.warning(f"Data not found for key {key}, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries})")
-                await asyncio.sleep(delay)
-                delay *= 2  # Exponential backoff
-            except Exception as e:
-                logger.error(f"Error fetching data for key {key}: {str(e)}", exc_info=True)
-                raise
-
-    async def get_task_dependencies(self, schedule, app_id):
-        logger.info(f"Getting dependencies for app_id: {app_id}")
-        level_info = schedule.get('level_info', {})
-
-        current_level = None
-        for level, tasks in level_info.items():
-            if any(task['app_id'] == app_id for task in tasks):
-                current_level = int(level)
-                break
-
-        if current_level is None:
-            logger.warning(f"App_id {app_id} not found in level_info")
-            return None, []
-
-        if current_level == 0:
-            logger.info(f"App_id {app_id} is at level 0. No dependencies.")
-            return 0, []
-
-        prev_level_tasks = level_info.get(str(current_level - 1), [])
-        dependencies = [task for task in prev_level_tasks if 'next' in task and app_id in task['next']]
-
-        return current_level, dependencies
+                    logger.debug(f"Dependencies not yet met for app_id: {app_id} in schedule {schedule_id}")
+                    self.task_status[task_key] = 'WAITING'
 
     async def check_dependencies(self, workflow_id, schedule_id, app_id):
         schedule_doc = await self.fetch_data_with_retry(self.schedule_db, schedule_id)
@@ -236,55 +207,13 @@ class TaskExecutor:
 
         for task in dependencies:
             dep_app_id = task['app_id']
-            if (schedule_id, dep_app_id) not in self.completed_tasks:
-                logger.info(f"Dependency {dep_app_id} not completed for app_id {app_id}")
+            dep_key = (schedule_id, dep_app_id)
+            if self.task_status.get(dep_key) != 'COMPLETED':
+                logger.info(f"Dependency {dep_app_id} not completed for app_id {app_id} in schedule {schedule_id}")
                 return False
 
-        logger.info(f"All dependencies met for app_id {app_id}")
+        logger.info(f"All dependencies met for app_id {app_id} in schedule {schedule_id}")
         return True
-
-    async def fetch_dependency_outputs(self, workflow_id, schedule_id, app_id, schedule):
-        logger.info(f"Fetching dependency outputs for task: {app_id}")
-
-        current_level, dependencies = await self.get_task_dependencies(schedule, app_id)
-
-        if current_level is None or current_level == 0:
-            raise Exception(f"Invalid level or no dependencies for task {app_id}")
-
-        dependency_outputs = []
-        for task in dependencies:
-            dep_app_id = task['app_id']
-            output_key = f"{workflow_id}_{schedule_id}_{dep_app_id}_output"
-            try:
-                output_doc = await self.fetch_data_with_retry(self.data_db, output_key)
-                dependency_outputs.extend(output_doc['data'])
-            except Exception as e:
-                logger.error(f"Error fetching dependency output for {output_key}: {str(e)}", exc_info=True)
-                raise
-
-        if not dependency_outputs:
-            raise Exception(f"No dependency outputs found for task {app_id}")
-
-        return dependency_outputs
-
-    async def check_task_completed(self, workflow_id, schedule_id, app_id):
-        try:
-            output_key = f"{workflow_id}_{schedule_id}_{app_id}_output"
-            doc = await self.fetch_data_with_retry(self.data_db, output_key, max_retries=3, initial_delay=0.05)
-            return doc is not None
-        except couchdb.http.ResourceNotFound:
-            return False
-
-    async def update_schedule_status(self, schedule_id, status):
-        logger.info(f"Updating schedule status: schedule_id={schedule_id}, status={status}")
-        try:
-            schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
-            schedule_doc['status'] = status
-            await self.loop.run_in_executor(self.thread_pool, self.schedule_db.save, schedule_doc)
-            logger.info(f"Schedule status updated: schedule_id={schedule_id}, status={status}")
-        except Exception as e:
-            logger.error(f"Error updating schedule status for {schedule_id}: {str(e)}", exc_info=True)
-            raise
 
     async def process_tasks(self):
         logger.info("Starting task processing loop")
@@ -294,15 +223,13 @@ class TaskExecutor:
                 logger.info(f"Processing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
                 try:
                     await self.execute_task(workflow_id, schedule_id, app_id)
-                    # Mark the task as completed after successful execution
-                    self.completed_tasks.add((schedule_id, app_id))
                     # Check if this was the final task in the schedule
                     if await self.is_final_task(schedule_id, app_id):
                         await self.update_schedule_status(schedule_id, "FINALIZED")
-
                 except Exception as e:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
                     await self.update_schedule_status(schedule_id, "FAILED")
+                    self.task_status[(schedule_id, app_id)] = 'FAILED'
                 finally:
                     self.task_queue.task_done()
             except asyncio.CancelledError:
@@ -312,35 +239,13 @@ class TaskExecutor:
                 logger.error(f"Unexpected error in task processing loop: {str(e)}", exc_info=True)
                 await asyncio.sleep(5)  # Wait before continuing the loop
 
-    async def is_final_task(self, schedule_id, app_id):
-        try:
-            schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
-            schedule = schedule_doc.get('schedule', {})
-            level_info = schedule.get('level_info', {})
-
-            # Find the highest level
-            max_level = max(map(int, level_info.keys()))
-
-            # Check if the app_id is in the highest level and is the last task
-            highest_level_tasks = level_info[str(max_level)]
-            is_final = app_id == highest_level_tasks[-1]['app_id']
-
-            logger.info(f"Checked if task {app_id} is final for schedule {schedule_id}: {is_final}")
-            return is_final
-        except Exception as e:
-            logger.error(f"Error checking if task is final: {str(e)}", exc_info=True)
-            return False
-
     async def execute_task(self, workflow_id, schedule_id, app_id):
         logger.info(f"Executing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
+        task_key = (schedule_id, app_id)
+        self.task_status[task_key] = 'IN_PROGRESS'
 
         schedule_doc = await self.fetch_data_with_retry(self.schedule_db, schedule_id)
-        if not schedule_doc:
-            raise Exception(f"Schedule document not found for schedule_id: {schedule_id}")
-
         schedule = schedule_doc.get('schedule', {})
-        if not schedule:
-            raise Exception(f"Schedule field not found in document for schedule_id: {schedule_id}")
 
         current_level, _ = await self.get_task_dependencies(schedule, app_id)
 
@@ -363,14 +268,12 @@ class TaskExecutor:
         else:
             try:
                 input_data = await self.fetch_dependency_outputs(workflow_id, schedule_id, app_id, schedule)
-                logger.debug(f"Dependency outputs fetched for task {app_id}: {input_data[:100]}...")  # Log first 100 characters
             except Exception as e:
                 logger.error(f"Error fetching dependency outputs for task {app_id}: {str(e)}", exc_info=True)
                 raise
 
         try:
             output_data = await self.run_docker_task(app_id, input_data)
-            logger.debug(f"Docker task output for {app_id}: {output_data['data']}...")  # Log first 100 characters
         except Exception as e:
             logger.error(f"Error running Docker task for {app_id}: {str(e)}", exc_info=True)
             raise
@@ -384,11 +287,36 @@ class TaskExecutor:
                 'schedule_id': schedule_id
             })
             logger.info(f"Task output stored: {output_key}")
+            self.task_status[task_key] = 'COMPLETED'
         except Exception as e:
             logger.error(f"Error storing task output for {output_key}: {str(e)}", exc_info=True)
             raise
 
         await self.update_schedule_on_task_completion(schedule_id, app_id)
+
+    async def fetch_dependency_outputs(self, workflow_id, schedule_id, app_id, schedule):
+        logger.info(f"Fetching dependency outputs for task: {app_id} in schedule {schedule_id}")
+
+        current_level, dependencies = await self.get_task_dependencies(schedule, app_id)
+
+        if current_level is None or current_level == 0:
+            raise Exception(f"Invalid level or no dependencies for task {app_id} in schedule {schedule_id}")
+
+        dependency_outputs = []
+        for task in dependencies:
+            dep_app_id = task['app_id']
+            output_key = f"{workflow_id}_{schedule_id}_{dep_app_id}_output"
+            try:
+                output_doc = await self.fetch_data_with_retry(self.data_db, output_key)
+                dependency_outputs.extend(output_doc['data'])
+            except Exception as e:
+                logger.error(f"Error fetching dependency output for {output_key}: {str(e)}", exc_info=True)
+                raise
+
+        if not dependency_outputs:
+            raise Exception(f"No dependency outputs found for task {app_id} in schedule {schedule_id}")
+
+        return dependency_outputs
 
     async def run_docker_task(self, app_id, input_data):
         container_name = f"sawtooth-{app_id}"
@@ -400,7 +328,6 @@ class TaskExecutor:
 
             logger.debug(f"Fetching container attributes for {container_name}")
             container_info = container.attrs
-            logger.debug(f"Container info retrieved: {json.dumps(container_info, indent=2)[:20]}...")
 
             logger.debug(f"Searching for exposed port in {container_name}")
             exposed_port = None
@@ -462,6 +389,17 @@ class TaskExecutor:
             logger.error(f"Unexpected error in run_docker_task for {container_name}: {str(e)}", exc_info=True)
             raise
 
+    async def update_schedule_status(self, schedule_id, status):
+        logger.info(f"Updating schedule status: schedule_id={schedule_id}, status={status}")
+        try:
+            schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
+            schedule_doc['status'] = status
+            await self.loop.run_in_executor(self.thread_pool, self.schedule_db.save, schedule_doc)
+            logger.info(f"Schedule status updated: schedule_id={schedule_id}, status={status}")
+        except Exception as e:
+            logger.error(f"Error updating schedule status for {schedule_id}: {str(e)}", exc_info=True)
+            raise
+
     async def update_schedule_on_task_completion(self, schedule_id, completed_app_id):
         try:
             schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
@@ -471,6 +409,66 @@ class TaskExecutor:
             logger.info(f"Updated schedule {schedule_id} with completed task {completed_app_id}")
         except Exception as e:
             logger.error(f"Error updating schedule on task completion: {str(e)}", exc_info=True)
+
+    async def is_final_task(self, schedule_id, app_id):
+        try:
+            schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
+            schedule = schedule_doc.get('schedule', {})
+            level_info = schedule.get('level_info', {})
+
+            # Find the highest level
+            max_level = max(map(int, level_info.keys()))
+
+            # Check if the app_id is in the highest level and is the last task
+            highest_level_tasks = level_info[str(max_level)]
+            is_final = app_id == highest_level_tasks[-1]['app_id']
+
+            logger.info(f"Checked if task {app_id} is final for schedule {schedule_id}: {is_final}")
+            return is_final
+        except Exception as e:
+            logger.error(f"Error checking if task is final: {str(e)}", exc_info=True)
+            return False
+
+    async def get_task_dependencies(self, schedule, app_id):
+        logger.info(f"Getting dependencies for app_id: {app_id}")
+        level_info = schedule.get('level_info', {})
+
+        current_level = None
+        for level, tasks in level_info.items():
+            if any(task['app_id'] == app_id for task in tasks):
+                current_level = int(level)
+                break
+
+        if current_level is None:
+            logger.warning(f"App_id {app_id} not found in level_info")
+            return None, []
+
+        if current_level == 0:
+            logger.info(f"App_id {app_id} is at level 0. No dependencies.")
+            return 0, []
+
+        prev_level_tasks = level_info.get(str(current_level - 1), [])
+        dependencies = [task for task in prev_level_tasks if 'next' in task and app_id in task['next']]
+
+        return current_level, dependencies
+
+    async def fetch_data_with_retry(self, db, key, max_retries=5, initial_delay=0.1):
+        delay = initial_delay
+        for attempt in range(max_retries):
+            try:
+                doc = await self.loop.run_in_executor(self.thread_pool, db.get, key)
+                return doc
+            except couchdb.http.ResourceNotFound:
+                if attempt == max_retries - 1:
+                    logger.error(f"Data not found for key {key} after {max_retries} attempts")
+                    raise
+                logger.warning(
+                    f"Data not found for key {key}, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(delay)
+                delay *= 2  # Exponential backoff
+            except Exception as e:
+                logger.error(f"Error fetching data for key {key}: {str(e)}", exc_info=True)
+                raise
 
     async def cleanup(self):
         logger.info("Cleaning up TaskExecutor")
@@ -489,6 +487,7 @@ class TaskExecutor:
         if self.docker_client:
             self.docker_client.close()
         self.thread_pool.shutdown()
+        self.task_status.clear()
         logger.info("TaskExecutor cleanup complete")
 
 
