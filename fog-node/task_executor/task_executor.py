@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -7,6 +8,7 @@ from functools import partial
 import aiohttp
 import couchdb
 import docker
+from docker import errors
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -330,7 +332,7 @@ class TaskExecutor:
         try:
             await self.loop.run_in_executor(self.thread_pool, self.data_db.save, {
                 '_id': output_key,
-                'data': output_data,
+                'data': output_data['data'],
                 'workflow_id': workflow_id,
                 'schedule_id': schedule_id
             })
@@ -343,29 +345,74 @@ class TaskExecutor:
 
     async def run_docker_task(self, app_id, input_data):
         container_name = f"sawtooth-{app_id}"
+        logger.info(f"Starting run_docker_task for container: {container_name}")
         try:
+            logger.debug(f"Attempting to get container: {container_name}")
             container = self.docker_client.containers.get(container_name)
-            container_info = container.attrs
+            logger.debug(f"Container {container_name} retrieved successfully")
 
+            logger.debug(f"Fetching container attributes for {container_name}")
+            container_info = container.attrs
+            logger.debug(f"Container info retrieved: {json.dumps(container_info, indent=2)[:20]}...")
+
+            logger.debug(f"Searching for exposed port in {container_name}")
             exposed_port = None
             for port, host_config in container_info['NetworkSettings']['Ports'].items():
+                logger.debug(f"Checking port mapping: {port} -> {host_config}")
                 if host_config:
                     exposed_port = host_config[0]['HostPort']
+                    logger.debug(f"Found exposed port: {exposed_port}")
                     break
 
             if not exposed_port:
+                logger.error(f"No exposed port found for container {container_name}")
                 raise Exception(f"No exposed port found for container {container_name}")
 
             logger.info(f"Found exposed port {exposed_port} for container {container_name}")
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(f'http://localhost:{exposed_port}',
-                                        json={'data': input_data}) as response:
-                    result = await response.json()
-                    logger.info(f"Received response from container {container_name}")
-                    return result
+            logger.debug(f"Preparing to send data to container {container_name}")
+            try:
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection('localhost', exposed_port),
+                    timeout=5
+                )
+                logger.debug(f"Connected to {container_name} at localhost:{exposed_port}")
+
+                payload = json.dumps({'data': input_data}).encode()
+                logger.debug(f"Sending payload to {container_name}. Size: {len(payload)} bytes")
+
+                writer.write(payload)
+                await writer.drain()
+                logger.debug(f"Payload sent to {container_name}, waiting for response")
+
+                response_data = await asyncio.wait_for(reader.read(), timeout=30)
+                logger.debug(f"Received response from {container_name}. Size: {len(response_data)} bytes")
+
+                writer.close()
+                await writer.wait_closed()
+
+                result = json.loads(response_data.decode())
+                logger.info(f"Successfully parsed JSON response from container {container_name}")
+                return result
+
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout occurred while communicating with {container_name}")
+                raise
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse JSON response from {container_name}")
+                raise
+            except Exception as e:
+                logger.error(f"Error in communication with {container_name}: {str(e)}")
+                raise
+
+        except docker.errors.NotFound:
+            logger.error(f"Container {container_name} not found")
+            raise
+        except docker.errors.APIError as api_error:
+            logger.error(f"Docker API error for {container_name}: {str(api_error)}")
+            raise
         except Exception as e:
-            logger.error(f"Error in run_docker_task for {container_name}: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error in run_docker_task for {container_name}: {str(e)}", exc_info=True)
             raise
 
     async def update_schedule_on_task_completion(self, schedule_id, completed_app_id):
