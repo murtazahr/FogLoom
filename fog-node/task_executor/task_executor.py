@@ -137,6 +137,8 @@ class TaskExecutor:
         for attempt in range(max_retries):
             try:
                 doc = await self.loop.run_in_executor(self.thread_pool, db.get, key)
+                if doc is None:
+                    raise couchdb.http.ResourceNotFound()
                 return doc
             except couchdb.http.ResourceNotFound:
                 if attempt == max_retries - 1:
@@ -284,7 +286,12 @@ class TaskExecutor:
         logger.info(f"Executing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
 
         schedule_doc = await self.fetch_data_with_retry(self.schedule_db, schedule_id)
+        if not schedule_doc:
+            raise Exception(f"Schedule document not found for schedule_id: {schedule_id}")
+
         schedule = schedule_doc.get('schedule', {})
+        if not schedule:
+            raise Exception(f"Schedule field not found in document for schedule_id: {schedule_id}")
 
         current_level, _ = await self.get_task_dependencies(schedule, app_id)
 
@@ -295,15 +302,26 @@ class TaskExecutor:
             input_key = f"{workflow_id}_{schedule_id}_{app_id}_input"
             try:
                 input_doc = await self.fetch_data_with_retry(self.data_db, input_key)
+                if input_doc is None:
+                    raise Exception(f"Input document not found for key: {input_key}")
+                if 'data' not in input_doc:
+                    raise Exception(f"'data' field not found in input document for key: {input_key}")
                 input_data = input_doc['data']
+                logger.debug(f"Input data fetched for task {app_id}: {input_data[:100]}...")  # Log first 100 characters
             except Exception as e:
                 logger.error(f"Error fetching input data for {input_key}: {str(e)}", exc_info=True)
                 raise
         else:
-            input_data = await self.fetch_dependency_outputs(workflow_id, schedule_id, app_id, schedule)
+            try:
+                input_data = await self.fetch_dependency_outputs(workflow_id, schedule_id, app_id, schedule)
+                logger.debug(f"Dependency outputs fetched for task {app_id}: {input_data[:100]}...")  # Log first 100 characters
+            except Exception as e:
+                logger.error(f"Error fetching dependency outputs for task {app_id}: {str(e)}", exc_info=True)
+                raise
 
         try:
             output_data = await self.run_docker_task(app_id, input_data)
+            logger.debug(f"Docker task output for {app_id}: {output_data[:100]}...")  # Log first 100 characters
         except Exception as e:
             logger.error(f"Error running Docker task for {app_id}: {str(e)}", exc_info=True)
             raise
