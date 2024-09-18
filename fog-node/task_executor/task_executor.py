@@ -323,7 +323,7 @@ class TaskExecutor:
 
         try:
             output_data = await self.run_docker_task(app_id, input_data)
-            logger.debug(f"Docker task output for {app_id}: {output_data[:100]}...")  # Log first 100 characters
+            logger.debug(f"Docker task output for {app_id}: {output_data['data']}...")  # Log first 100 characters
         except Exception as e:
             logger.error(f"Error running Docker task for {app_id}: {str(e)}", exc_info=True)
             raise
