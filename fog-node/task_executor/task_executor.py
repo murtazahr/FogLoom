@@ -211,7 +211,7 @@ class TaskExecutor:
             output_key = f"{workflow_id}_{schedule_id}_{dep_app_id}_output"
             try:
                 output_doc = await self.fetch_data_with_retry(self.data_db, output_key)
-                dependency_outputs.append(output_doc['data'])
+                dependency_outputs.extend(output_doc['data'])
             except Exception as e:
                 logger.error(f"Error fetching dependency output for {output_key}: {str(e)}", exc_info=True)
                 raise
