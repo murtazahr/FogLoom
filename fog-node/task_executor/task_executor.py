@@ -34,7 +34,7 @@ class TaskExecutor:
         self.loop = asyncio.get_event_loop()
         self.change_feed_task = None
         self.process_tasks_task = None
-        self.processed_changes = TTLCache(maxsize=1000, ttl=300)
+        self.processed_changes = TTLCache(maxsize=1000, ttl=60)
         logger.info("TaskExecutor initialized")
 
     async def initialize(self):
