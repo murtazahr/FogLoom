@@ -457,6 +457,8 @@ class TaskExecutor:
         for attempt in range(max_retries):
             try:
                 doc = await self.loop.run_in_executor(self.thread_pool, db.get, key)
+                if doc is None:
+                    raise couchdb.http.ResourceNotFound
                 return doc
             except couchdb.http.ResourceNotFound:
                 if attempt == max_retries - 1:
