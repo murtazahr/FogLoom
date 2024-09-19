@@ -419,12 +419,23 @@ class TaskExecutor:
             # Find the highest level
             max_level = max(map(int, level_info.keys()))
 
-            # Check if the app_id is in the highest level and is the last task
+            # Get all tasks in the highest level
             highest_level_tasks = level_info[str(max_level)]
-            is_final = app_id == highest_level_tasks[-1]['app_id']
 
-            logger.info(f"Checked if task {app_id} is final for schedule {schedule_id}: {is_final}")
-            return is_final
+            # Check if the current app_id is in the highest level
+            if not any(task['app_id'] == app_id for task in highest_level_tasks):
+                logger.info(f"Task {app_id} is not in the final level for schedule {schedule_id}")
+                return False
+
+            # Check if all tasks in the highest level are completed
+            for task in highest_level_tasks:
+                task_key = (schedule_id, task['app_id'])
+                if self.task_status.get(task_key) != 'COMPLETED':
+                    logger.info(f"Not all final level tasks are completed for schedule {schedule_id}")
+                    return False
+
+            logger.info(f"All final level tasks are completed for schedule {schedule_id}")
+            return True
         except Exception as e:
             logger.error(f"Error checking if task is final: {str(e)}", exc_info=True)
             return False
