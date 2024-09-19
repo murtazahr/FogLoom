@@ -109,15 +109,17 @@ def submit_iot_data_from_file(json_file):
         iot_data = data['iot_data']
         workflow_id = data['workflow_id']
 
-        transaction = create_iot_schedule_transaction(signer, iot_data, workflow_id)
-        batch = create_batch([transaction], signer)
-        result = submit_batch(batch)
+        for _ in range(100):
+            transaction = create_iot_schedule_transaction(signer, iot_data, workflow_id)
+            batch = create_batch([transaction], signer)
+            result = submit_batch(batch)
 
-        print({
-            "message": "Data submitted successfully",
-            "result": str(result),
-            "schedule_id": json.loads(transaction.payload.decode())['schedule_id']
-        })
+            print({
+                "message": "Data submitted successfully",
+                "result": str(result),
+                "schedule_id": json.loads(transaction.payload.decode())['schedule_id']
+            })
+
     except Exception as ex:
         logger.error(f"Error processing file: {str(ex)}")
         raise
