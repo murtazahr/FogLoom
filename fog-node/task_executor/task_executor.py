@@ -35,7 +35,7 @@ class TaskExecutor:
         self.change_feed_task = None
         self.process_tasks_task = None
         self.processed_changes = TTLCache(maxsize=1000, ttl=300)  # Cache for 5 minutes
-        self.task_status = {}  # Dictionary to keep track of task statuses
+        self.task_status = {}
         logger.info("TaskExecutor initialized")
 
     async def initialize(self):
@@ -412,7 +412,7 @@ class TaskExecutor:
 
     async def is_final_task(self, schedule_id, app_id):
         try:
-            schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
+            schedule_doc = await self.fetch_data_with_retry(self.schedule_db, schedule_id)
             schedule = schedule_doc.get('schedule', {})
             level_info = schedule.get('level_info', {})
 
@@ -428,12 +428,16 @@ class TaskExecutor:
                 return False
 
             # Check if all tasks in the highest level are completed
-            logger.info(f"{self.task_status}")
             for task in highest_level_tasks:
-                task_key = (schedule_id, task['app_id'])
-                if self.task_status.get(task_key) != 'COMPLETED':
-                    logger.info(f"Not all final level tasks are completed for schedule {schedule_id}")
-                    return False
+                if task['app_id'] != app_id:
+                    task_app_id = task['app_id']
+                    output_key = f"{schedule_doc['workflow_id']}_{schedule_id}_{task_app_id}_output"
+                    try:
+                        # Check if the output document exists in the database
+                        await self.fetch_data_with_retry(self.data_db, output_key)
+                    except couchdb.http.ResourceNotFound:
+                        logger.info(f"Output not found for task {task_app_id} in schedule {schedule_id}")
+                        return False
 
             logger.info(f"All final level tasks are completed for schedule {schedule_id}")
             return True
