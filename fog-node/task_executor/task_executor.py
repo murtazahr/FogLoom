@@ -428,6 +428,7 @@ class TaskExecutor:
                 return False
 
             # Check if all tasks in the highest level are completed
+            logger.info(f"{self.task_status}")
             for task in highest_level_tasks:
                 task_key = (schedule_id, task['app_id'])
                 if self.task_status.get(task_key) != 'COMPLETED':
