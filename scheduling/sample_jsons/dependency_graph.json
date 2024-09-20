@@ -1,7 +1,6 @@
 {
-  "start": "771ddee5-137d-4e9f-a12f-67fbb283a9bd",
+  "start": "48b4aa3c-fcf2-4a80-a998-c5f38e056ea5",
   "nodes": {
-    "0ffdd99c-ebdc-4374-9660-3eb27d3e4fb1": {"next": []},
-    "771ddee5-137d-4e9f-a12f-67fbb283a9bd": {"next": ["0ffdd99c-ebdc-4374-9660-3eb27d3e4fb1"]}
+    "48b4aa3c-fcf2-4a80-a998-c5f38e056ea5": {"next": []}
   }
 }
