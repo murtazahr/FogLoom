@@ -1,12 +1,11 @@
 import argparse
-import json
 import logging
 import time
 import pandas as pd
 import numpy as np
 from itertools import cycle
 
-#from transaction_initiator.transaction_initiator import transaction_creator
+from transaction_initiator.transaction_initiator import transaction_creator
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -86,11 +85,9 @@ def continuous_ecg_simulation(workflow_id):
                 "workflow_id": workflow_id
             }
 
-            print(json.dumps(payload))
-
             # Send data to transaction creator
-            #schedule_id = transaction_creator.create_and_send_transaction(payload)
-            #logger.info(f"Data sent to blockchain. Schedule ID: {schedule_id}")
+            schedule_id = transaction_creator.create_and_send_transaction(payload)
+            logger.info(f"Data sent to blockchain. Schedule ID: {schedule_id}")
 
             time.sleep(N_SECONDS)  # Wait before generating next batch of data
 
