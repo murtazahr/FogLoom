@@ -524,8 +524,8 @@ items:"
           nodeSelector:
             kubernetes.io/hostname: iot-node-$((i+1))
           containers:
-            - name: scheduling-client
-              image: murtazahr/scheduling-client:latest
+            - name: iot-node
+              image: murtazahr/iot-node:latest
               env:
                 - name: VALIDATOR_URL
                   value: \"tcp://sawtooth-0:4004\""

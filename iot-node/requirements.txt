@@ -14,3 +14,4 @@ sawtooth-sdk==1.2.5
 secp256k1==0.14.0
 toml==0.10.2
 urllib3==2.2.2
+numpy==1.24.4

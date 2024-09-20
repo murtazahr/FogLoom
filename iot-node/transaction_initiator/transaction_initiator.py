@@ -1,24 +1,24 @@
-import uuid
-import hashlib
 import json
+import uuid
+import time
+import hashlib
 import logging
 import os
-import time
-import argparse
-
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
 from sawtooth_sdk.messaging.stream import Stream
 
+# Setup logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Constants
 FAMILY_NAME = 'iot-schedule'
 FAMILY_VERSION = '1.0'
-
+SCHEDULE_NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 WORKFLOW_NAMESPACE = hashlib.sha512('workflow-dependency'.encode()).hexdigest()[:6]
 DOCKER_IMAGE_NAMESPACE = hashlib.sha512('docker-image'.encode()).hexdigest()[:6]
-SCHEDULE_NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/client.priv')
 VALIDATOR_URL = os.getenv('VALIDATOR_URL', 'tcp://validator:4004')
@@ -34,7 +34,7 @@ def load_private_key(key_file):
 
 
 def create_iot_schedule_transaction(signer, iot_data, workflow_id):
-    schedule_id = str(uuid.uuid4())  # Generate a unique schedule_id
+    schedule_id = str(uuid.uuid4())
     payload = {
         "iot_data": iot_data,
         "workflow_id": workflow_id,
@@ -43,9 +43,7 @@ def create_iot_schedule_transaction(signer, iot_data, workflow_id):
     }
     payload_bytes = json.dumps(payload).encode()
 
-    # Use all namespaces for input (for reading/validation)
     inputs = [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
-    # Use only Schedule namespace for output
     outputs = [SCHEDULE_NAMESPACE]
 
     txn_header = TransactionHeader(
@@ -98,49 +96,30 @@ def submit_batch(batch):
     return result
 
 
-def submit_iot_data_from_file(json_file):
-    try:
-        with open(json_file, 'r') as f:
-            data = json.load(f)
+class TransactionCreator:
+    def __init__(self):
+        private_key = load_private_key(PRIVATE_KEY_FILE)
+        context = create_context('secp256k1')
+        self.signer = CryptoFactory(context).new_signer(private_key)
 
-        if not data or 'iot_data' not in data or 'workflow_id' not in data:
-            raise ValueError("Missing iot_data or workflow_id in the JSON file")
-
-        iot_data = data['iot_data']
-        workflow_id = data['workflow_id']
-
-        for _ in range(100):
-            transaction = create_iot_schedule_transaction(signer, iot_data, workflow_id)
-            batch = create_batch([transaction], signer)
+    def create_and_send_transaction(self, iot_data, workflow_id):
+        try:
+            transaction = create_iot_schedule_transaction(self.signer, iot_data, workflow_id)
+            batch = create_batch([transaction], self.signer)
             result = submit_batch(batch)
 
-            print({
+            logger.info({
                 "message": "Data submitted successfully",
                 "result": str(result),
                 "schedule_id": json.loads(transaction.payload.decode())['schedule_id']
             })
 
-    except Exception as ex:
-        logger.error(f"Error processing file: {str(ex)}")
-        raise
+            return json.loads(transaction.payload.decode())['schedule_id']
+
+        except Exception as ex:
+            logger.error(f"Error creating and sending transaction: {str(ex)}")
+            raise
 
 
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-
-    # Argument parsing
-    parser = argparse.ArgumentParser(description='Submit IoT data to Sawtooth blockchain.')
-    parser.add_argument('json_file', help='Path to the JSON file containing IoT data and workflow_id')
-    args = parser.parse_args()
-
-    # Load private key and signer
-    try:
-        private_key = load_private_key(PRIVATE_KEY_FILE)
-        context = create_context('secp256k1')
-        signer = CryptoFactory(context).new_signer(private_key)
-    except IOError as e:
-        logger.error(f"Failed to load private key: {str(e)}")
-        raise
-
-    # Submit IoT data from the provided JSON file
-    submit_iot_data_from_file(args.json_file)
+# This can be imported and used by various data sources
+transaction_creator = TransactionCreator()

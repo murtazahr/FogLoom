@@ -31,7 +31,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the client script
-COPY scheduling_client.py .
+COPY transaction_initiator/* ./transaction_initiator/
+COPY *.py .
 
 ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/client.priv
 

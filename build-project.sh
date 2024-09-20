@@ -32,8 +32,8 @@ docker build -t $DOCKER_USERNAME/dependency-management-tp:latest ./manage-depend
 docker build -t $DOCKER_USERNAME/dependency-management-client:latest ./manage-dependency-workflow/dependency-management-client
 # Build scheduling-tp image
 docker build -t $DOCKER_USERNAME/scheduling-tp:latest ./scheduling/scheduling-tp
-# Build scheduling-client image
-docker build -t $DOCKER_USERNAME/scheduling-client:latest ./scheduling/scheduling-client
+# Build iot-node image
+docker build -t $DOCKER_USERNAME/iot-node:latest ./iot-node
 # Build fog-node image
 docker build -t $DOCKER_USERNAME/fog-node:latest ./fog-node
 
@@ -45,7 +45,7 @@ docker push $DOCKER_USERNAME/docker-image-client:latest
 docker push $DOCKER_USERNAME/dependency-management-tp:latest
 docker push $DOCKER_USERNAME/dependency-management-client:latest
 docker push $DOCKER_USERNAME/scheduling-tp:latest
-docker push $DOCKER_USERNAME/scheduling-client:latest
 docker push $DOCKER_USERNAME/fog-node:latest
+docker push $DOCKER_USERNAME/iot-node:latest
 
 echo "Images built and pushed to registry successfully"
