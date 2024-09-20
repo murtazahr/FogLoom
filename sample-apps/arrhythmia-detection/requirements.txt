@@ -1,0 +1,4 @@
+matplotlib==3.9.2
+numpy==1.24.3
+opencv_python==4.10.0.84
+tflite_runtime==2.14.0

@@ -3,22 +3,18 @@
 # Main script content starts here
 
 WORK_DIR=$(pwd)
-TEST_APP_DIR=$(pwd)/example-application-object-detection
+TEST_APP_DIR=$(pwd)/sample-apps
 DOCKER_USERNAME=murtazahr
 
 # Building docker image for test docker application
-cd "$TEST_APP_DIR/object-detection" || exit
-docker build -t yolo-object-detection:latest -f Dockerfile .
-
-cd "$TEST_APP_DIR/output-image-generation" || exit
-docker build -t bounding-box-image-generation:latest -f Dockerfile .
+cd "$TEST_APP_DIR/arrhythmia-detection" || exit
+docker build -t arrhythmia-detection:latest -f Dockerfile .
 
 # Make sure user is in the correct working directory
 cd "$WORK_DIR" || exit
 
 # Export test docker application
-docker save -o auto-docker-deployment/docker-image-client/yolo-object-detection.tar yolo-object-detection
-docker save -o auto-docker-deployment/docker-image-client/bounding-box-image-generation.tar bounding-box-image-generation
+docker save -o auto-docker-deployment/docker-image-client/arrhythmia-detection.tar arrhythmia-detection
 
 # Build peer-registry-tp image
 docker build -t $DOCKER_USERNAME/peer-registry-tp:latest ./peer-registry/peer-registry-tp

@@ -1,0 +1,58 @@
+{
+  "data": [
+    {
+      "window_start_time": 0,
+      "window_end_time": 9.996,
+      "arrhythmia": {
+        "type": "PVC",
+        "probability": 1.0,
+        "time": 0
+      }
+    },
+    {
+      "window_start_time": 5,
+      "window_end_time": 14.996,
+      "arrhythmia": {
+        "type": "PVC",
+        "probability": 1.0,
+        "time": 5
+      }
+    },
+    {
+      "window_start_time": 10,
+      "window_end_time": 19.996,
+      "arrhythmia": {
+        "type": "PVC",
+        "probability": 1.0,
+        "time": 10
+      }
+    },
+    {
+      "window_start_time": 15,
+      "window_end_time": 24.996,
+      "arrhythmia": {
+        "type": "PVC",
+        "probability": 1.0,
+        "time": 15
+      }
+    },
+    {
+      "window_start_time": 20,
+      "window_end_time": 29.996,
+      "arrhythmia": {
+        "type": "PVC",
+        "probability": 1.0,
+        "time": 20
+      }
+    },
+    {
+      "window_start_time": 25,
+      "window_end_time": 34.996,
+      "arrhythmia": {
+        "type": "PVC",
+        "probability": 1.0,
+        "time": 25
+      }
+    }
+  ]
+}

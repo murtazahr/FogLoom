@@ -40,8 +40,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY docker_image_client.py .
 
 # Copy tar file
-COPY yolo-object-detection.tar .
-COPY bounding-box-image-generation.tar .
+COPY arrhythmia-detection.tar .
 
 ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/client.priv
 

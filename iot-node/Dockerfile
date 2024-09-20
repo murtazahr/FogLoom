@@ -32,6 +32,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the client script
 COPY transaction_initiator/* ./transaction_initiator/
+COPY datasets/* ./datasets/
 COPY *.py .
 
 ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/client.priv
