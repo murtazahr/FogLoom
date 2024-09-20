@@ -79,14 +79,8 @@ def continuous_ecg_simulation(workflow_id):
                 processed_window = process_window(window, window_labels)
                 processed_windows.append(processed_window)
 
-            # Prepare payload for transaction
-            payload = {
-                "iot_data": processed_windows,
-                "workflow_id": workflow_id
-            }
-
             # Send data to transaction creator
-            schedule_id = transaction_creator.create_and_send_transaction(payload)
+            schedule_id = transaction_creator.create_and_send_transaction(processed_windows, workflow_id)
             logger.info(f"Data sent to blockchain. Schedule ID: {schedule_id}")
 
             time.sleep(N_SECONDS)  # Wait before generating next batch of data
