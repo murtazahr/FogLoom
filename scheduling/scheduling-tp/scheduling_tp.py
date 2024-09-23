@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import traceback
+from time import sleep
 
 import couchdb
 from sawtooth_sdk.processor.core import TransactionProcessor
@@ -75,13 +76,18 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                     self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
                     self._store_initial_input_data(workflow_id, schedule_id, iot_data, schedule_result)
 
+            schedule_doc = self.fetch_data_with_retry(self.schedule_db, schedule_id)
             schedule_address = self._make_schedule_address(schedule_id)
             schedule_state_data = json.dumps({
                 'schedule_id': schedule_id,
                 'workflow_id': workflow_id,
                 'timestamp': timestamp,
+                'schedule': schedule_doc['schedule'],
                 'status': 'ACTIVE'
-            }).encode()
+            })
+
+            logger.info(f"{schedule_state_data}")
+            schedule_state_data = schedule_state_data.encode()
 
             logger.info(f"Writing schedule status to blockchain for schedule ID: {schedule_id}")
             context.set_state({schedule_address: schedule_state_data})
@@ -95,6 +101,27 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.error(f"Unexpected error in apply method: {str(e)}")
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
+
+    @staticmethod
+    def fetch_data_with_retry(db, key, max_retries=5, initial_delay=0.1):
+        delay = initial_delay
+        for attempt in range(max_retries):
+            try:
+                doc = db.get(key)
+                if doc is None:
+                    raise couchdb.http.ResourceNotFound
+                return doc
+            except couchdb.http.ResourceNotFound:
+                if attempt == max_retries - 1:
+                    logger.error(f"Data not found for key {key} after {max_retries} attempts")
+                    raise
+                logger.warning(
+                    f"Data not found for key {key}, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries})")
+                sleep(delay)
+                delay *= 2  # Exponential backoff
+            except Exception as e:
+                logger.error(f"Error fetching data for key {key}: {str(e)}", exc_info=True)
+                raise
 
     def _check_schedule_in_couchdb(self, schedule_id):
         try:
