@@ -84,10 +84,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 'timestamp': timestamp,
                 'schedule': schedule_doc['schedule'],
                 'status': 'ACTIVE'
-            })
-
-            logger.info(f"{schedule_state_data}")
-            schedule_state_data = schedule_state_data.encode()
+            }).encode()
 
             logger.info(f"Writing schedule status to blockchain for schedule ID: {schedule_id}")
             context.set_state({schedule_address: schedule_state_data})

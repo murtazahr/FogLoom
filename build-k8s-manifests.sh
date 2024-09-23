@@ -303,6 +303,12 @@ items:"
                 - name: VALIDATOR_URL
                   value: \"tcp://$service_name:4004\"
 
+            - name: schedule-status-update-tp
+              image: murtazahr/schedule-status-update-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: \"tcp://$service_name:4004\"
+
             - name: scheduling-tp
               image: murtazahr/scheduling-tp:latest
               env:

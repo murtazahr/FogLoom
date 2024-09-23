@@ -11,6 +11,8 @@ import docker
 from cachetools import TTLCache
 from docker import errors
 
+from ..helpers.blockchain_task_status_updater import status_update_transactor
+
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
@@ -226,10 +228,22 @@ class TaskExecutor:
                     # Check if this was the final task in the schedule
                     if await self.is_final_task(schedule_id, app_id):
                         await self.update_schedule_status(schedule_id, "FINALIZED")
+                        await asyncio.to_thread(
+                            status_update_transactor.create_and_send_transaction,
+                            workflow_id,
+                            schedule_id,
+                            "FINALIZED"
+                        )
                 except Exception as e:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
                     await self.update_schedule_status(schedule_id, "FAILED")
                     self.task_status[(schedule_id, app_id)] = 'FAILED'
+                    await asyncio.to_thread(
+                        status_update_transactor.create_and_send_transaction,
+                        workflow_id,
+                        schedule_id,
+                        "FAILED"
+                    )
                 finally:
                     self.task_queue.task_done()
             except asyncio.CancelledError:
