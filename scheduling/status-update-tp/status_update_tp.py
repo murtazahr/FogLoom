@@ -9,7 +9,7 @@ from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
 
 # Sawtooth configuration
-FAMILY_NAME = 'iot-schedule'
+FAMILY_NAME = 'schedule-status'
 FAMILY_VERSION = '1.0'
 
 SCHEDULE_NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
@@ -40,7 +40,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
             logger.info(f"Processing status update for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
 
-            schedule_address = self._make_schedule_address(schedule_id)
+            schedule_address = self._make_schedule_address(schedule_id, status)
             schedule_state_data = json.dumps({
                 'schedule_id': schedule_id,
                 'workflow_id': workflow_id,
@@ -61,8 +61,9 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
 
-    def _make_schedule_address(self, schedule_id):
-        return SCHEDULE_NAMESPACE + hashlib.sha512(schedule_id.encode()).hexdigest()[:64]
+    @staticmethod
+    def _make_schedule_address(schedule_id, status):
+        return SCHEDULE_NAMESPACE + hashlib.sha512(f"{schedule_id}:{status}".encode()).hexdigest()[:64]
 
 def main():
     processor = TransactionProcessor(url=os.getenv('VALIDATOR_URL', 'tcp://validator:4004'))

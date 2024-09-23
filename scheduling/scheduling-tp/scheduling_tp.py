@@ -11,6 +11,7 @@ from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
 
 from scheduler import create_scheduler
+from blockchain_task_status_updater import status_update_transactor
 
 # CouchDB configuration
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
@@ -75,6 +76,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 else:
                     self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
                     self._store_initial_input_data(workflow_id, schedule_id, iot_data, schedule_result)
+                    status_update_transactor(workflow_id, schedule_id, "ACTIVE")
 
             schedule_doc = self.fetch_data_with_retry(self.schedule_db, schedule_id)
             schedule_address = self._make_schedule_address(schedule_id)
@@ -82,8 +84,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 'schedule_id': schedule_id,
                 'workflow_id': workflow_id,
                 'timestamp': timestamp,
-                'schedule': schedule_doc['schedule'],
-                'status': 'ACTIVE'
+                'schedule': schedule_doc['schedule']
             }).encode()
 
             logger.info(f"Writing schedule status to blockchain for schedule ID: {schedule_id}")
