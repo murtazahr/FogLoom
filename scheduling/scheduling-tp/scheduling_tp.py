@@ -76,7 +76,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 else:
                     self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
                     self._store_initial_input_data(workflow_id, schedule_id, iot_data, schedule_result)
-                    status_update_transactor(workflow_id, schedule_id, "ACTIVE")
+                    status_update_transactor.create_and_send_transaction(workflow_id, schedule_id, "ACTIVE")
 
             schedule_doc = self.fetch_data_with_retry(self.schedule_db, schedule_id)
             schedule_address = self._make_schedule_address(schedule_id)
