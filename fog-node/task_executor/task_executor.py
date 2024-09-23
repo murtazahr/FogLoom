@@ -11,7 +11,7 @@ import docker
 from cachetools import TTLCache
 from docker import errors
 
-from ..helpers.blockchain_task_status_updater import status_update_transactor
+from helper.blockchain_task_status_updater import status_update_transactor
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
