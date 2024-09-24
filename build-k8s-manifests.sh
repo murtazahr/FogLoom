@@ -309,6 +309,12 @@ items:"
                 - name: VALIDATOR_URL
                   value: \"tcp://$service_name:4004\"
 
+            - name: iot-data-tp
+              image: murtazahr/iot-data-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: \"tcp://$service_name:4004\"
+
             - name: scheduling-tp
               image: murtazahr/scheduling-tp:latest
               env:
