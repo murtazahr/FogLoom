@@ -461,29 +461,10 @@ items:"
                   sleep 30 &&
                   echo sawtooth.consensus.pbft.members=[\"${pbft_members}\"] &&
                   if [ ! -e config.batch ]; then
-                    sawset proposal create -k /root/.sawtooth/keys/my_key.priv sawtooth.consensus.algorithm.name=pbft sawtooth.consensus.algorithm.version=1.0 sawtooth.consensus.pbft.members=[\"${pbft_members}\"] sawtooth.publisher.max_batches_per_block=1200 -o config.batch
+                    sawset proposal create -k /root/.sawtooth/keys/my_key.priv sawtooth.consensus.algorithm.name=pbft sawtooth.consensus.algorithm.version=1.0 sawtooth.consensus.pbft.members=[\"${pbft_members}\"] sawtooth.publisher.max_batches_per_block=1200 sawtooth.validator.state_pruning_enabled=true sawtooth.validator.state_pruning_block_depth=1000 sawtooth.validator.state_pruning_grace_period=10 sawtooth.validator.max_database_size_mb=3096 sawtooth.validator.state_pruning_check_interval=100 -o config.batch
                   fi && if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
                     sawadm genesis config-genesis.batch config.batch
                   fi &&
-                  cat > /etc/sawtooth/validator.toml <<EOL
-                  # Validator Configuration File
-
-                  # Enable pruning
-                  state_pruning_enabled = true
-
-                  # Set the block depth at which pruning occurs
-                  state_pruning_block_depth = 1000
-
-                  # Set the pruning grace period (in blocks)
-                  state_pruning_grace_period = 10
-
-                  # Optional: Configure a maximum database size (in MB)
-                  max_database_size_mb = 3096
-
-                  # Optional: Set a pruning check interval (in seconds)
-                  state_pruning_check_interval = 100
-                  EOL
-                  &&
                   sawtooth-validator -vv --endpoint tcp://\$SAWTOOTH_0_SERVICE_HOST:8800 --bind component:tcp://eth0:4004 --bind consensus:tcp://eth0:5050 --bind network:tcp://eth0:8800 --scheduler parallel --peering static --maximum-peer-connectivity 10000"
         else
             yaml_content+="
@@ -508,25 +489,6 @@ items:"
                     echo \$pbft${i}pub > /etc/sawtooth/keys/validator.pub
                   fi &&
                   sawtooth keygen my_key &&
-                  cat > /etc/sawtooth/validator.toml <<EOL
-                  # Validator Configuration File
-
-                  # Enable pruning
-                  state_pruning_enabled = true
-
-                  # Set the block depth at which pruning occurs
-                  state_pruning_block_depth = 1000
-
-                  # Set the pruning grace period (in blocks)
-                  state_pruning_grace_period = 10
-
-                  # Optional: Configure a maximum database size (in MB)
-                  max_database_size_mb = 3096
-
-                  # Optional: Set a pruning check interval (in seconds)
-                  state_pruning_check_interval = 100
-                  EOL
-                  &&
                   sawtooth-validator -vv --endpoint tcp://\$SAWTOOTH_${i}_SERVICE_HOST:8800 --bind component:tcp://eth0:4004 --bind consensus:tcp://eth0:5050 --bind network:tcp://eth0:8800 --scheduler parallel --peering static --maximum-peer-connectivity 10000 $(for ((j=0; j<i; j++)); do echo -n "--peers tcp://\$SAWTOOTH_${j}_SERVICE_HOST:8800 "; done)"
         fi
 
