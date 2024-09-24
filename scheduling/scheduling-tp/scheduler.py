@@ -16,7 +16,7 @@ class BaseScheduler(ABC):
         pass
 
     @abstractmethod
-    def schedule(self, iot_data: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    def schedule(self) -> Dict[str, List[str]]:
         pass
 
 
@@ -107,7 +107,7 @@ class LCDWRRScheduler(BaseScheduler):
                     node_resources['rows'].append({'id': row.id, 'doc': doc})
         return node_resources
 
-    def schedule(self, iot_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def schedule(self) -> Dict[str, Any]:
         node_resources = self.get_latest_node_data()
         node_schedule = {node['id']: [] for node in node_resources['rows']}
         unscheduled_tasks = []

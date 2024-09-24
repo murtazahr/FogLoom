@@ -18,6 +18,9 @@ SCHEDULE_FAMILY_NAME = 'iot-schedule'
 SCHEDULE_FAMILY_VERSION = '1.0'
 STATUS_FAMILY_NAME = 'schedule-status'
 STATUS_FAMILY_VERSION = '1.0'
+IOT_DATA_FAMILY_NAME = 'iot-data'
+IOT_DATA_FAMILY_VERSION = '1.0'
+IOT_DATA_NAMESPACE = hashlib.sha512(IOT_DATA_FAMILY_NAME.encode()).hexdigest()[:6]
 SCHEDULE_NAMESPACE = hashlib.sha512(SCHEDULE_FAMILY_NAME.encode()).hexdigest()[:6]
 STATUS_NAMESPACE = hashlib.sha512(STATUS_FAMILY_NAME.encode()).hexdigest()[:6]
 WORKFLOW_NAMESPACE = hashlib.sha512('workflow-dependency'.encode()).hexdigest()[:6]
@@ -102,7 +105,6 @@ class TransactionCreator:
 
             # Create iot-schedule transaction
             schedule_payload = {
-                "iot_data": iot_data,
                 "workflow_id": workflow_id,
                 "schedule_id": schedule_id,
                 "timestamp": timestamp
@@ -124,8 +126,19 @@ class TransactionCreator:
             status_txn = create_transaction(self.signer, STATUS_FAMILY_NAME, STATUS_FAMILY_VERSION,
                                             status_payload, status_inputs, status_outputs)
 
-            # Create and submit batch with both transactions
-            batch = create_batch([schedule_txn, status_txn], self.signer)
+            # Create iot-data transaction
+            iot_data_payload = {
+                "iot_data": iot_data,
+                "workflow_id": workflow_id,
+                "schedule_id": schedule_id
+            }
+            iot_data_inputs = [IOT_DATA_NAMESPACE, WORKFLOW_NAMESPACE]
+            iot_data_outputs = [IOT_DATA_NAMESPACE]
+            iot_data_txn = create_transaction(self.signer, IOT_DATA_FAMILY_NAME, IOT_DATA_FAMILY_VERSION,
+                                              iot_data_payload, iot_data_inputs, iot_data_outputs)
+
+            # Create and submit batch with all three transactions
+            batch = create_batch([schedule_txn, status_txn, iot_data_txn], self.signer)
             result = submit_batch(batch)
 
             logger.info({
@@ -139,7 +152,6 @@ class TransactionCreator:
         except Exception as ex:
             logger.error(f"Error creating and sending transactions: {str(ex)}")
             raise
-
 
 # This can be imported and used by various data sources
 transaction_creator = TransactionCreator()
