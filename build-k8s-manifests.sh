@@ -431,6 +431,7 @@ items:"
                 - name: validators
                   containerPort: 8800"
 
+        # First node (index 0) configuration
         if [ "$i" -eq 0 ]; then
             local pbft_members=$(for ((j=0; j<num_fog_nodes; j++)); do
                 echo -n "\\\"\$pbft${j}pub\\\""
@@ -440,33 +441,55 @@ items:"
             done)
 
             yaml_content+="
-              envFrom:
-                - configMapRef:
-                    name: keys-config
-              command:
-                - bash
-              args:
-                - -c
-                - |
-                  if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
-                    echo \$pbft0priv > /etc/sawtooth/keys/validator.priv
-                    echo \$pbft0pub > /etc/sawtooth/keys/validator.pub
-                  fi &&
-                  if [ ! -e /root/.sawtooth/keys/my_key.priv ]; then
-                    sawtooth keygen my_key
-                  fi &&
-                  if [ ! -e config-genesis.batch ]; then
-                    sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
-                  fi &&
-                  sleep 30 &&
-                  echo sawtooth.consensus.pbft.members=[\"${pbft_members}\"] &&
-                  if [ ! -e config.batch ]; then
-                    sawset proposal create -k /root/.sawtooth/keys/my_key.priv sawtooth.consensus.algorithm.name=pbft sawtooth.consensus.algorithm.version=1.0 sawtooth.consensus.pbft.members=[\"${pbft_members}\"] sawtooth.publisher.max_batches_per_block=1200 -o config.batch
-                  fi && if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
-                    sawadm genesis config-genesis.batch config.batch
-                  fi &&
-                  sawtooth-validator -vv --endpoint tcp://\$SAWTOOTH_0_SERVICE_HOST:8800 --bind component:tcp://eth0:4004 --bind consensus:tcp://eth0:5050 --bind network:tcp://eth0:8800 --scheduler parallel --peering static --maximum-peer-connectivity 10000"
+                  envFrom:
+                    - configMapRef:
+                        name: keys-config
+                  command:
+                    - bash
+                  args:
+                    - -c
+                    - |
+                      if [ ! -e /etc/sawtooth/keys/validator.priv ]; then
+                        echo \$pbft0priv > /etc/sawtooth/keys/validator.priv
+                        echo \$pbft0pub > /etc/sawtooth/keys/validator.pub
+                      fi &&
+                      if [ ! -e /root/.sawtooth/keys/my_key.priv ]; then
+                        sawtooth keygen my_key
+                      fi &&
+                      if [ ! -e config-genesis.batch ]; then
+                        sawset genesis -k /root/.sawtooth/keys/my_key.priv -o config-genesis.batch
+                      fi &&
+                      sleep 30 &&
+                      echo sawtooth.consensus.pbft.members=[\"${pbft_members}\"] &&
+                      if [ ! -e config.batch ]; then
+                        sawset proposal create -k /root/.sawtooth/keys/my_key.priv sawtooth.consensus.algorithm.name=pbft sawtooth.consensus.algorithm.version=1.0 sawtooth.consensus.pbft.members=[\"${pbft_members}\"] sawtooth.publisher.max_batches_per_block=1200 -o config.batch
+                      fi &&
+                      if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
+                        sawadm genesis config-genesis.batch config.batch
+                      fi &&
+                      # Create or update validator.toml with pruning settings
+                      cat > /etc/sawtooth/validator.toml <<EOL
+                      # Validator Configuration File
+
+                      # Enable pruning
+                      state_pruning_enabled = true
+
+                      # Set the block depth at which pruning occurs
+                      state_pruning_block_depth = 1000
+
+                      # Set the pruning grace period (in blocks)
+                      state_pruning_grace_period = 10
+
+                      # Optional: Configure a maximum database size (in MB)
+                      max_database_size_mb = 3096
+
+                      # Optional: Set a pruning check interval (in seconds)
+                      state_pruning_check_interval = 100
+                      EOL
+                      &&
+                      sawtooth-validator -vv --endpoint tcp://\$SAWTOOTH_0_SERVICE_HOST:8800 --bind component:tcp://eth0:4004 --bind consensus:tcp://eth0:5050 --bind network:tcp://eth0:8800 --scheduler parallel --peering static --maximum-peer-connectivity 10000"
         else
+            # Configuration for all other nodes (index > 0)
             yaml_content+="
               env:
                 - name: pbft${i}priv
@@ -489,6 +512,26 @@ items:"
                     echo \$pbft${i}pub > /etc/sawtooth/keys/validator.pub
                   fi &&
                   sawtooth keygen my_key &&
+                  # Create or update validator.toml with pruning settings
+                  cat > /etc/sawtooth/validator.toml <<EOL
+                  # Validator Configuration File
+
+                  # Enable pruning
+                  state_pruning_enabled = true
+
+                  # Set the block depth at which pruning occurs
+                  state_pruning_block_depth = 1000
+
+                  # Set the pruning grace period (in blocks)
+                  state_pruning_grace_period = 10
+
+                  # Optional: Configure a maximum database size (in MB)
+                  max_database_size_mb = 3096
+
+                  # Optional: Set a pruning check interval (in seconds)
+                  state_pruning_check_interval = 100
+                  EOL
+                  &&
                   sawtooth-validator -vv --endpoint tcp://\$SAWTOOTH_${i}_SERVICE_HOST:8800 --bind component:tcp://eth0:4004 --bind consensus:tcp://eth0:5050 --bind network:tcp://eth0:8800 --scheduler parallel --peering static --maximum-peer-connectivity 10000 $(for ((j=0; j<i; j++)); do echo -n "--peers tcp://\$SAWTOOTH_${j}_SERVICE_HOST:8800 "; done)"
         fi
 
