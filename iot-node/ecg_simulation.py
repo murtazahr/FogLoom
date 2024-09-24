@@ -80,7 +80,7 @@ def continuous_ecg_simulation(workflow_id):
                 processed_windows.append(processed_window)
 
             # Send data to transaction creator
-            schedule_id = transaction_creator.create_and_send_transaction(processed_windows, workflow_id)
+            schedule_id = transaction_creator.create_and_send_transactions(processed_windows, workflow_id)
             logger.info(f"Data sent to blockchain. Schedule ID: {schedule_id}")
 
             time.sleep(N_SECONDS)  # Wait before generating next batch of data

@@ -228,22 +228,22 @@ class TaskExecutor:
                     # Check if this was the final task in the schedule
                     if await self.is_final_task(schedule_id, app_id):
                         await self.update_schedule_status(schedule_id, "FINALIZED")
-                        await asyncio.to_thread(
+                        await self.loop.run_in_executor(
+                            self.thread_pool,
                             status_update_transactor.create_and_send_transaction,
                             workflow_id,
                             schedule_id,
-                            "FINALIZED"
-                        )
+                            "FINALIZED")
                 except Exception as e:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
                     await self.update_schedule_status(schedule_id, "FAILED")
                     self.task_status[(schedule_id, app_id)] = 'FAILED'
-                    await asyncio.to_thread(
+                    await self.loop.run_in_executor(
+                        self.thread_pool,
                         status_update_transactor.create_and_send_transaction,
                         workflow_id,
                         schedule_id,
-                        "FAILED"
-                    )
+                        "FAILED")
                 finally:
                     self.task_queue.task_done()
             except asyncio.CancelledError:
