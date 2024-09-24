@@ -78,18 +78,34 @@ class LCDWRRScheduler(BaseScheduler):
     def update_node_resources(self, node_resources: Dict[str, List[Dict]], node_id: str, app_id: str):
         for node in node_resources['rows']:
             if node['id'] == node_id:
-                cpu_used = node['doc']['resource_data']['cpu']['used_percent']
-                memory_used = node['doc']['resource_data']['memory']['used_percent']
-                cpu_total = node['doc']['resource_data']['cpu']['total']
-                memory_total = node['doc']['resource_data']['memory']['total']
+                latest_data = node['doc']['resource_data_list'][-1]['data']
+                cpu_used = latest_data['cpu']['used_percent']
+                memory_used = latest_data['memory']['used_percent']
+                cpu_total = latest_data['cpu']['total']
+                memory_total = latest_data['memory']['total']
 
                 cpu_used_new = cpu_used + (self.app_requirements[app_id]['cpu'] / cpu_total * 100)
                 memory_used_new = memory_used + (self.app_requirements[app_id]['memory'] / memory_total * 100)
 
-                node['doc']['resource_data']['cpu']['used_percent'] = min(cpu_used_new, 100)
-                node['doc']['resource_data']['memory']['used_percent'] = min(memory_used_new, 100)
+                new_resource_data = latest_data.copy()
+                new_resource_data['cpu']['used_percent'] = min(cpu_used_new, 100)
+                new_resource_data['memory']['used_percent'] = min(memory_used_new, 100)
+
+                # Update the in-memory representation without creating a new entry
+                node['doc']['resource_data'] = new_resource_data
                 return True
         return False
+
+    def get_latest_node_data(self):
+        node_resources = {'rows': []}
+        for row in self.db.view('_all_docs', include_docs=True):
+            if row.id.startswith('sawtooth-'):
+                doc = row.doc
+                if 'resource_data_list' in doc and doc['resource_data_list']:
+                    latest_data = doc['resource_data_list'][-1]['data']
+                    doc['resource_data'] = latest_data
+                    node_resources['rows'].append({'id': row.id, 'doc': doc})
+        return node_resources
 
     def schedule(self, iot_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         node_resources = self.get_latest_node_data()
@@ -137,13 +153,6 @@ class LCDWRRScheduler(BaseScheduler):
             "level_info": level_info,
             "timestamp": int(time.time())
         }
-
-    def get_latest_node_data(self):
-        node_resources = {'rows': []}
-        for row in self.db.view('_all_docs', include_docs=True):
-            if row.id.startswith('sawtooth-'):
-                node_resources['rows'].append({'id': row.id, 'doc': row.doc})
-        return node_resources
 
     def topological_sort_with_levels(self):
         graph = {node: self.dependency_graph['nodes'][node].get('next', []) for node in self.dependency_graph['nodes']}

@@ -110,22 +110,32 @@ def store_resource_data(db, node_id, resource_data):
 
         if doc_id in db:
             doc = db[doc_id]
-            doc['resource_data'] = resource_data
-            doc['updates'].append({
+            if 'resource_data_list' not in doc:
+                doc['resource_data_list'] = []
+            doc['resource_data_list'].append({
                 'timestamp': timestamp,
+                'data': resource_data,
                 'data_hash': data_hash
             })
+            doc['latest_update'] = {
+                'timestamp': timestamp,
+                'data_hash': data_hash
+            }
         else:
             doc = {
-                'resource_data': resource_data,
-                'updates': [{
+                'resource_data_list': [{
+                    'timestamp': timestamp,
+                    'data': resource_data,
+                    'data_hash': data_hash
+                }],
+                'latest_update': {
                     'timestamp': timestamp,
                     'data_hash': data_hash
-                }]
+                }
             }
 
         db[doc_id] = doc
-        logger.info(f"Stored resource data for node {node_id} in CouchDB")
+        logger.info(f"Appended resource data for node {node_id} in CouchDB")
         return {'timestamp': timestamp, 'data_hash': data_hash}
     except Exception as e:
         logger.error(f"Error storing resource data for node {node_id} in CouchDB: {str(e)}")
