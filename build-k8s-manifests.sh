@@ -314,6 +314,18 @@ items:"
               env:
                 - name: VALIDATOR_URL
                   value: \"tcp://$service_name:4004\"
+                - name: COUCHDB_HOST
+                  value: \"couchdb-$i.default.svc.cluster.local:5984\"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
 
             - name: scheduling-tp
               image: murtazahr/scheduling-tp:latest
