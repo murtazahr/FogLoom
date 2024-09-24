@@ -14,9 +14,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Constants
-FAMILY_NAME = 'iot-schedule'
-FAMILY_VERSION = '1.0'
-SCHEDULE_NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
+SCHEDULE_FAMILY_NAME = 'iot-schedule'
+SCHEDULE_FAMILY_VERSION = '1.0'
+STATUS_FAMILY_NAME = 'schedule-status'
+STATUS_FAMILY_VERSION = '1.0'
+SCHEDULE_NAMESPACE = hashlib.sha512(SCHEDULE_FAMILY_NAME.encode()).hexdigest()[:6]
+STATUS_NAMESPACE = hashlib.sha512(STATUS_FAMILY_NAME.encode()).hexdigest()[:6]
 WORKFLOW_NAMESPACE = hashlib.sha512('workflow-dependency'.encode()).hexdigest()[:6]
 DOCKER_IMAGE_NAMESPACE = hashlib.sha512('docker-image'.encode()).hexdigest()[:6]
 
@@ -33,22 +36,12 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(ex)}") from ex
 
 
-def create_iot_schedule_transaction(signer, iot_data, workflow_id):
-    schedule_id = str(uuid.uuid4())
-    payload = {
-        "iot_data": iot_data,
-        "workflow_id": workflow_id,
-        "schedule_id": schedule_id,
-        "timestamp": int(time.time())
-    }
+def create_transaction(signer, family_name, family_version, payload, inputs, outputs):
     payload_bytes = json.dumps(payload).encode()
 
-    inputs = [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
-    outputs = [SCHEDULE_NAMESPACE]
-
     txn_header = TransactionHeader(
-        family_name=FAMILY_NAME,
-        family_version=FAMILY_VERSION,
+        family_name=family_name,
+        family_version=family_version,
         inputs=inputs,
         outputs=outputs,
         signer_public_key=signer.get_public_key().as_hex(),
@@ -102,22 +95,49 @@ class TransactionCreator:
         context = create_context('secp256k1')
         self.signer = CryptoFactory(context).new_signer(private_key)
 
-    def create_and_send_transaction(self, iot_data, workflow_id):
+    def create_and_send_transactions(self, iot_data, workflow_id):
         try:
-            transaction = create_iot_schedule_transaction(self.signer, iot_data, workflow_id)
-            batch = create_batch([transaction], self.signer)
+            schedule_id = str(uuid.uuid4())
+            timestamp = int(time.time())
+
+            # Create iot-schedule transaction
+            schedule_payload = {
+                "iot_data": iot_data,
+                "workflow_id": workflow_id,
+                "schedule_id": schedule_id,
+                "timestamp": timestamp
+            }
+            schedule_inputs = [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
+            schedule_outputs = [SCHEDULE_NAMESPACE]
+            schedule_txn = create_transaction(self.signer, SCHEDULE_FAMILY_NAME, SCHEDULE_FAMILY_VERSION,
+                                              schedule_payload, schedule_inputs, schedule_outputs)
+
+            # Create schedule-status transaction
+            status_payload = {
+                "schedule_id": schedule_id,
+                "workflow_id": workflow_id,
+                "timestamp": timestamp,
+                "status": "ACTIVE"
+            }
+            status_inputs = [STATUS_NAMESPACE]
+            status_outputs = [STATUS_NAMESPACE]
+            status_txn = create_transaction(self.signer, STATUS_FAMILY_NAME, STATUS_FAMILY_VERSION,
+                                            status_payload, status_inputs, status_outputs)
+
+            # Create and submit batch with both transactions
+            batch = create_batch([schedule_txn, status_txn], self.signer)
             result = submit_batch(batch)
 
             logger.info({
                 "message": "Data submitted successfully",
                 "result": str(result),
-                "schedule_id": json.loads(transaction.payload.decode())['schedule_id']
+                "schedule_id": schedule_id
             })
 
-            return json.loads(transaction.payload.decode())['schedule_id']
+            return schedule_id
 
         except Exception as ex:
-            logger.error(f"Error creating and sending transaction: {str(ex)}")
+            logger.error(f"Error creating and sending transactions: {str(ex)}")
             raise
 
 
