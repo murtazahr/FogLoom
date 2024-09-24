@@ -43,8 +43,7 @@ COPY event_handlers/* ./event_handlers/
 COPY scheduled/* ./scheduled/
 
 # Copy the task executor script
-COPY task_executor/*.py ./task_executor
-COPY task_executor/helper/* ./task_executor/helper
+COPY task_executor/* ./task_executor/
 
 # Copy the entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
