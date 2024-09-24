@@ -42,6 +42,9 @@ COPY event_handlers/* ./event_handlers/
 # Copy scheduler scripts
 COPY scheduled/* ./scheduled/
 
+# Copy services
+COPY services/* ./services/
+
 # Copy the task executor script
 COPY task_executor ./task_executor
 
@@ -51,5 +54,5 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Use the entrypoint script
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD sh -c "for file in event_handlers/*.py; do python \"\$file\" & done; for file in scheduled/*.py; do python \"\$file\" & done; for file in task_executor/*.py; do python \"\$file\" & done; wait"
+CMD sh -c "for file in event_handlers/*.py; do python \"\$file\" & done; for file in scheduled/*.py; do python \"\$file\" & done; for file in task_executor/*.py; do python \"\$file\" & done; for file in services/*.py; do python \"\$file\" & done; wait"
 

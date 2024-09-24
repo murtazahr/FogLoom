@@ -6,3 +6,4 @@ sawtooth_sdk==1.2.5
 protobuf==3.20.0
 secp256k1==0.14.0
 cachetools==5.5.0
+flask==3.0.3
