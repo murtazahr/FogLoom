@@ -48,6 +48,9 @@ COPY services/* ./services/
 # Copy the task executor script
 COPY task_executor ./task_executor
 
+# Copy the node startup script
+COPY node_startup_script.py .
+
 # Copy the entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

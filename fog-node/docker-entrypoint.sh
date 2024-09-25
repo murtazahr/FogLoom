@@ -18,5 +18,11 @@ kill -SIGHUP $(pidof dockerd)
 # Wait for Docker to reload its configuration
 sleep 5
 
+# Run node_startup_script.py if IS_NEW_ADDITION is true
+if [ "$IS_NEW_ADDITION" = "true" ]; then
+    echo "Running node startup script..."
+    python /app/node_startup_script.py
+fi
+
 # Execute the main command
 exec "$@"

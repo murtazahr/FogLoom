@@ -142,7 +142,6 @@ items:"
               args:
                 - -c
                 - |
-                  DB_NAME=\"resource_registry\" &&
                   echo \"Starting CouchDB cluster setup\" &&
                   for i in \$(seq 0 $((num_fog_nodes-1))); do
                     echo \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984\"
@@ -420,6 +419,8 @@ items:"
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: IS_NEW_ADDITION
+                  value: \"false\"
 
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
@@ -519,6 +520,10 @@ items:"
           protocol: TCP
           port: 8080
           targetPort: 8080
+        - name: \"5000\"
+          protocol: TCP
+          port: 5000
+          targetPort: 5000
         - name: \"8800\"
           protocol: TCP
           port: 8800
