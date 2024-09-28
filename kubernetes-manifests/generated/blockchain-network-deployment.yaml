@@ -1106,7 +1106,7 @@ items:
                 - name: IOT_URL
                   value: "tcp://iot-0"
 
-    - apiVersion: v1
+  - apiVersion: v1
     kind: Service
     metadata:
       name: iot-0
@@ -1147,7 +1147,7 @@ items:
                 - name: IOT_URL
                   value: "tcp://iot-1"
 
-    - apiVersion: v1
+  - apiVersion: v1
     kind: Service
     metadata:
       name: iot-1
