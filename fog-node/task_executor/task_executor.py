@@ -330,6 +330,8 @@ class TaskExecutor:
 
         await self.update_schedule_on_task_completion(schedule_id, app_id)
 
+        return output_data
+
     async def fetch_dependency_outputs(self, workflow_id, schedule_id, app_id, schedule):
         logger.info(f"Fetching dependency outputs for task: {app_id} in schedule {schedule_id}")
 
