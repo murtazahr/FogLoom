@@ -4,7 +4,10 @@ import zmq.auth
 from zmq.auth.thread import ThreadAuthenticator
 import os
 import threading
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
 class IoTDeviceManager:
     def __init__(self, port):
@@ -25,18 +28,18 @@ class IoTDeviceManager:
 
     def start(self):
         if self.is_running:
-            print("IoT Device is already running.")
+            logging.info("IoT Device is already running.")
             return
 
         self.is_running = True
         self.thread = threading.Thread(target=self._run)
         self.thread.start()
-        print(f"IoT Device started on port {self.port}")
-        print(f"Public key: {self.public_key}")
+        logging.info(f"IoT Device started on port {self.port}")
+        logging.info(f"Public key: {self.public_key}")
 
     def stop(self):
         if not self.is_running:
-            print("IoT Device is not running.")
+            logging.info("IoT Device is not running.")
             return
 
         self.is_running = False
@@ -46,7 +49,7 @@ class IoTDeviceManager:
             self.context.term()
         if self.thread:
             self.thread.join()
-        print("IoT Device stopped.")
+        logging.info("IoT Device stopped.")
 
     def _run(self):
         self.context = zmq.Context()
@@ -70,7 +73,7 @@ class IoTDeviceManager:
                 events = dict(poller.poll(1000))  # 1 second timeout
                 if self.socket in events:
                     message = self.socket.recv_string()
-                    print(f"Received: {message}")
+                    logging.info(f"Received: {message}")
                     self.socket.send_string("Message received securely")
             except zmq.ZMQError as e:
                 if e.errno == zmq.ETERM:
