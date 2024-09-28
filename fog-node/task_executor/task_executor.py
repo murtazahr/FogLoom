@@ -232,7 +232,7 @@ class TaskExecutor:
                 response_manager = ResponseManager(source_url, source_public_key)
 
                 try:
-                    connect_response_manager = self.loop.create_task(response_manager.connect())
+                    connect_response_manager = self.loop.run_in_executor(self.thread_pool, response_manager.connect)
                     execute_task = self.execute_task(workflow_id, schedule_id, app_id)
 
                     result = (await asyncio.gather(connect_response_manager, execute_task))[1]
@@ -240,12 +240,16 @@ class TaskExecutor:
                     # Check if this was the final task in the schedule
                     if await self.is_final_task(schedule_id, app_id):
                         update_local_status = self.update_schedule_status(schedule_id, "FINALIZED")
-                        update_blockchain_status = self.loop.create_task(status_update_transactor
-                                                                         .create_and_send_transaction(workflow_id,
-                                                                                                      schedule_id,
-                                                                                                      "FINALIZED"))
-                        send_response_to_client = self.loop.create_task(response_manager
-                                                                        .send_message(json.dumps(result)))
+                        update_blockchain_status = self.loop.run_in_executor(
+                            self.thread_pool,
+                            status_update_transactor.create_and_send_transaction,
+                            workflow_id,
+                            schedule_id,
+                            "FINALIZED")
+                        send_response_to_client = self.loop.run_in_executor(
+                            self.thread_pool,
+                            response_manager.send_message,
+                            json.dumps(result))
 
                         await asyncio.gather(update_local_status, update_blockchain_status, send_response_to_client)
 
@@ -253,11 +257,13 @@ class TaskExecutor:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
                     self.task_status[(schedule_id, app_id)] = 'FAILED'
                     update_local_status = self.update_schedule_status(schedule_id, "FAILED")
-                    update_blockchain_status = self.loop.create_task(status_update_transactor
-                                                                     .create_and_send_transaction(workflow_id,
-                                                                                                  schedule_id,
-                                                                                                  "FAILED"))
-                    disconnect_response_manager = self.loop.create_task(response_manager.disconnect())
+                    update_blockchain_status = self.loop.run_in_executor(
+                        self.thread_pool,
+                        status_update_transactor.create_and_send_transaction,
+                        workflow_id,
+                        schedule_id,
+                        "FAILED")
+                    disconnect_response_manager = self.loop.run_in_executor(self.thread_pool, response_manager.disconnect)
 
                     await asyncio.gather(update_local_status, update_blockchain_status, disconnect_response_manager)
                 finally:
