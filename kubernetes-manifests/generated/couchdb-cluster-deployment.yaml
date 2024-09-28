@@ -320,7 +320,6 @@ items:
               args:
                 - -c
                 - |
-                  DB_NAME="resource_registry" &&
                   echo "Starting CouchDB cluster setup" &&
                   for i in $(seq 0 3); do
                     echo "http://${COUCHDB_USER}:${COUCHDB_PASSWORD}@couchdb-${i}.default.svc.cluster.local:5984"

@@ -65,14 +65,6 @@ items:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
           containers:
-            - name: sawtooth-intkey-tp-python
-              image: hyperledger/sawtooth-intkey-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
-
             - name: peer-registry-tp
               image: murtazahr/peer-registry-tp:latest
               env:
@@ -92,6 +84,30 @@ items:
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-0:4004"
+
+            - name: schedule-status-update-tp
+              image: murtazahr/schedule-status-update-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+
+            - name: iot-data-tp
+              image: murtazahr/iot-data-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-0.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
 
             - name: scheduling-tp
               image: murtazahr/scheduling-tp:latest
@@ -186,6 +202,8 @@ items:
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: IS_NEW_ADDITION
+                  value: "false"
 
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
@@ -217,7 +235,7 @@ items:
                   sleep 30 &&
                   echo sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\""] &&
                   if [ ! -e config.batch ]; then
-                    sawset proposal create -k /root/.sawtooth/keys/my_key.priv sawtooth.consensus.algorithm.name=pbft sawtooth.consensus.algorithm.version=1.0 sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\""] sawtooth.publisher.max_batches_per_block=1200 -o config.batch
+                    sawset proposal create -k /root/.sawtooth/keys/my_key.priv sawtooth.consensus.algorithm.name=pbft sawtooth.consensus.algorithm.version=1.0 sawtooth.consensus.pbft.members=["\"$pbft0pub\",\"$pbft1pub\",\"$pbft2pub\",\"$pbft3pub\""] sawtooth.publisher.max_batches_per_block=1200 sawtooth.validator.state_pruning_enabled=true sawtooth.validator.state_pruning_block_depth=1000 sawtooth.validator.state_pruning_grace_period=10 sawtooth.validator.max_database_size_mb=3096 sawtooth.validator.state_pruning_check_interval=100 -o config.batch
                   fi && if [ ! -e /var/lib/sawtooth/genesis.batch ]; then
                     sawadm genesis config-genesis.batch config.batch
                   fi &&
@@ -248,6 +266,10 @@ items:
           protocol: TCP
           port: 8080
           targetPort: 8080
+        - name: "5000"
+          protocol: TCP
+          port: 5000
+          targetPort: 5000
         - name: "8800"
           protocol: TCP
           port: 8800
@@ -315,14 +337,6 @@ items:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
           containers:
-            - name: sawtooth-intkey-tp-python
-              image: hyperledger/sawtooth-intkey-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
-
             - name: peer-registry-tp
               image: murtazahr/peer-registry-tp:latest
               env:
@@ -342,6 +356,30 @@ items:
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-1:4004"
+
+            - name: schedule-status-update-tp
+              image: murtazahr/schedule-status-update-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+
+            - name: iot-data-tp
+              image: murtazahr/iot-data-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-1:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-1.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
 
             - name: scheduling-tp
               image: murtazahr/scheduling-tp:latest
@@ -436,6 +474,8 @@ items:
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: IS_NEW_ADDITION
+                  value: "false"
 
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
@@ -494,6 +534,10 @@ items:
           protocol: TCP
           port: 8080
           targetPort: 8080
+        - name: "5000"
+          protocol: TCP
+          port: 5000
+          targetPort: 5000
         - name: "8800"
           protocol: TCP
           port: 8800
@@ -561,14 +605,6 @@ items:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
           containers:
-            - name: sawtooth-intkey-tp-python
-              image: hyperledger/sawtooth-intkey-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
-
             - name: peer-registry-tp
               image: murtazahr/peer-registry-tp:latest
               env:
@@ -588,6 +624,30 @@ items:
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-2:4004"
+
+            - name: schedule-status-update-tp
+              image: murtazahr/schedule-status-update-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+
+            - name: iot-data-tp
+              image: murtazahr/iot-data-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-2:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-2.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
 
             - name: scheduling-tp
               image: murtazahr/scheduling-tp:latest
@@ -682,6 +742,8 @@ items:
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: IS_NEW_ADDITION
+                  value: "false"
 
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
@@ -740,6 +802,10 @@ items:
           protocol: TCP
           port: 8080
           targetPort: 8080
+        - name: "5000"
+          protocol: TCP
+          port: 5000
+          targetPort: 5000
         - name: "8800"
           protocol: TCP
           port: 8800
@@ -807,14 +873,6 @@ items:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
           containers:
-            - name: sawtooth-intkey-tp-python
-              image: hyperledger/sawtooth-intkey-tp-python:chime
-              command:
-                - bash
-              args:
-                - -c
-                - "intkey-tp-python -vv -C tcp://$HOSTNAME:4004"
-
             - name: peer-registry-tp
               image: murtazahr/peer-registry-tp:latest
               env:
@@ -834,6 +892,30 @@ items:
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-3:4004"
+
+            - name: schedule-status-update-tp
+              image: murtazahr/schedule-status-update-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+
+            - name: iot-data-tp
+              image: murtazahr/iot-data-tp:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-3:4004"
+                - name: COUCHDB_HOST
+                  value: "couchdb-3.default.svc.cluster.local:5984"
+                - name: COUCHDB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_USER
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: COUCHDB_PASSWORD
 
             - name: scheduling-tp
               image: murtazahr/scheduling-tp:latest
@@ -928,6 +1010,8 @@ items:
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: IS_NEW_ADDITION
+                  value: "false"
 
             - name: sawtooth-validator
               image: hyperledger/sawtooth-validator:chime
@@ -986,6 +1070,10 @@ items:
           protocol: TCP
           port: 8080
           targetPort: 8080
+        - name: "5000"
+          protocol: TCP
+          port: 5000
+          targetPort: 5000
         - name: "8800"
           protocol: TCP
           port: 8800
@@ -1010,11 +1098,68 @@ items:
           nodeSelector:
             kubernetes.io/hostname: iot-node-1
           containers:
-            - name: scheduling-client
-              image: murtazahr/scheduling-client:latest
+            - name: iot-node
+              image: murtazahr/iot-node:latest
               env:
                 - name: VALIDATOR_URL
                   value: "tcp://sawtooth-0:4004"
+                - name: IOT_URL
+                  value: "tcp://iot-0"
+
+    - apiVersion: v1
+    kind: Service
+    metadata:
+      name: iot-0
+    spec:
+      type: ClusterIP
+      selector:
+        name: iot-0
+      ports:
+        - name: "5555"
+          protocol: TCP
+          port: 5555
+          targetPort: 5555
+
+  # -------------------------=== iot-node-2 ===------------------
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: iot-1
+    spec:
+      selector:
+        matchLabels:
+          name: iot-1
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            name: iot-1
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: iot-node-2
+          containers:
+            - name: iot-node
+              image: murtazahr/iot-node:latest
+              env:
+                - name: VALIDATOR_URL
+                  value: "tcp://sawtooth-0:4004"
+                - name: IOT_URL
+                  value: "tcp://iot-1"
+
+    - apiVersion: v1
+    kind: Service
+    metadata:
+      name: iot-1
+    spec:
+      type: ClusterIP
+      selector:
+        name: iot-1
+      ports:
+        - name: "5555"
+          protocol: TCP
+          port: 5555
+          targetPort: 5555
 
   # -------------------------=== client-console ===------------------
 
