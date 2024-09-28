@@ -12,6 +12,7 @@ from cachetools import TTLCache
 from docker import errors
 
 from helper.blockchain_task_status_updater import status_update_transactor
+from helper.response_manager import ResponseManager
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -139,13 +140,15 @@ class TaskExecutor:
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
                 timestamp = schedule_doc.get('timestamp')
+                source_url = schedule_doc.get('source_url')
+                source_public_key = schedule_doc.get('source_public_key')
                 task_key = (schedule_id, app_id)
 
                 logger.info(f"Checking dependencies for app_id: {app_id} in schedule {schedule_id}")
                 if await self.check_dependencies(workflow_id, schedule_id, app_id):
                     logger.info(
                         f"Dependencies met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
-                    await self.task_queue.put((timestamp, workflow_id, schedule_id, app_id))
+                    await self.task_queue.put((source_url, source_public_key, timestamp, workflow_id, schedule_id, app_id))
                     self.task_status[task_key] = 'QUEUED'
                 else:
                     logger.info(
@@ -189,7 +192,9 @@ class TaskExecutor:
                     logger.info(
                         f"Dependencies now met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
                     timestamp = schedule_doc.get('timestamp')
-                    await self.task_queue.put((timestamp, workflow_id, schedule_id, app_id))
+                    source_url = schedule_doc.get('source_url')
+                    source_public_key = schedule_doc.get('source_public_key')
+                    await self.task_queue.put((source_url, source_public_key, timestamp, workflow_id, schedule_id, app_id))
                     self.task_status[task_key] = 'QUEUED'
                 else:
                     logger.debug(f"Dependencies not yet met for app_id: {app_id} in schedule {schedule_id}")
@@ -221,29 +226,40 @@ class TaskExecutor:
         logger.info("Starting task processing loop")
         while True:
             try:
-                timestamp, workflow_id, schedule_id, app_id = await self.task_queue.get()
+                source_url, source_public_key, timestamp, workflow_id, schedule_id, app_id = await self.task_queue.get()
                 logger.info(f"Processing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
+
+                response_manager = ResponseManager(source_url, source_public_key)
+
                 try:
-                    await self.execute_task(workflow_id, schedule_id, app_id)
+                    connect_response_manager = self.loop.create_task(response_manager.connect())
+                    execute_task = self.execute_task(workflow_id, schedule_id, app_id)
+
+                    result = (await asyncio.gather(connect_response_manager, execute_task))[1]
+
                     # Check if this was the final task in the schedule
                     if await self.is_final_task(schedule_id, app_id):
-                        await self.update_schedule_status(schedule_id, "FINALIZED")
-                        await self.loop.run_in_executor(
-                            self.thread_pool,
-                            status_update_transactor.create_and_send_transaction,
-                            workflow_id,
-                            schedule_id,
-                            "FINALIZED")
+                        update_local_status = self.update_schedule_status(schedule_id, "FINALIZED")
+                        update_blockchain_status = self.loop.create_task(status_update_transactor
+                                                                         .create_and_send_transaction(workflow_id,
+                                                                                                      schedule_id,
+                                                                                                      "FINALIZED"))
+                        send_response_to_client = self.loop.create_task(response_manager
+                                                                        .send_message(json.dumps(result)))
+
+                        await asyncio.gather(update_local_status, update_blockchain_status, send_response_to_client)
+
                 except Exception as e:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
-                    await self.update_schedule_status(schedule_id, "FAILED")
                     self.task_status[(schedule_id, app_id)] = 'FAILED'
-                    await self.loop.run_in_executor(
-                        self.thread_pool,
-                        status_update_transactor.create_and_send_transaction,
-                        workflow_id,
-                        schedule_id,
-                        "FAILED")
+                    update_local_status = self.update_schedule_status(schedule_id, "FAILED")
+                    update_blockchain_status = self.loop.create_task(status_update_transactor
+                                                                     .create_and_send_transaction(workflow_id,
+                                                                                                  schedule_id,
+                                                                                                  "FAILED"))
+                    disconnect_response_manager = self.loop.create_task(response_manager.disconnect())
+
+                    await asyncio.gather(update_local_status, update_blockchain_status, disconnect_response_manager)
                 finally:
                     self.task_queue.task_done()
             except asyncio.CancelledError:

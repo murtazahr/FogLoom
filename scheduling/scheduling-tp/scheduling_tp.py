@@ -53,6 +53,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             payload = json.loads(transaction.payload.decode())
             workflow_id = payload['workflow_id']
             schedule_id = payload['schedule_id']
+            source_url = payload['source_url']
+            source_public_key = payload['source_public_key']
             timestamp = payload['timestamp']
 
             logger.info(f"Processing schedule for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
@@ -70,7 +72,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                     logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists in "
                                 f"CouchDB. Proceeding with blockchain update.")
                 else:
-                    self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, timestamp)
+                    self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, source_url,
+                                                    source_public_key, timestamp)
 
             schedule_doc = self.fetch_data_with_retry(self.schedule_db, schedule_id)
             schedule_address = self._make_schedule_address(schedule_id)
@@ -78,6 +81,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 'schedule_id': schedule_id,
                 'workflow_id': workflow_id,
                 'timestamp': timestamp,
+                'source_url': source_url,
+                'source_public_key': source_public_key,
                 'schedule': schedule_doc['schedule']
             }).encode()
 
@@ -122,12 +127,15 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         except couchdb.http.ResourceNotFound:
             return False
 
-    def _store_schedule_in_couchdb(self, schedule_id, schedule_result, workflow_id, timestamp):
+    def _store_schedule_in_couchdb(self, schedule_id, schedule_result, workflow_id, source_url,
+                                   source_public_key, timestamp):
         try:
             document = {
                 '_id': schedule_id,
                 'schedule': schedule_result,
                 'workflow_id': workflow_id,
+                'source_url': source_url,
+                'source_public_key': source_public_key,
                 'timestamp': timestamp,
                 'status': 'ACTIVE'
             }
