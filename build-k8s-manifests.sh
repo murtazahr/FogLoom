@@ -532,6 +532,10 @@ items:"
 
     # Generate IoT Node Deployments
     for ((i=0; i<num_iot_nodes; i++)); do
+        local hostname="iot-node-$((i+1))"
+        local deployment_name="iot-$i"
+        local service_name="iot-$i"
+
         yaml_content+="
 
   # -------------------------=== iot-node-$((i+1)) ===------------------
@@ -539,16 +543,16 @@ items:"
   - apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: iot-$i
+      name: $deployment_name
     spec:
       selector:
         matchLabels:
-          name: iot-$i
+          name: $deployment_name
       replicas: 1
       template:
         metadata:
           labels:
-            name: iot-$i
+            name: $deployment_name
         spec:
           nodeSelector:
             kubernetes.io/hostname: iot-node-$((i+1))
@@ -559,7 +563,22 @@ items:"
                 - name: VALIDATOR_URL
                   value: \"tcp://sawtooth-0:4004\"
                 - name: IOT_URL
-                  value: \"tcp://iot-$i\""
+                  value: \"tcp://$service_name\"
+
+    - apiVersion: v1
+    kind: Service
+    metadata:
+      name: $service_name
+    spec:
+      type: ClusterIP
+      selector:
+        name: $deployment_name
+      ports:
+        - name: \"5555\"
+          protocol: TCP
+          port: 5555
+          targetPort: 5555"
+
     done
 
     # Add Client Console Deployment
