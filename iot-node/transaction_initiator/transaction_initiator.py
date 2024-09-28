@@ -28,7 +28,7 @@ DOCKER_IMAGE_NAMESPACE = hashlib.sha512('docker-image'.encode()).hexdigest()[:6]
 
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/client.priv')
 VALIDATOR_URL = os.getenv('VALIDATOR_URL', 'tcp://validator:4004')
-
+IOT_URL = os.getenv('IOT_URL', 'tcp://iot')
 
 def load_private_key(key_file):
     try:
@@ -98,7 +98,7 @@ class TransactionCreator:
         context = create_context('secp256k1')
         self.signer = CryptoFactory(context).new_signer(private_key)
 
-    def create_and_send_transactions(self, iot_data, workflow_id):
+    def create_and_send_transactions(self, iot_data, workflow_id, iot_port, iot_public_key):
         try:
             schedule_id = str(uuid.uuid4())
             timestamp = int(time.time())
@@ -107,6 +107,8 @@ class TransactionCreator:
             schedule_payload = {
                 "workflow_id": workflow_id,
                 "schedule_id": schedule_id,
+                "source_url": f"{IOT_URL}:{iot_port}",
+                "source_public_key": iot_public_key,
                 "timestamp": timestamp
             }
             schedule_inputs = [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]

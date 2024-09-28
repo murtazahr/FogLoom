@@ -557,7 +557,9 @@ items:"
               image: murtazahr/iot-node:latest
               env:
                 - name: VALIDATOR_URL
-                  value: \"tcp://sawtooth-0:4004\""
+                  value: \"tcp://sawtooth-0:4004\"
+                - name: IOT_URL
+                  value: \"tcp://iot-$i\""
     done
 
     # Add Client Console Deployment

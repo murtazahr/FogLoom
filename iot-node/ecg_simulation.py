@@ -6,6 +6,7 @@ import numpy as np
 from itertools import cycle
 
 from transaction_initiator.transaction_initiator import transaction_creator
+from response_manager.response_manager import IoTDeviceManager
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -80,13 +81,16 @@ def continuous_ecg_simulation(workflow_id):
                 processed_windows.append(processed_window)
 
             # Send data to transaction creator
-            schedule_id = transaction_creator.create_and_send_transactions(processed_windows, workflow_id)
+            schedule_id = transaction_creator.create_and_send_transactions(processed_windows, workflow_id,
+                                                                           iot_device_manager.port,
+                                                                           iot_device_manager.public_key)
             logger.info(f"Data sent to blockchain. Schedule ID: {schedule_id}")
 
             time.sleep(N_SECONDS)  # Wait before generating next batch of data
 
         except Exception as ex:
             logger.error(f"Error in ECG simulation: {str(ex)}")
+            iot_device_manager.stop()
             time.sleep(5)  # Wait a bit before retrying in case of error
 
 
@@ -95,5 +99,9 @@ if __name__ == "__main__":
         description='Continuously generate ECG data from CSV and send to Sawtooth blockchain.')
     parser.add_argument('workflow_id', help='Workflow ID for the ECG monitoring process')
     args = parser.parse_args()
+
+    # initiate IOTDeviceManager
+    iot_device_manager = IoTDeviceManager(5555)
+    iot_device_manager.start()
 
     continuous_ecg_simulation(args.workflow_id)
