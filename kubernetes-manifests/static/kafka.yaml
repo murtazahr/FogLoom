@@ -6,16 +6,18 @@ metadata:
 data:
   server.properties: |
     process.roles=broker,controller
+    node.id=-1
     controller.quorum.voters=1@kafka-0.kafka-headless.default.svc.cluster.local:9093,2@kafka-1.kafka-headless.default.svc.cluster.local:9093,3@kafka-2.kafka-headless.default.svc.cluster.local:9093,4@kafka-3.kafka-headless.default.svc.cluster.local:9093,5@kafka-4.kafka-headless.default.svc.cluster.local:9093
     listeners=PLAINTEXT://:9092,CONTROLLER://:9093
     inter.broker.listener.name=PLAINTEXT
+    advertised.listeners=PLAINTEXT://$(MY_POD_NAME).kafka-headless.default.svc.cluster.local:9092
     listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
     num.network.threads=3
     num.io.threads=8
     socket.send.buffer.bytes=102400
     socket.receive.buffer.bytes=102400
     socket.request.max.bytes=104857600
-    log.dirs=/var/lib/kafka/data
+    log.dirs=/bitnami/kafka/data
     num.partitions=1
     num.recovery.threads.per.data.dir=1
     offsets.topic.replication.factor=3
@@ -56,51 +58,64 @@ spec:
                 - fog-node-5
       containers:
       - name: kafka
-        image: confluentinc/cp-kafka:7.3.0
+        image: bitnami/kafka:3.5.1
         ports:
         - containerPort: 9092
         - containerPort: 9093
         env:
-        - name: KAFKA_CLUSTER_ID
-          value: "MkU3OEVBNTcwNTJENDM2Qk"
-        - name: KAFKA_NODE_ID
+        - name: BITNAMI_DEBUG
+          value: "true"
+        - name: MY_POD_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        - name: KAFKA_PROCESS_ROLES
+        - name: MY_POD_ORDINAL
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['my-pod-ordinal']
+        - name: KAFKA_CFG_PROCESS_ROLES
           value: "broker,controller"
-        - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+        - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
           value: "1@kafka-0.kafka-headless.default.svc.cluster.local:9093,2@kafka-1.kafka-headless.default.svc.cluster.local:9093,3@kafka-2.kafka-headless.default.svc.cluster.local:9093,4@kafka-3.kafka-headless.default.svc.cluster.local:9093,5@kafka-4.kafka-headless.default.svc.cluster.local:9093"
-        - name: KAFKA_LISTENERS
+        - name: KAFKA_CFG_LISTENERS
           value: "PLAINTEXT://:9092,CONTROLLER://:9093"
-        - name: KAFKA_INTER_BROKER_LISTENER_NAME
-          value: "PLAINTEXT"
-        - name: KAFKA_ADVERTISED_LISTENERS
-          value: "PLAINTEXT://$(POD_NAME).kafka-headless.default.svc.cluster.local:9092"
-        - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+        - name: KAFKA_CFG_ADVERTISED_LISTENERS
+          value: "PLAINTEXT://$(MY_POD_NAME).kafka-headless.default.svc.cluster.local:9092"
+        - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
           value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
-        - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
-          value: "3"
-        - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
-          value: "0"
-        - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
-          value: "2"
-        - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
-          value: "3"
-        - name: POD_NAME
+        - name: KAFKA_CFG_NODE_ID
+          value: "$(MY_POD_ORDINAL)"
+        - name: KAFKA_KRAFT_CLUSTER_ID
+          value: "abcdefghijklmnopqrstuv"
+        - name: ALLOW_PLAINTEXT_LISTENER
+          value: "yes"
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /bitnami/kafka
+      initContainers:
+      - name: set-pod-ordinal
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          ordinal=$(echo $MY_POD_NAME | awk -F'-' '{print $NF}')
+          ordinal=$((ordinal + 1))
+          echo "{\"my-pod-ordinal\": \"$ordinal\"}" > /etc/podinfo/annotations
+        env:
+        - name: MY_POD_NAME
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
         volumeMounts:
-        - name: kafka-data
-          mountPath: /var/lib/kafka/data
-        - name: config
-          mountPath: /etc/kafka/server.properties
-          subPath: server.properties
+        - name: podinfo
+          mountPath: /etc/podinfo
       volumes:
-      - name: config
-        configMap:
-          name: kafka-config
+      - name: podinfo
+        downwardAPI:
+          items:
+          - path: "annotations"
+            fieldRef:
+              fieldPath: metadata.annotations
   volumeClaimTemplates:
   - metadata:
       name: kafka-data
