@@ -50,10 +50,10 @@ items:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
                 - matchExpressions:
-                  - key: kubernetes.io/hostname
-                    operator: Matches
+                  - key: node-type
+                    operator: In
                     values:
-                    - fog-node-.*
+                    - fog-node
           containers:
           - name: redis
             image: redis:6.2-alpine
