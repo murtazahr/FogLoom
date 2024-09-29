@@ -2,7 +2,7 @@ apiVersion: v1
 kind: List
 
 items:
-  # Redis ConfigMap
+  # Redis ConfigMap (unchanged)
   - apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -31,7 +31,7 @@ items:
         replica-lazy-flush yes
         lazyfree-lazy-user-del yes
 
-  # Redis DaemonSet
+  # Redis DaemonSet (updated)
   - apiVersion: apps/v1
     kind: DaemonSet
     metadata:
@@ -45,8 +45,15 @@ items:
           labels:
             app: redis
         spec:
-          nodeSelector:
-            kubernetes.io/hostname: fog-node-*
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: Matches
+                    values:
+                    - fog-node-.*
           containers:
           - name: redis
             image: redis:6.2-alpine
@@ -67,7 +74,7 @@ items:
             configMap:
               name: redis-config
 
-  # Redis Service
+  # Redis Service (unchanged)
   - apiVersion: v1
     kind: Service
     metadata:
@@ -79,7 +86,7 @@ items:
       - port: 6379
         targetPort: 6379
 
-  # Redis Cluster Setup Job
+  # Redis Cluster Setup Job (unchanged)
   - apiVersion: batch/v1
     kind: Job
     metadata:
