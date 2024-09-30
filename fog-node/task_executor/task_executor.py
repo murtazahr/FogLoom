@@ -34,7 +34,7 @@ class TaskExecutor:
         self.data_db = None
         self.task_queue = asyncio.PriorityQueue()
         self.docker_client = docker.from_env()
-        self.thread_pool = ThreadPoolExecutor()
+        self.thread_pool = ThreadPoolExecutor(max_workers=5)
         self.loop = asyncio.get_event_loop()
         self.redis_subscriber = None
         self.redis_pubsub = None

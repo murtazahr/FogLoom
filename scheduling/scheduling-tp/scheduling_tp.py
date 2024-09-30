@@ -42,7 +42,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         self.data_db = self.couch[COUCHDB_DATA_DB]
         self.redis = RedisCluster.from_url(REDIS_URL, decode_responses=True)
         self.loop = asyncio.new_event_loop()
-        self.thread_pool = ThreadPoolExecutor()
+        self.thread_pool = ThreadPoolExecutor(max_workers=3)
 
     @property
     def family_name(self):
