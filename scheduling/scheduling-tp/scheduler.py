@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 import couchdb
 import random
 import logging
+
+from redis import RedisError
 from redis.cluster import RedisCluster
 
 logger = logging.getLogger(__name__)
@@ -104,24 +106,25 @@ class LCDWRRScheduler(BaseScheduler):
     def get_latest_node_data(self):
         node_resources = {'rows': []}
 
-        # Get all keys matching the pattern 'resources_*'
-        redis_keys = self.redis.keys('resources_*')
+        try:
+            # Use scan_iter to get all keys matching the pattern across the cluster
+            for key in self.redis.scan_iter(match='resources_*'):
+                redis_data = self.redis.get(key)
+                if redis_data:
+                    resource_data = json.loads(redis_data)
+                    node_resources['rows'].append({
+                        'id': key,
+                        'doc': {'resource_data': resource_data}
+                    })
+                    logger.debug(f"Data for node {key} fetched from Redis")
+                else:
+                    logger.warning(f"No resource data available in Redis for node {key}")
 
-        logger.info(f"Redis keys: {redis_keys}")
+            logger.debug(f"Total nodes found in Redis Cluster: {len(node_resources['rows'])}")
 
-        for key in redis_keys:
-            node_id = key.split('_', 1)[1]
-            redis_data = self.redis.get(key)
-
-            if redis_data:
-                resource_data = json.loads(redis_data)
-                node_resources['rows'].append({
-                    'id': node_id,
-                    'doc': {'resource_data': resource_data}
-                })
-                logger.debug(f"Data for node {node_id} fetched from Redis")
-            else:
-                logger.warning(f"No resource data available in Redis for node {node_id}")
+        except RedisError as e:
+            logger.error(f"Error accessing Redis Cluster: {str(e)}")
+            # Fall back to CouchDB here if needed
 
         # If we didn't get any data from Redis, fall back to CouchDB
         if not node_resources['rows']:
