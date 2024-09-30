@@ -21,6 +21,7 @@ The framework has been extensively tested on Ubuntu machines but should support 
 - Docker
 - K3S Kubernetes Cluster
 - Python 3.8
+- GIT LFS
 
 ## Installation
 
