@@ -54,7 +54,7 @@ class PeerRegistryTransactionHandler(TransactionHandler):
 
             # Update the state
             state_data = json.dumps(current_state).encode()
-            context.set_state({ state_key: state_data })
+            context.set_state({state_key: state_data})
 
             logger.info(f"Updated state for node {node_id} with {len(updates)} new resource updates")
 

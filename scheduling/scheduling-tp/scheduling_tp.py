@@ -18,6 +18,9 @@ COUCHDB_DB = 'resource_registry'
 COUCHDB_SCHEDULE_DB = 'schedules'
 COUCHDB_DATA_DB = 'task_data'
 
+# Redis configuration
+REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
+
 # Sawtooth configuration
 FAMILY_NAME = 'iot-schedule'
 FAMILY_VERSION = '1.0'
@@ -157,7 +160,11 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 "name": COUCHDB_DB
             }
 
-            return create_scheduler("lcdwrr", dependency_graph, app_requirements, db_config)
+            redis_config = {
+                "url": REDIS_URL
+            }
+
+            return create_scheduler("lcdwrr", dependency_graph, app_requirements, db_config, redis_config)
         except Exception as e:
             logger.error(f"Failed to initialize scheduler: {str(e)}")
             raise
