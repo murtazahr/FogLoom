@@ -109,11 +109,12 @@ class LCDWRRScheduler(BaseScheduler):
         try:
             # Use scan_iter to get all keys matching the pattern across the cluster
             for key in self.redis.scan_iter(match='resources_*'):
+                node_id = key.split('_', 1)[1]
                 redis_data = self.redis.get(key)
                 if redis_data:
                     resource_data = json.loads(redis_data)
                     node_resources['rows'].append({
-                        'id': key,
+                        'id': node_id,
                         'doc': {'resource_data': resource_data}
                     })
                     logger.debug(f"Data for node {key} fetched from Redis")
