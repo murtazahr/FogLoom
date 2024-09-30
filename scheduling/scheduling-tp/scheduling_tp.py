@@ -1,11 +1,12 @@
+import asyncio
 import hashlib
 import json
 import logging
 import os
 import traceback
-from time import sleep
 
 import couchdb
+from redis import RedisCluster, RedisError
 from sawtooth_sdk.processor.core import TransactionProcessor
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
@@ -38,6 +39,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         self.couch = couchdb.Server(COUCHDB_URL)
         self.schedule_db = self.couch[COUCHDB_SCHEDULE_DB]
         self.data_db = self.couch[COUCHDB_DATA_DB]
+        self.redis = RedisCluster.from_url(REDIS_URL, decode_responses=True)
 
     @property
     def family_name(self):
@@ -51,7 +53,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
     def namespaces(self):
         return [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
 
-    def apply(self, transaction, context):
+    async def apply(self, transaction, context):
         try:
             payload = json.loads(transaction.payload.decode())
             workflow_id = payload['workflow_id']
@@ -65,20 +67,25 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             if not self._validate_workflow_id(context, workflow_id):
                 raise InvalidTransaction(f"Invalid workflow ID: {workflow_id}")
 
-            if self._check_schedule_in_couchdb(schedule_id):
-                logger.info(f"Schedule {schedule_id} already exists in CouchDB. Proceeding with blockchain update.")
+            if await self._check_schedule_in_redis(schedule_id):
+                logger.info(f"Schedule {schedule_id} already exists in Redis. Proceeding with blockchain update.")
             else:
                 self.scheduler = self._initialize_scheduler(context, workflow_id)
                 schedule_result = self.scheduler.schedule()
 
-                if self._check_schedule_in_couchdb(schedule_id):
-                    logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists in "
-                                f"CouchDB. Proceeding with blockchain update.")
+                if await self._check_schedule_in_redis(schedule_id):
+                    logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists. "
+                                f"Proceeding with blockchain update.")
                 else:
-                    self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, source_url,
-                                                    source_public_key, timestamp)
+                    # Parallel storage in Redis and CouchDB
+                    await asyncio.gather(
+                        self._store_schedule_in_redis(schedule_id, schedule_result, workflow_id, source_url,
+                                                      source_public_key, timestamp),
+                        self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, source_url,
+                                                        source_public_key, timestamp)
+                    )
 
-            schedule_doc = self.fetch_data_with_retry(self.schedule_db, schedule_id)
+            schedule_doc = await self.fetch_data_with_retry(schedule_id)
             schedule_address = self._make_schedule_address(schedule_id)
             schedule_state_data = json.dumps({
                 'schedule_id': schedule_id,
@@ -102,36 +109,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
 
-    @staticmethod
-    def fetch_data_with_retry(db, key, max_retries=5, initial_delay=0.1):
-        delay = initial_delay
-        for attempt in range(max_retries):
-            try:
-                doc = db.get(key)
-                if doc is None:
-                    raise couchdb.http.ResourceNotFound
-                return doc
-            except couchdb.http.ResourceNotFound:
-                if attempt == max_retries - 1:
-                    logger.error(f"Data not found for key {key} after {max_retries} attempts")
-                    raise
-                logger.warning(
-                    f"Data not found for key {key}, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries})")
-                sleep(delay)
-                delay *= 2  # Exponential backoff
-            except Exception as e:
-                logger.error(f"Error fetching data for key {key}: {str(e)}", exc_info=True)
-                raise
-
-    def _check_schedule_in_couchdb(self, schedule_id):
-        try:
-            _ = self.schedule_db[schedule_id]
-            return True
-        except couchdb.http.ResourceNotFound:
-            return False
-
-    def _store_schedule_in_couchdb(self, schedule_id, schedule_result, workflow_id, source_url,
-                                   source_public_key, timestamp):
+    async def _store_schedule_in_couchdb(self, schedule_id, schedule_result, workflow_id, source_url,
+                                         source_public_key, timestamp):
         try:
             document = {
                 '_id': schedule_id,
@@ -147,6 +126,58 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         except Exception as e:
             logger.error(f"Failed to store schedule in CouchDB: {str(e)}")
             raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
+
+    async def _store_schedule_in_redis(self, schedule_id, schedule_result, workflow_id, source_url,
+                                       source_public_key, timestamp):
+        try:
+            schedule_data = {
+                'schedule': schedule_result,
+                'workflow_id': workflow_id,
+                'source_url': source_url,
+                'source_public_key': source_public_key,
+                'timestamp': timestamp,
+                'status': 'ACTIVE'
+            }
+            schedule_json = json.dumps(schedule_data)
+            key = f"schedule_{schedule_id}"
+            result = self.redis.set(key, schedule_json)
+            if result:
+                logger.info(f"Successfully stored schedule in Redis for schedule ID: {schedule_id}")
+            else:
+                raise Exception("Redis set operation failed")
+        except RedisError as e:
+            logger.error(f"Failed to store schedule in Redis: {str(e)}")
+            raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
+        except Exception as e:
+            logger.error(f"Unexpected error while storing schedule in Redis: {str(e)}")
+            raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
+
+    async def _check_schedule_in_redis(self, schedule_id):
+        try:
+            key = f"schedule_{schedule_id}"
+            schedule_data = await self.redis.get(key)
+            return schedule_data is not None
+        except RedisError as e:
+            logger.error(f"Error checking schedule in Redis: {str(e)}")
+            return False
+
+    async def fetch_data_with_retry(self, schedule_id, max_retries=3, retry_delay=1):
+        for attempt in range(max_retries):
+            try:
+                redis_data = self.redis.get(f"schedule_{schedule_id}")
+                if redis_data:
+                    return json.loads(redis_data)
+
+                couchdb_data = self.schedule_db.get(schedule_id)
+                if couchdb_data:
+                    return couchdb_data
+
+                raise Exception("Data not found in Redis or CouchDB")
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    logger.error(f"Failed to fetch data after {max_retries} attempts: {str(e)}")
+                    raise
+                await asyncio.sleep(retry_delay)
 
     def _initialize_scheduler(self, context, workflow_id):
         try:
@@ -205,13 +236,16 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         else:
             raise InvalidTransaction(f"No requirements found for app ID: {app_id}")
 
-    def _make_workflow_address(self, workflow_id):
+    @staticmethod
+    def _make_workflow_address(workflow_id):
         return WORKFLOW_NAMESPACE + hashlib.sha512(workflow_id.encode()).hexdigest()[:64]
 
-    def _make_docker_image_address(self, app_id):
+    @staticmethod
+    def _make_docker_image_address(app_id):
         return DOCKER_IMAGE_NAMESPACE + hashlib.sha512(app_id.encode()).hexdigest()[:64]
 
-    def _make_schedule_address(self, schedule_id):
+    @staticmethod
+    def _make_schedule_address(schedule_id):
         return SCHEDULE_NAMESPACE + hashlib.sha512(schedule_id.encode()).hexdigest()[:64]
 
 
