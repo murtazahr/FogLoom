@@ -1,10 +1,13 @@
+import asyncio
 import hashlib
 import json
 import logging
 import os
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 import couchdb
+from redis import RedisCluster, RedisError
 from sawtooth_sdk.processor.core import TransactionProcessor
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
@@ -12,6 +15,9 @@ from sawtooth_sdk.processor.handler import TransactionHandler
 # CouchDB configuration
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
 COUCHDB_DATA_DB = 'task_data'
+
+# Redis configuration
+REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
 
 # Sawtooth configuration
 FAMILY_NAME = 'iot-data'
@@ -27,6 +33,9 @@ class IoTDataTransactionHandler(TransactionHandler):
     def __init__(self):
         self.couch = couchdb.Server(COUCHDB_URL)
         self.data_db = self.couch[COUCHDB_DATA_DB]
+        self.redis = RedisCluster.from_url(REDIS_URL, decode_responses=True)
+        self.loop = asyncio.new_event_loop()
+        self.executor = ThreadPoolExecutor(max_workers=3)
 
     @property
     def family_name(self):
@@ -57,7 +66,9 @@ class IoTDataTransactionHandler(TransactionHandler):
 
             iot_data_hash = self._calculate_hash(iot_data)
 
-            self._store_initial_input_data(context, workflow_id, schedule_id, iot_data)
+            # Run async operations in a separate thread
+            future = self.executor.submit(self._run_async_operations, context, workflow_id, schedule_id, iot_data, iot_data_hash)
+            future.result()  # This will raise any exceptions that occurred in the async operations
 
             iot_data_address = self._make_iot_data_address(schedule_id)
             iot_data_state = json.dumps({
@@ -78,6 +89,52 @@ class IoTDataTransactionHandler(TransactionHandler):
             logger.error(f"Unexpected error in apply method: {str(e)}")
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
+
+    def _run_async_operations(self, context, workflow_id, schedule_id, iot_data, iot_data_hash):
+        return self.loop.run_until_complete(self._async_operations(context, workflow_id, schedule_id, iot_data, iot_data_hash))
+
+    async def _async_operations(self, context, workflow_id, schedule_id, iot_data, iot_data_hash):
+        dependency_graph = self._get_dependency_graph(context, workflow_id)
+        data_id = self._generate_data_id(workflow_id, schedule_id, dependency_graph["start"], 'input')
+
+        # Parallel storage in Redis and CouchDB
+        await asyncio.gather(
+            self._store_data_in_redis(data_id, iot_data, iot_data_hash, workflow_id, schedule_id),
+            self._store_data_in_couchdb(data_id, iot_data, iot_data_hash, workflow_id, schedule_id)
+        )
+
+    async def _store_data_in_redis(self, data_id, data, data_hash, workflow_id, schedule_id):
+        try:
+            data_json = json.dumps({
+                'data': data,
+                'data_hash': data_hash,
+                'workflow_id': workflow_id,
+                'schedule_id': schedule_id
+            })
+            result = self.redis.set(f"iot_data_{data_id}", data_json)
+            if result:
+                logger.info(f"Successfully stored IoT data in Redis for ID: {data_id}")
+            else:
+                raise Exception("Redis set operation failed")
+        except RedisError as e:
+            logger.error(f"Failed to store IoT data in Redis: {str(e)}")
+            raise
+
+    async def _store_data_in_couchdb(self, data_id, data, data_hash, workflow_id, schedule_id):
+        try:
+            self.data_db.save({
+                '_id': data_id,
+                'data': data,
+                'data_hash': data_hash,
+                'workflow_id': workflow_id,
+                'schedule_id': schedule_id
+            })
+            logger.info(f"Successfully stored IoT data in CouchDB for ID: {data_id}")
+        except couchdb.http.ResourceConflict:
+            logger.info(f"Data for ID: {data_id} already exists in CouchDB. Skipping storage.")
+        except Exception as e:
+            logger.error(f"Unexpected error while storing data in CouchDB for ID {data_id}: {str(e)}")
+            raise
 
     def _validate_workflow_id(self, context, workflow_id):
         address = self._make_workflow_address(workflow_id)
@@ -105,41 +162,6 @@ class IoTDataTransactionHandler(TransactionHandler):
     @staticmethod
     def _generate_data_id(workflow_id, schedule_id, app_id, data_type):
         return f"{workflow_id}_{schedule_id}_{app_id}_{data_type}"
-
-    def _store_initial_input_data(self, context, workflow_id, schedule_id, iot_data):
-        try:
-            dependency_graph = self._get_dependency_graph(context, workflow_id)
-
-            data_id = self._generate_data_id(workflow_id, schedule_id, dependency_graph["start"], 'input')
-            iot_data_hash = self._calculate_hash(iot_data)
-            self._safe_store_data(data_id, iot_data, iot_data_hash, workflow_id, schedule_id)
-
-            logger.info(f"Successfully processed initial input data for workflow ID: {workflow_id}, "
-                        f"schedule ID: {schedule_id}")
-        except KeyError as e:
-            logger.error(f"Error processing initial input data: {str(e)}")
-            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, "
-                                     f"schedule ID: {schedule_id}. Error: {str(e)}")
-        except Exception as e:
-            logger.error(f"Unexpected error processing initial input data: {str(e)}")
-            raise InvalidTransaction(f"Failed to process initial input data for workflow ID: {workflow_id}, "
-                                     f"schedule ID: {schedule_id}")
-
-    def _safe_store_data(self, data_id, data, data_hash, workflow_id, schedule_id):
-        try:
-            self.data_db.save({
-                '_id': data_id,
-                'data': data,
-                'data_hash': data_hash,
-                'workflow_id': workflow_id,
-                'schedule_id': schedule_id
-            })
-            logger.info(f"Successfully stored data for ID: {data_id}")
-        except couchdb.http.ResourceConflict:
-            logger.info(f"Data for ID: {data_id} already exists. Skipping storage.")
-        except Exception as e:
-            logger.error(f"Unexpected error while storing data for ID {data_id}: {str(e)}")
-            raise
 
     @staticmethod
     def _calculate_hash(data):

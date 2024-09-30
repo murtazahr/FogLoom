@@ -106,7 +106,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists. "
                             f"Proceeding with blockchain update.")
             else:
-                # Parallel storage in Redis and CouchDB
+                # Store in Redis and CouchDB
                 await asyncio.gather(
                     self._store_schedule_in_redis(schedule_id, schedule_result, workflow_id,
                                                   source_url, source_public_key, timestamp),
@@ -146,6 +146,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                                        source_public_key, timestamp):
         try:
             schedule_data = {
+                'schedule_id': schedule_id,
                 'schedule': schedule_result,
                 'workflow_id': workflow_id,
                 'source_url': source_url,
@@ -155,13 +156,29 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             }
             schedule_json = json.dumps(schedule_data)
             key = f"schedule_{schedule_id}"
-            result = self.redis.set(key, schedule_json)
-            if result:
-                logger.info(f"Successfully stored schedule in Redis for schedule ID: {schedule_id}")
+
+            # Use a pipeline to perform both operations atomically
+            pipeline = self.redis.pipeline()
+
+            # Set the schedule data in Redis
+            pipeline.set(key, schedule_json)
+
+            # Publish the schedule data to the single "schedule" channel
+            channel = "schedule"
+            pipeline.publish(channel, schedule_json)
+
+            # Execute the pipeline
+            results = pipeline.execute()
+
+            if all(results):
+                logger.info(f"Successfully stored and published schedule in Redis for schedule ID: {schedule_id}")
             else:
-                raise Exception("Redis set operation failed")
+                raise Exception("Redis set or publish operation failed")
         except RedisError as e:
-            logger.error(f"Failed to store schedule in Redis: {str(e)}")
+            logger.error(f"Failed to store and publish schedule in Redis: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in _store_schedule_in_redis: {str(e)}")
             raise
 
     async def _check_schedule_in_redis(self, schedule_id):
