@@ -7,6 +7,7 @@ import json
 import psutil
 import couchdb
 from couchdb import ResourceNotFound, Unauthorized
+from redis.cluster import RedisCluster
 
 from sawtooth_sdk.messaging.stream import Stream
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
@@ -21,8 +22,13 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 
 # Path to the private key file
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
+
+# Couchdb configuration
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
 COUCHDB_DB = 'resource_registry'
+
+# Redis configuration
+REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
 
 UPDATE_INTERVAL = int(os.getenv('RESOURCE_UPDATE_INTERVAL', 300))
 BLOCKCHAIN_BATCH_SIZE = int(os.getenv('RESOURCE_UPDATE_BATCH_SIZE', 5))
@@ -100,6 +106,39 @@ def connect_to_couchdb(max_retries=5, retry_delay=5):
                 return None
 
     return None
+
+
+def connect_to_redis(max_retries=5, retry_delay=5):
+    logger.info(f'Connecting to Redis cluster at {REDIS_URL}')
+    for attempt in range(max_retries):
+        try:
+            redis_cluster = RedisCluster.from_url(REDIS_URL, decode_responses=True)
+            logger.info("Successfully connected to Redis cluster.")
+            return redis_cluster
+        except Exception as e:
+            logger.error(f"Error connecting to Redis cluster: {str(e)}")
+            if attempt < max_retries - 1:
+                logger.warning(f"Retrying in {retry_delay} seconds. Attempt {attempt + 1}/{max_retries}")
+                time.sleep(retry_delay)
+            else:
+                logger.error(f"Failed to connect to Redis cluster after {max_retries} attempts.")
+                return None
+
+
+def update_redis(redis_cluster, node_id, resource_data):
+    try:
+        key = f"resources_{node_id}"
+        # Measure the time taken for the CouchDB write operation
+        start_time = time.time()
+        redis_cluster.set(key, json.dumps(resource_data))
+        end_time = time.time()
+
+        write_time = end_time - start_time
+        logger.info(f"Updated resource data for node {node_id} in Redis. Write time: {write_time:.4f} seconds")
+
+        logger.info(f"Updated Redis with latest resource data for node {node_id}")
+    except Exception as e:
+        logger.error(f"Error updating Redis for node {node_id}: {str(e)}")
 
 
 def store_resource_data(db, node_id, resource_data):
@@ -229,6 +268,11 @@ def main():
         logger.error("Couldn't connect to CouchDB. Exiting.")
         sys.exit(1)
 
+    redis_cluster = connect_to_redis()
+    if not redis_cluster:
+        logger.error("Couldn't connect to Redis cluster. Exiting.")
+        sys.exit(1)
+
     updates = []
     while True:
         try:
@@ -238,6 +282,9 @@ def main():
                 update_info = store_resource_data(db, node_id, resource_data)
                 if update_info:
                     updates.append(update_info)
+
+                    # Update Redis with the latest resource data
+                    update_redis(redis_cluster, node_id, resource_data)
 
                     if len(updates) >= BLOCKCHAIN_BATCH_SIZE:
                         transaction = create_transaction(node_id, updates, signer)
