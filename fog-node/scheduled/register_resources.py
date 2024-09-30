@@ -134,9 +134,15 @@ def store_resource_data(db, node_id, resource_data):
                 }
             }
 
+        # Measure the time taken for the CouchDB write operation
+        start_time = time.time()
         db[doc_id] = doc
-        logger.info(f"Appended resource data for node {node_id} in CouchDB")
-        return {'timestamp': timestamp, 'data_hash': data_hash}
+        end_time = time.time()
+
+        write_time = end_time - start_time
+        logger.info(f"Appended resource data for node {node_id} in CouchDB. Write time: {write_time:.4f} seconds")
+
+        return {'timestamp': timestamp, 'data_hash': data_hash, 'write_time': write_time}
     except Exception as e:
         logger.error(f"Error storing resource data for node {node_id} in CouchDB: {str(e)}")
         return None
