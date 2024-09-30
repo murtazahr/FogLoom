@@ -107,6 +107,8 @@ class LCDWRRScheduler(BaseScheduler):
         # Get all keys matching the pattern 'resources_*'
         redis_keys = self.redis.keys('resources_*')
 
+        logger.info(f"Redis keys: {redis_keys}")
+
         for key in redis_keys:
             node_id = key.split('_', 1)[1]
             redis_data = self.redis.get(key)
