@@ -2,11 +2,13 @@ import asyncio
 import json
 import logging
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 import couchdb
 import docker
-from redis import RedisCluster, RedisError
+from cachetools import TTLCache
 from docker import errors
 
 from helper.blockchain_task_status_updater import status_update_transactor
@@ -23,33 +25,28 @@ COUCHDB_SCHEDULE_DB = 'schedules'
 COUCHDB_DATA_DB = 'task_data'
 CURRENT_NODE = os.getenv('NODE_ID')
 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
-
 
 class TaskExecutor:
     def __init__(self):
-        self.last_completed_app_id = None
         self.couch_server = None
         self.schedule_db = None
         self.data_db = None
         self.task_queue = asyncio.PriorityQueue()
         self.docker_client = docker.from_env()
-        self.thread_pool = ThreadPoolExecutor(max_workers=5)
+        self.thread_pool = ThreadPoolExecutor()
         self.loop = asyncio.get_event_loop()
-        self.redis_subscriber = None
-        self.redis_pubsub = None
-        self.redis_client = None
+        self.change_feed_task = None
         self.process_tasks_task = None
+        self.processed_changes = TTLCache(maxsize=1000, ttl=300)  # Cache for 5 minutes
         self.task_status = {}
         logger.info("TaskExecutor initialized")
 
     async def initialize(self):
         logger.info("Initializing TaskExecutor")
         await self.connect_to_couchdb()
-        await self.connect_to_redis()
 
-        # Start the Redis subscriber and task processor
-        self.redis_subscriber = self.loop.create_task(self.subscribe_to_redis())
+        # Start the change feed listener and task processor
+        self.change_feed_task = self.loop.create_task(self.listen_for_changes())
         self.process_tasks_task = self.loop.create_task(self.process_tasks())
 
         logger.info("TaskExecutor initialization complete")
@@ -66,81 +63,104 @@ class TaskExecutor:
             logger.error(f"Failed to connect to CouchDB: {str(e)}")
             raise
 
-    async def connect_to_redis(self):
-        try:
-            self.redis_client = RedisCluster.from_url(REDIS_URL, decode_responses=True)
-            self.redis_pubsub = self.redis_client.pubsub()
-            logger.info("Connected to Redis successfully")
-        except RedisError as e:
-            logger.error(f"Failed to connect to Redis: {str(e)}")
-            raise
+    async def listen_for_changes(self):
+        logger.info("Starting to listen for changes in the schedule database")
+        last_seq = None
+        while True:
+            try:
+                changes_func = partial(self.schedule_db.changes, feed='continuous', include_docs=True, heartbeat=1000,
+                                       since=last_seq)
+                changes = await self.loop.run_in_executor(self.thread_pool, changes_func)
+                logger.debug("Initiated changes feed")
+                async for change in AsyncIterator(changes):
+                    logger.debug(f"Received change: {change}")
+                    if not isinstance(change, dict) or 'id' not in change:
+                        logger.warning(f"Unexpected change data structure: {change}")
+                        continue
 
-    async def subscribe_to_redis(self):
-        logger.info("Starting to subscribe to Redis channel")
-        try:
-            await self.loop.run_in_executor(self.thread_pool, self.redis_pubsub.subscribe, 'schedule')
-            logger.info("Subscribed to Redis 'schedule' channel successfully")
+                    change_id = change['id']
+                    seq = change.get('seq')
 
-            while True:
-                message = await self.loop.run_in_executor(self.thread_pool, self.redis_pubsub.get_message)
-                if message and message['type'] == 'message':
-                    data = json.loads(message['data'])
-                    await self.handle_redis_message(data)
-        except asyncio.CancelledError:
-            logger.info("Redis subscriber cancelled")
-        except Exception as e:
-            logger.error(f"Error in Redis subscriber: {str(e)}", exc_info=True)
+                    if 'doc' not in change:
+                        logger.warning(f"Change does not contain 'doc' field: {change}")
+                        continue
 
-    async def handle_redis_message(self, data):
-        schedule_id = data.get('schedule_id')
-        current_status = data.get('status')
-        logger.info(f"Handling Redis message for schedule: {schedule_id}, status: {current_status}")
+                    doc = change['doc']
+                    current_status = doc.get('status')
 
-        if current_status == 'ACTIVE':
-            logger.info(f"Active schedule detected: {schedule_id}")
-            await self.handle_new_schedule(data)
-        elif current_status == 'TASK_COMPLETED':
-            logger.info(f"Task completion update detected for schedule: {schedule_id}")
-            await self.handle_task_completion(data)
-        else:
-            logger.info(f"Unhandled status {current_status} for schedule: {schedule_id}")
+                    # Check if we've already processed this change and if the status is the same
+                    if change_id in self.processed_changes:
+                        prev_status = self.processed_changes[change_id]['status']
+                        if prev_status == current_status:
+                            logger.debug(f"Skipping already processed change with unchanged status: {change_id}")
+                            continue
+                        else:
+                            logger.info(
+                                f"Re-processing change {change_id} due to status change: {prev_status} -> {current_status}")
 
-    async def handle_new_schedule(self, schedule_data):
-        schedule_id = schedule_data.get('schedule_id')
-        logger.info(f"Handling new schedule: {schedule_id}")
-        schedule = schedule_data.get('schedule')
+                    # Process the change
+                    if current_status == 'ACTIVE':
+                        logger.info(f"Active schedule detected: {doc['_id']}")
+                        await self.handle_new_schedule(doc)
+                    elif current_status == 'TASK_COMPLETED':
+                        logger.info(f"Task completion update detected for schedule: {doc['_id']}")
+                        await self.handle_task_completion(doc)
+                    else:
+                        logger.info(f"Unhandled status {current_status} for schedule: {doc['_id']}")
+
+                    # Mark this change as processed with its current status
+                    self.processed_changes[change_id] = {
+                        'timestamp': time.time(),
+                        'status': current_status
+                    }
+
+                    # Update the last processed sequence number
+                    if seq:
+                        last_seq = seq
+
+            except asyncio.CancelledError:
+                logger.info("Change feed listener cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in change feed listener: {str(e)}", exc_info=True)
+                await asyncio.sleep(5)  # Wait before trying to reconnect
+            logger.info("Restarting change feed listener after error or completion")
+
+    async def handle_new_schedule(self, schedule_doc):
+        logger.info(f"Handling new schedule: {schedule_doc['_id']}")
+        schedule = schedule_doc.get('schedule')
         if not schedule:
-            logger.warning(f"Schedule document {schedule_id} does not contain a 'schedule' field")
+            logger.warning(f"Schedule document {schedule_doc['_id']} does not contain a 'schedule' field")
             return
         node_schedule = schedule.get('node_schedule', {})
 
-        workflow_id = schedule_data.get('workflow_id')
+        workflow_id = schedule_doc.get('workflow_id')
+        schedule_id = schedule_doc['_id']
 
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
-                timestamp = schedule_data.get('timestamp')
-                source_url = schedule_data.get('source_url')
-                source_public_key = schedule_data.get('source_public_key')
+                timestamp = schedule_doc.get('timestamp')
+                source_url = schedule_doc.get('source_url')
+                source_public_key = schedule_doc.get('source_public_key')
                 task_key = (schedule_id, app_id)
 
                 logger.info(f"Checking dependencies for app_id: {app_id} in schedule {schedule_id}")
-                if await self.check_dependencies(schedule_id, app_id, schedule):
+                if await self.check_dependencies(workflow_id, schedule_id, app_id):
                     logger.info(
                         f"Dependencies met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
                     await self.task_queue.put((source_url, source_public_key, timestamp, workflow_id, schedule_id, app_id))
                     self.task_status[task_key] = 'QUEUED'
                 else:
                     logger.info(
-                        f"Dependencies not met for app_id: {app_id} in schedule {schedule_id}. Will be checked again "
-                        f"on task completions.")
+                        f"Dependencies not met for app_id: {app_id} in schedule {schedule_id}. Will be checked again on task completions.")
                     self.task_status[task_key] = 'WAITING'
         else:
             logger.info(f"No tasks for current node {CURRENT_NODE} in this schedule")
 
-    async def handle_task_completion(self, schedule_data):
-        schedule_id = schedule_data.get('schedule_id')
-        completed_app_id = schedule_data.get('completed_app_id')
-        logger.info(f"Handling task completion for schedule: {schedule_id}, completed app: {completed_app_id}")
+    async def handle_task_completion(self, schedule_doc):
+        logger.info(f"Handling task completion for schedule: {schedule_doc['_id']}")
+        schedule_id = schedule_doc['_id']
+        completed_app_id = schedule_doc.get('completed_app_id')
 
         if not completed_app_id:
             logger.warning(f"No completed_app_id found in schedule document: {schedule_id}")
@@ -150,12 +170,12 @@ class TaskExecutor:
         task_key = (schedule_id, completed_app_id)
         self.task_status[task_key] = 'COMPLETED'
 
-        schedule = schedule_data.get('schedule')
+        schedule = schedule_doc.get('schedule')
         if not schedule:
             logger.warning(f"Schedule document {schedule_id} does not contain a 'schedule' field")
             return
 
-        workflow_id = schedule_data.get('workflow_id')
+        workflow_id = schedule_doc.get('workflow_id')
         node_schedule = schedule.get('node_schedule', {})
 
         if CURRENT_NODE in node_schedule:
@@ -168,19 +188,22 @@ class TaskExecutor:
                     logger.debug(f"Skipping task: {app_id} for schedule {schedule_id}. Status: {current_status}")
                     continue
 
-                if await self.check_dependencies(schedule_id, app_id, schedule):
+                if await self.check_dependencies(workflow_id, schedule_id, app_id):
                     logger.info(
                         f"Dependencies now met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
-                    timestamp = schedule_data.get('timestamp')
-                    source_url = schedule_data.get('source_url')
-                    source_public_key = schedule_data.get('source_public_key')
+                    timestamp = schedule_doc.get('timestamp')
+                    source_url = schedule_doc.get('source_url')
+                    source_public_key = schedule_doc.get('source_public_key')
                     await self.task_queue.put((source_url, source_public_key, timestamp, workflow_id, schedule_id, app_id))
                     self.task_status[task_key] = 'QUEUED'
                 else:
                     logger.debug(f"Dependencies not yet met for app_id: {app_id} in schedule {schedule_id}")
                     self.task_status[task_key] = 'WAITING'
 
-    async def check_dependencies(self, schedule_id, app_id, schedule):
+    async def check_dependencies(self, workflow_id, schedule_id, app_id):
+        schedule_doc = await self.fetch_data_with_retry(self.schedule_db, schedule_id)
+        schedule = schedule_doc.get('schedule', {})
+
         current_level, dependencies = await self.get_task_dependencies(schedule, app_id)
 
         if current_level is None:
@@ -216,7 +239,7 @@ class TaskExecutor:
 
                     # Check if this was the final task in the schedule
                     if await self.is_final_task(schedule_id, app_id):
-                        update_redis_status = self.update_schedule_status_redis(schedule_id, "FINALIZED")
+                        update_local_status = self.update_schedule_status(schedule_id, "FINALIZED")
                         update_blockchain_status = self.loop.run_in_executor(
                             self.thread_pool,
                             status_update_transactor.create_and_send_transaction,
@@ -228,12 +251,12 @@ class TaskExecutor:
                             response_manager.send_message,
                             json.dumps(result))
 
-                        await asyncio.gather(update_redis_status, update_blockchain_status, send_response_to_client)
+                        await asyncio.gather(update_local_status, update_blockchain_status, send_response_to_client)
 
                 except Exception as e:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
                     self.task_status[(schedule_id, app_id)] = 'FAILED'
-                    update_redis_status = self.update_schedule_status_redis(schedule_id, "FAILED")
+                    update_local_status = self.update_schedule_status(schedule_id, "FAILED")
                     update_blockchain_status = self.loop.run_in_executor(
                         self.thread_pool,
                         status_update_transactor.create_and_send_transaction,
@@ -242,7 +265,7 @@ class TaskExecutor:
                         "FAILED")
                     disconnect_response_manager = self.loop.run_in_executor(self.thread_pool, response_manager.disconnect)
 
-                    await asyncio.gather(update_redis_status, update_blockchain_status, disconnect_response_manager)
+                    await asyncio.gather(update_local_status, update_blockchain_status, disconnect_response_manager)
                 finally:
                     self.task_queue.task_done()
             except asyncio.CancelledError:
@@ -250,21 +273,14 @@ class TaskExecutor:
                 break
             except Exception as e:
                 logger.error(f"Unexpected error in task processing loop: {str(e)}", exc_info=True)
-                await asyncio.sleep(5)
+                await asyncio.sleep(5)  # Wait before continuing the loop
 
     async def execute_task(self, workflow_id, schedule_id, app_id):
         logger.info(f"Executing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
         task_key = (schedule_id, app_id)
         self.task_status[task_key] = 'IN_PROGRESS'
 
-        # Fetch schedule document from Redis
-        key = f"schedule_{schedule_id}"
-        schedule_data = await self.loop.run_in_executor(self.thread_pool, self.redis_client.get, key)
-
-        if not schedule_data:
-            raise Exception(f"Schedule {schedule_id} not found in Redis")
-
-        schedule_doc = json.loads(schedule_data)
+        schedule_doc = await self.fetch_data_with_retry(self.schedule_db, schedule_id)
         schedule = schedule_doc.get('schedule', {})
 
         current_level, _ = await self.get_task_dependencies(schedule, app_id)
@@ -312,50 +328,9 @@ class TaskExecutor:
             logger.error(f"Error storing task output for {output_key}: {str(e)}", exc_info=True)
             raise
 
-        # Update schedule status in Redis
-        self.last_completed_app_id = app_id
-        await self.update_schedule_status_redis(schedule_id, "TASK_COMPLETED")
+        await self.update_schedule_on_task_completion(schedule_id, app_id)
 
         return output_data
-
-    async def update_schedule_status_redis(self, schedule_id, status):
-        logger.info(f"Updating schedule status in Redis: schedule_id={schedule_id}, status={status}")
-        try:
-            key = f"schedule_{schedule_id}"
-            schedule_data = await self.loop.run_in_executor(self.thread_pool, self.redis_client.get, key)
-            if schedule_data:
-                schedule_doc = json.loads(schedule_data)
-                schedule_doc['status'] = status
-                if status == 'TASK_COMPLETED':
-                    schedule_doc['completed_app_id'] = self.last_completed_app_id
-                updated_data = json.dumps(schedule_doc)
-
-                # Perform SET operation
-                set_result = await self.loop.run_in_executor(
-                    self.thread_pool,
-                    self.redis_client.set,
-                    key,
-                    updated_data
-                )
-                if not set_result:
-                    raise Exception(f"Failed to update schedule {schedule_id} in Redis")
-
-                # Perform PUBLISH operation
-                publish_result = await self.loop.run_in_executor(
-                    self.thread_pool,
-                    self.redis_client.publish,
-                    'schedule',
-                    updated_data
-                )
-                if publish_result == 0:
-                    logger.warning(f"No clients received the published update for schedule {schedule_id}")
-
-                logger.info(f"Schedule status updated in Redis: schedule_id={schedule_id}, status={status}")
-            else:
-                logger.error(f"Schedule {schedule_id} not found in Redis")
-        except Exception as e:
-            logger.error(f"Error updating schedule status in Redis for {schedule_id}: {str(e)}", exc_info=True)
-            raise
 
     async def fetch_dependency_outputs(self, workflow_id, schedule_id, app_id, schedule):
         logger.info(f"Fetching dependency outputs for task: {app_id} in schedule {schedule_id}")
@@ -452,17 +427,30 @@ class TaskExecutor:
             logger.error(f"Unexpected error in run_docker_task for {container_name}: {str(e)}", exc_info=True)
             raise
 
+    async def update_schedule_status(self, schedule_id, status):
+        logger.info(f"Updating schedule status: schedule_id={schedule_id}, status={status}")
+        try:
+            schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
+            schedule_doc['status'] = status
+            await self.loop.run_in_executor(self.thread_pool, self.schedule_db.save, schedule_doc)
+            logger.info(f"Schedule status updated: schedule_id={schedule_id}, status={status}")
+        except Exception as e:
+            logger.error(f"Error updating schedule status for {schedule_id}: {str(e)}", exc_info=True)
+            raise
+
+    async def update_schedule_on_task_completion(self, schedule_id, completed_app_id):
+        try:
+            schedule_doc = await self.loop.run_in_executor(self.thread_pool, self.schedule_db.get, schedule_id)
+            schedule_doc['status'] = 'TASK_COMPLETED'
+            schedule_doc['completed_app_id'] = completed_app_id
+            await self.loop.run_in_executor(self.thread_pool, self.schedule_db.save, schedule_doc)
+            logger.info(f"Updated schedule {schedule_id} with completed task {completed_app_id}")
+        except Exception as e:
+            logger.error(f"Error updating schedule on task completion: {str(e)}", exc_info=True)
+
     async def is_final_task(self, schedule_id, app_id):
         try:
-            # Fetch schedule document from Redis
-            key = f"schedule_{schedule_id}"
-            schedule_data = await self.loop.run_in_executor(self.thread_pool, self.redis_client.get, key)
-
-            if not schedule_data:
-                logger.error(f"Schedule {schedule_id} not found in Redis")
-                return False
-
-            schedule_doc = json.loads(schedule_data)
+            schedule_doc = await self.fetch_data_with_retry(self.schedule_db, schedule_id)
             schedule = schedule_doc.get('schedule', {})
             level_info = schedule.get('level_info', {})
 
@@ -481,9 +469,12 @@ class TaskExecutor:
             for task in highest_level_tasks:
                 if task['app_id'] != app_id:
                     task_app_id = task['app_id']
-                    task_key = (schedule_id, task_app_id)
-                    if self.task_status.get(task_key) != 'COMPLETED':
-                        logger.info(f"Task {task_app_id} in schedule {schedule_id} is not completed")
+                    output_key = f"{schedule_doc['workflow_id']}_{schedule_id}_{task_app_id}_output"
+                    try:
+                        # Check if the output document exists in the database
+                        await self.fetch_data_with_retry(self.data_db, output_key)
+                    except couchdb.http.ResourceNotFound:
+                        logger.info(f"Output not found for task {task_app_id} in schedule {schedule_id}")
                         return False
 
             logger.info(f"All final level tasks are completed for schedule {schedule_id}")
@@ -492,8 +483,7 @@ class TaskExecutor:
             logger.error(f"Error checking if task is final: {str(e)}", exc_info=True)
             return False
 
-    @staticmethod
-    async def get_task_dependencies(schedule, app_id):
+    async def get_task_dependencies(self, schedule, app_id):
         logger.info(f"Getting dependencies for app_id: {app_id}")
         level_info = schedule.get('level_info', {})
 
@@ -538,10 +528,10 @@ class TaskExecutor:
 
     async def cleanup(self):
         logger.info("Cleaning up TaskExecutor")
-        if self.redis_subscriber:
-            self.redis_subscriber.cancel()
+        if self.change_feed_task:
+            self.change_feed_task.cancel()
             try:
-                await self.redis_subscriber
+                await self.change_feed_task
             except asyncio.CancelledError:
                 pass
         if self.process_tasks_task:
@@ -552,13 +542,27 @@ class TaskExecutor:
                 pass
         if self.docker_client:
             self.docker_client.close()
-        if self.redis_pubsub:
-            await self.loop.run_in_executor(self.thread_pool, self.redis_pubsub.close)
-        if self.redis_client:
-            await self.loop.run_in_executor(self.thread_pool, self.redis_client.close)
         self.thread_pool.shutdown()
         self.task_status.clear()
         logger.info("TaskExecutor cleanup complete")
+
+
+class AsyncIterator:
+    def __init__(self, sync_iterator):
+        self.sync_iterator = sync_iterator
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            next_func = partial(next, self.sync_iterator)
+            item = await asyncio.get_event_loop().run_in_executor(None, next_func)
+            logger.debug(f"AsyncIterator yielded: {item}")
+            return item
+        except StopIteration:
+            logger.debug("AsyncIterator completed")
+            raise StopAsyncIteration
 
 
 async def main():
@@ -566,7 +570,7 @@ async def main():
     executor = TaskExecutor()
     await executor.initialize()
 
-    logger.info(f"TaskExecutor initialized and running. Waiting for Redis messages on node: {CURRENT_NODE}")
+    logger.info(f"TaskExecutor initialized and running. Waiting for changes on node: {CURRENT_NODE}")
 
     try:
         while True:
@@ -578,6 +582,7 @@ async def main():
         await executor.cleanup()
 
     logger.info("Main application shutdown complete")
+
 
 if __name__ == "__main__":
     try:
