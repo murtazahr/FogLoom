@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 
 import couchdb
 from redis import RedisCluster, RedisError
@@ -40,6 +41,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         self.schedule_db = self.couch[COUCHDB_SCHEDULE_DB]
         self.data_db = self.couch[COUCHDB_DATA_DB]
         self.redis = RedisCluster.from_url(REDIS_URL, decode_responses=True)
+        self.loop = asyncio.new_event_loop()
+        self.executor = ThreadPoolExecutor(max_workers=3)
 
     @property
     def family_name(self):
@@ -53,7 +56,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
     def namespaces(self):
         return [SCHEDULE_NAMESPACE, WORKFLOW_NAMESPACE, DOCKER_IMAGE_NAMESPACE]
 
-    async def apply(self, transaction, context):
+    def apply(self, transaction, context):
         try:
             payload = json.loads(transaction.payload.decode())
             workflow_id = payload['workflow_id']
@@ -67,34 +70,13 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             if not self._validate_workflow_id(context, workflow_id):
                 raise InvalidTransaction(f"Invalid workflow ID: {workflow_id}")
 
-            if await self._check_schedule_in_redis(schedule_id):
-                logger.info(f"Schedule {schedule_id} already exists in Redis. Proceeding with blockchain update.")
-            else:
-                self.scheduler = self._initialize_scheduler(context, workflow_id)
-                schedule_result = self.scheduler.schedule()
+            # Run async operations in a separate thread
+            future = self.executor.submit(self._run_async_operations, schedule_id, workflow_id, source_url,
+                                          source_public_key, timestamp, context)
+            result = future.result()  # This will raise any exceptions that occurred in the async operations
 
-                if await self._check_schedule_in_redis(schedule_id):
-                    logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists. "
-                                f"Proceeding with blockchain update.")
-                else:
-                    # Parallel storage in Redis and CouchDB
-                    await asyncio.gather(
-                        self._store_schedule_in_redis(schedule_id, schedule_result, workflow_id, source_url,
-                                                      source_public_key, timestamp),
-                        self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id, source_url,
-                                                        source_public_key, timestamp)
-                    )
-
-            schedule_doc = await self.fetch_data_with_retry(schedule_id)
             schedule_address = self._make_schedule_address(schedule_id)
-            schedule_state_data = json.dumps({
-                'schedule_id': schedule_id,
-                'workflow_id': workflow_id,
-                'timestamp': timestamp,
-                'source_url': source_url,
-                'source_public_key': source_public_key,
-                'schedule': schedule_doc['schedule']
-            }).encode()
+            schedule_state_data = json.dumps(result).encode()
 
             logger.info(f"Writing schedule status to blockchain for schedule ID: {schedule_id}")
             context.set_state({schedule_address: schedule_state_data})
@@ -108,6 +90,39 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.error(f"Unexpected error in apply method: {str(e)}")
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
+
+    def _run_async_operations(self, schedule_id, workflow_id, source_url, source_public_key, timestamp, context):
+        return self.loop.run_until_complete(self._async_operations(schedule_id, workflow_id, source_url,
+                                                                   source_public_key, timestamp, context))
+
+    async def _async_operations(self, schedule_id, workflow_id, source_url, source_public_key, timestamp, context):
+        if await self._check_schedule_in_redis(schedule_id):
+            logger.info(f"Schedule {schedule_id} already exists in Redis. Proceeding with blockchain update.")
+        else:
+            scheduler = self._initialize_scheduler(context, workflow_id)
+            schedule_result = scheduler.schedule()
+
+            if await self._check_schedule_in_redis(schedule_id):
+                logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists. "
+                            f"Proceeding with blockchain update.")
+            else:
+                # Parallel storage in Redis and CouchDB
+                await asyncio.gather(
+                    self._store_schedule_in_redis(schedule_id, schedule_result, workflow_id,
+                                                  source_url, source_public_key, timestamp),
+                    self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id,
+                                                    source_url, source_public_key, timestamp)
+                )
+
+        schedule_doc = await self._fetch_data_with_retry(schedule_id)
+        return {
+            'schedule_id': schedule_id,
+            'workflow_id': workflow_id,
+            'timestamp': timestamp,
+            'source_url': source_url,
+            'source_public_key': source_public_key,
+            'schedule': schedule_doc['schedule']
+        }
 
     async def _store_schedule_in_couchdb(self, schedule_id, schedule_result, workflow_id, source_url,
                                          source_public_key, timestamp):
@@ -125,7 +140,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.info(f"Successfully stored schedule in CouchDB for schedule ID: {schedule_id}")
         except Exception as e:
             logger.error(f"Failed to store schedule in CouchDB: {str(e)}")
-            raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
+            raise
 
     async def _store_schedule_in_redis(self, schedule_id, schedule_result, workflow_id, source_url,
                                        source_public_key, timestamp):
@@ -147,27 +162,26 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 raise Exception("Redis set operation failed")
         except RedisError as e:
             logger.error(f"Failed to store schedule in Redis: {str(e)}")
-            raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
-        except Exception as e:
-            logger.error(f"Unexpected error while storing schedule in Redis: {str(e)}")
-            raise InvalidTransaction(f"Failed to store schedule off-chain for schedule ID: {schedule_id}")
+            raise
 
     async def _check_schedule_in_redis(self, schedule_id):
         try:
             key = f"schedule_{schedule_id}"
-            schedule_data = await self.redis.get(key)
+            schedule_data = self.redis.get(key)
             return schedule_data is not None
         except RedisError as e:
             logger.error(f"Error checking schedule in Redis: {str(e)}")
             return False
 
-    async def fetch_data_with_retry(self, schedule_id, max_retries=3, retry_delay=1):
+    async def _fetch_data_with_retry(self, schedule_id, max_retries=3, retry_delay=1):
         for attempt in range(max_retries):
             try:
+                # Try Redis first
                 redis_data = self.redis.get(f"schedule_{schedule_id}")
                 if redis_data:
                     return json.loads(redis_data)
 
+                # If not in Redis, try CouchDB
                 couchdb_data = self.schedule_db.get(schedule_id)
                 if couchdb_data:
                     return couchdb_data
