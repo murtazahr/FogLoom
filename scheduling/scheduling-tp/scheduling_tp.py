@@ -42,7 +42,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         self.data_db = self.couch[COUCHDB_DATA_DB]
         self.redis = RedisCluster.from_url(REDIS_URL, decode_responses=True)
         self.loop = asyncio.new_event_loop()
-        self.executor = ThreadPoolExecutor(max_workers=3)
+        self.thread_pool = ThreadPoolExecutor()
 
     @property
     def family_name(self):
@@ -71,8 +71,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 raise InvalidTransaction(f"Invalid workflow ID: {workflow_id}")
 
             # Run async operations in a separate thread
-            future = self.executor.submit(self._run_async_operations, schedule_id, workflow_id, source_url,
-                                          source_public_key, timestamp, context)
+            future = self.thread_pool.submit(self._run_async_operations, schedule_id, workflow_id, source_url,
+                                             source_public_key, timestamp, context)
             result = future.result()  # This will raise any exceptions that occurred in the async operations
 
             schedule_address = self._make_schedule_address(schedule_id)
@@ -157,23 +157,30 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             schedule_json = json.dumps(schedule_data)
             key = f"schedule_{schedule_id}"
 
-            # Use a pipeline to perform both operations atomically
-            pipeline = self.redis.pipeline()
-
             # Set the schedule data in Redis
-            pipeline.set(key, schedule_json)
+            set_result = await self.loop.run_in_executor(
+                self.thread_pool,
+                self.redis.set,
+                key,
+                schedule_json
+            )
+
+            if not set_result:
+                raise Exception("Redis set operation failed")
 
             # Publish the schedule data to the single "schedule" channel
             channel = "schedule"
-            pipeline.publish(channel, schedule_json)
+            publish_result = await self.loop.run_in_executor(
+                self.thread_pool,
+                self.redis.publish,
+                channel,
+                schedule_json
+            )
 
-            # Execute the pipeline
-            results = pipeline.execute()
+            if publish_result == 0:
+                logger.warning(f"No clients received the published message for schedule ID: {schedule_id}")
 
-            if all(results):
-                logger.info(f"Successfully stored and published schedule in Redis for schedule ID: {schedule_id}")
-            else:
-                raise Exception("Redis set or publish operation failed")
+            logger.info(f"Successfully stored and published schedule in Redis for schedule ID: {schedule_id}")
         except RedisError as e:
             logger.error(f"Failed to store and publish schedule in Redis: {str(e)}")
             raise

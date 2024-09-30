@@ -330,11 +330,25 @@ class TaskExecutor:
                     schedule_doc['completed_app_id'] = self.last_completed_app_id
                 updated_data = json.dumps(schedule_doc)
 
-                # Use a pipeline to perform both operations atomically
-                pipeline = self.redis_client.pipeline()
-                pipeline.set(key, updated_data)
-                pipeline.publish('schedule', updated_data)
-                await self.loop.run_in_executor(self.thread_pool, pipeline.execute)
+                # Perform SET operation
+                set_result = await self.loop.run_in_executor(
+                    self.thread_pool,
+                    self.redis_client.set,
+                    key,
+                    updated_data
+                )
+                if not set_result:
+                    raise Exception(f"Failed to update schedule {schedule_id} in Redis")
+
+                # Perform PUBLISH operation
+                publish_result = await self.loop.run_in_executor(
+                    self.thread_pool,
+                    self.redis_client.publish,
+                    'schedule',
+                    updated_data
+                )
+                if publish_result == 0:
+                    logger.warning(f"No clients received the published update for schedule {schedule_id}")
 
                 logger.info(f"Schedule status updated in Redis: schedule_id={schedule_id}, status={status}")
             else:
