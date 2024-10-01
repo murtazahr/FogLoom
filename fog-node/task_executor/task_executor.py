@@ -38,9 +38,13 @@ class TaskExecutor:
 
     async def connect_to_redis(self):
         try:
-            self.redis = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
+            # Use run_in_executor to run the synchronous RedisCluster.from_url in a separate thread
+            self.redis = await self.loop.run_in_executor(
+                self.thread_pool,
+                lambda: RedisCluster.from_url(REDIS_URL, decode_responses=True)
+            )
             logger.info("Connected to Redis cluster successfully")
-        except RedisError as e:
+        except Exception as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
             raise
 
