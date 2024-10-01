@@ -13,9 +13,6 @@ from redis import RedisError, RedisCluster
 from helper.blockchain_task_status_updater import status_update_transactor
 from helper.response_manager import ResponseManager
 
-import io
-from line_profiler import LineProfiler
-
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
@@ -23,19 +20,6 @@ logger = logging.getLogger(__name__)
 
 CURRENT_NODE = os.getenv('NODE_ID')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
-
-
-def line_profile(func):
-    def wrapper(*args, **kwargs):
-        prof = LineProfiler()
-        try:
-            return prof(func)(*args, **kwargs)
-        finally:
-            s = io.StringIO()
-            prof.print_stats(stream=s)
-            print(f'LINE PROFILER RESULTS FOR {func.__name__}:')
-            print(s.getvalue())
-    return wrapper
 
 
 class TaskExecutor:
@@ -76,7 +60,6 @@ class TaskExecutor:
 
         logger.info("TaskExecutor initialization complete")
 
-    @line_profile
     def schedule_event_handler(self, message):
         try:
             logger.info(f"Received message: {message}")
@@ -87,7 +70,6 @@ class TaskExecutor:
         except Exception as e:
             logger.error(f"Error in event listener: {str(e)}", exc_info=True)
 
-    @line_profile
     async def process_schedule(self, schedule_data):
         try:
             schedule_id = schedule_data.get('schedule_id')
@@ -224,7 +206,6 @@ class TaskExecutor:
         logger.info(f"All dependencies met for app_id {app_id} in schedule {schedule_id}")
         return True
 
-    @line_profile
     async def process_tasks(self):
         logger.info("Starting task processing loop")
         while True:
@@ -306,7 +287,6 @@ class TaskExecutor:
             logger.error(f"Error updating schedule status for {schedule_id}: {str(e)}", exc_info=True)
             raise
 
-    @line_profile
     async def execute_task(self, workflow_id, schedule_id, app_id):
         logger.info(f"Executing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
         task_key = (schedule_id, app_id)
@@ -440,7 +420,6 @@ class TaskExecutor:
 
         return dependency_outputs
 
-    @line_profile
     async def run_docker_task(self, app_id, input_data):
         container_name = f"sawtooth-{app_id}"
         logger.info(f"Starting run_docker_task for container: {container_name}")
