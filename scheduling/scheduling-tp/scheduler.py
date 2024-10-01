@@ -6,9 +6,10 @@ from abc import ABC, abstractmethod
 import couchdb
 import random
 import logging
+import asyncio
 
-from redis import RedisError
-from redis.cluster import RedisCluster
+from coredis import RedisCluster
+from coredis.exceptions import RedisError
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ class BaseScheduler(ABC):
         pass
 
     @abstractmethod
-    def schedule(self) -> Dict[str, List[str]]:
+    async def schedule(self) -> Dict[str, List[str]]:
         pass
 
 
@@ -46,9 +47,13 @@ class LCDWRRScheduler(BaseScheduler):
         self.app_requirements = app_requirements
         self.couch = couchdb.Server(db_config['url'])
         self.db = self.couch[db_config['name']]
-        self.redis = RedisCluster.from_url(redis_config['url'], decode_responses=True)
+        self.redis = None
+        self.redis_config = redis_config
         self.max_retries = 3
         self.retry_delay = 5  # seconds
+
+    async def initialize_redis(self):
+        self.redis = await RedisCluster.from_url(self.redis_config['url'], decode_responses=True)
 
     @staticmethod
     def calculate_load(node: Dict) -> float:
@@ -59,7 +64,8 @@ class LCDWRRScheduler(BaseScheduler):
     @staticmethod
     def calculate_available_resources(node: Dict) -> Dict[str, float]:
         cpu_available = node['resource_data']['cpu']['total'] * (1 - node['resource_data']['cpu']['used_percent'] / 100)
-        memory_available = node['resource_data']['memory']['total'] * (1 - node['resource_data']['memory']['used_percent'] / 100)
+        memory_available = node['resource_data']['memory']['total'] * (
+                    1 - node['resource_data']['memory']['used_percent'] / 100)
         return {
             'cpu': cpu_available,
             'memory': memory_available
@@ -103,14 +109,17 @@ class LCDWRRScheduler(BaseScheduler):
                 return True
         return False
 
-    def get_latest_node_data(self):
+    async def get_latest_node_data(self):
+        if not self.redis:
+            await self.initialize_redis()
+
         node_resources = {'rows': []}
 
         try:
             # Use scan_iter to get all keys matching the pattern across the cluster
-            for key in self.redis.scan_iter(match='resources_*'):
+            async for key in self.redis.scan_iter(match='resources_*'):
                 node_id = key.split('_', 1)[1]
-                redis_data = self.redis.get(key)
+                redis_data = await self.redis.get(key)
                 if redis_data:
                     resource_data = json.loads(redis_data)
                     node_resources['rows'].append({
@@ -138,7 +147,7 @@ class LCDWRRScheduler(BaseScheduler):
                         doc['resource_data'] = latest_data
                         # Update Redis with this data for future use
                         redis_key = f"resources_{row.id}"
-                        self.redis.set(redis_key, json.dumps(latest_data))
+                        await self.redis.set(redis_key, json.dumps(latest_data))
                         logger.debug(f"Data for node {row.id} fetched from CouchDB and updated in Redis")
                         node_resources['rows'].append({'id': row.id, 'doc': doc})
                     else:
@@ -146,8 +155,8 @@ class LCDWRRScheduler(BaseScheduler):
 
         return node_resources
 
-    def schedule(self) -> Dict[str, Any]:
-        node_resources = self.get_latest_node_data()
+    async def schedule(self) -> Dict[str, Any]:
+        node_resources = await self.get_latest_node_data()
         node_schedule = {node['id']: [] for node in node_resources['rows']}
         unscheduled_tasks = []
 
@@ -175,8 +184,8 @@ class LCDWRRScheduler(BaseScheduler):
                     except NodeSelectionError as e:
                         logger.warning(f"Attempt {attempt + 1} failed for {app_id}: {str(e)}")
                         if attempt < self.max_retries - 1:
-                            time.sleep(self.retry_delay)
-                            node_resources = self.get_latest_node_data()
+                            await asyncio.sleep(self.retry_delay)
+                            node_resources = await self.get_latest_node_data()
                         else:
                             logger.error(f"Failed to schedule {app_id} after {self.max_retries} attempts")
 
