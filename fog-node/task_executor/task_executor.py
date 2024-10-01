@@ -8,7 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 import docker
 from cachetools import TTLCache
 from docker import errors
-from redis.asyncio import RedisError, RedisCluster
+from coredis import RedisCluster
+from coredis.exceptions import RedisError
 
 from helper.blockchain_task_status_updater import status_update_transactor
 from helper.response_manager import ResponseManager
