@@ -170,11 +170,15 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 raise Exception("Redis set operation failed")
 
             # Add the schedule data to the Redis Stream
+            stream_data = {
+                'schedule_id': schedule_id,
+                'data': schedule_json  # Use the JSON string for the stream
+            }
             stream_result = await self.loop.run_in_executor(
                 self.thread_pool,
                 self.redis.xadd,
                 self.stream_name,
-                schedule_data
+                stream_data
             )
 
             if not stream_result:

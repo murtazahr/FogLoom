@@ -64,7 +64,7 @@ class TaskExecutor:
         while True:
             try:
                 # Read new messages from the stream
-                messages = await self.redis.xread({self.stream_name: last_id}, count=1, block=0)
+                messages = self.redis.xread({self.stream_name: last_id}, count=1, block=0)
 
                 if messages:
                     for stream, message_list in messages:
