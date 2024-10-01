@@ -264,7 +264,7 @@ class TaskExecutor:
         try:
             # Retrieve the schedule from Redis
             schedule_key = f"schedule_{schedule_id}"
-            schedule_json = await self.loop.run_in_executor(self.thread_pool, self.redis.get, schedule_key)
+            schedule_json = self.redis.get(schedule_key)
 
             if not schedule_json:
                 raise Exception(f"Schedule {schedule_id} not found in Redis")
@@ -274,15 +274,10 @@ class TaskExecutor:
 
             # Save the updated schedule back to Redis
             updated_schedule_json = json.dumps(schedule_doc)
-            await self.loop.run_in_executor(self.thread_pool, self.redis.set, schedule_key, updated_schedule_json)
+            self.redis.set(schedule_key, updated_schedule_json)
 
             # Publish the updated schedule
-            await self.loop.run_in_executor(
-                self.thread_pool,
-                self.redis.publish,
-                self.channel_name,
-                schedule_json
-            )
+            self.redis.publish(self.channel_name, schedule_json)
 
             logger.info(f"Schedule status updated: schedule_id={schedule_id}, status={status}")
         except RedisError as e:
@@ -341,7 +336,7 @@ class TaskExecutor:
                 'workflow_id': workflow_id,
                 'schedule_id': schedule_id
             })
-            await self.loop.run_in_executor(self.thread_pool, self.redis.set, output_key, output_json)
+            self.redis.set(output_key, output_json)
             logger.info(f"Task output stored: {output_key}")
             self.task_status[task_key] = 'COMPLETED'
         except Exception as e:
@@ -362,15 +357,10 @@ class TaskExecutor:
             updated_schedule_json = json.dumps(schedule_doc)
 
             # Update the schedule in Redis
-            await self.loop.run_in_executor(self.thread_pool, self.redis.set, schedule_key, updated_schedule_json)
+            self.redis.set(schedule_key, updated_schedule_json)
 
             # Publish the updated schedule
-            await self.loop.run_in_executor(
-                self.thread_pool,
-                self.redis.publish,
-                self.channel_name,
-                updated_schedule_json
-            )
+            self.redis.publish(self.channel_name, updated_schedule_json)
 
             logger.info(f"Updated schedule {schedule_id} with completed task {completed_app_id}")
         except Exception as e:
@@ -380,7 +370,7 @@ class TaskExecutor:
         delay = initial_delay
         for attempt in range(max_retries):
             try:
-                data = await self.loop.run_in_executor(self.thread_pool, self.redis.get, key)
+                data = self.redis.get(key)
                 if data is None:
                     raise KeyError(f"Data not found for key: {key}")
                 return data
