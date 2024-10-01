@@ -28,6 +28,7 @@ class TaskExecutor:
         self.docker_client = docker.from_env()
         self.thread_pool = ThreadPoolExecutor()
         self.loop = asyncio.get_event_loop()
+        self.listen_for_schedules = None
         self.process_tasks_task = None
         self.processed_changes = TTLCache(maxsize=1000, ttl=300)  # Cache for 5 minutes
         self.task_status = {}
@@ -44,7 +45,7 @@ class TaskExecutor:
                 lambda: RedisCluster.from_url(REDIS_URL, decode_responses=True)
             )
             self.pubsub = self.redis.pubsub()
-            self.pubsub.subscribe(**{self.channel_name: self.schedule_event_handler})
+            self.pubsub.subscribe(self.channel_name)
             logger.info("Connected to Redis cluster and subscribed to channel successfully")
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
@@ -55,20 +56,25 @@ class TaskExecutor:
         await self.connect_to_redis()
 
         # Start the Redis Stream listener and task processor
-        self.pubsub.run_in_thread(sleep_time=0.001)
+        self.listen_for_schedules = self.loop.create_task(self.listen_for_events())
         self.process_tasks_task = self.loop.create_task(self.process_tasks())
 
         logger.info("TaskExecutor initialization complete")
 
-    def schedule_event_handler(self, message):
-        try:
-            logger.info(f"Received message: {message}")
-            schedule_data = json.loads(message['data'])
-            asyncio.run(self.process_schedule(schedule_data))
-        except asyncio.CancelledError:
-            logger.info("Event listener cancelled")
-        except Exception as e:
-            logger.error(f"Error in event listener: {str(e)}", exc_info=True)
+    async def listen_for_events(self):
+        logger.info(f"Starting to listen for events on the '{self.channel_name}' channel")
+
+        for message in self.pubsub.listen():
+            try:
+                if message:
+                    schedule_data = json.loads(message['data'])
+                    await self.process_schedule(schedule_data)
+            except asyncio.CancelledError:
+                logger.info("Event listener cancelled")
+                break
+            except Exception as e:
+                logger.error(f"Error in event listener: {str(e)}", exc_info=True)
+                await asyncio.sleep(1)
 
     async def process_schedule(self, schedule_data):
         try:
@@ -557,6 +563,13 @@ class TaskExecutor:
 
     async def cleanup(self):
         logger.info("Cleaning up TaskExecutor")
+
+        if self.listen_for_schedules:
+            self.listen_for_schedules.cancel()
+            try:
+                await self.listen_for_schedules
+            except asyncio.CancelledError:
+                pass
 
         if self.process_tasks_task:
             self.process_tasks_task.cancel()
