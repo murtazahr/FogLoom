@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import docker
 from cachetools import TTLCache
 from docker import errors
-from redis import RedisError, RedisCluster
+from redis.asyncio import RedisError, RedisCluster
 
 from helper.blockchain_task_status_updater import status_update_transactor
 from helper.response_manager import ResponseManager
@@ -33,20 +33,12 @@ class TaskExecutor:
         self.processed_changes = TTLCache(maxsize=1000, ttl=300)  # Cache for 5 minutes
         self.task_status = {}
         self.redis = None
-        self.pubsub = None
         self.channel_name = 'schedule'
-        logger.info("TaskExecutor initialized")
 
     async def connect_to_redis(self):
         try:
-            # Use run_in_executor to run the synchronous RedisCluster.from_url in a separate thread
-            self.redis = await self.loop.run_in_executor(
-                self.thread_pool,
-                lambda: RedisCluster.from_url(REDIS_URL, decode_responses=True)
-            )
-            self.pubsub = self.redis.pubsub()
-            self.pubsub.subscribe(self.channel_name)
-            logger.info("Connected to Redis cluster and subscribed to channel successfully")
+            self.redis = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
+            logger.info("Connected to Redis cluster successfully")
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
             raise
@@ -63,19 +55,35 @@ class TaskExecutor:
 
     async def listen_for_events(self):
         logger.info(f"Starting to listen for events on the '{self.channel_name}' channel")
+        pubsub = None
+        try:
+            pubsub = self.redis.pubsub()
+            await pubsub.subscribe(self.channel_name)
 
-        for message in self.pubsub.listen():
-            try:
-                if message and message['type'] == 'message':
-                    logger.info(f"Received message: {message}")
-                    schedule_data = json.loads(message['data'])
-                    await self.process_schedule(schedule_data)
-            except asyncio.CancelledError:
-                logger.info("Event listener cancelled")
-                break
-            except Exception as e:
-                logger.error(f"Error in event listener: {str(e)}", exc_info=True)
-                await asyncio.sleep(1)
+            while True:
+                try:
+                    message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                    if message:
+                        logger.info(f"Received message: {message}")
+                        schedule_data = json.loads(message['data'])
+                        await self.process_schedule(schedule_data)
+                except asyncio.CancelledError:
+                    logger.info("Event listener cancelled")
+                    break
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error decoding message: {str(e)}", exc_info=True)
+                except Exception as e:
+                    logger.error(f"Error in event listener: {str(e)}", exc_info=True)
+                    await asyncio.sleep(1)
+        except Exception as e:
+            logger.error(f"Error setting up pubsub: {str(e)}", exc_info=True)
+        finally:
+            if pubsub:
+                try:
+                    await pubsub.unsubscribe(self.channel_name)
+                    await pubsub.close()
+                except Exception as e:
+                    logger.error(f"Error closing pubsub connection: {str(e)}", exc_info=True)
 
     async def process_schedule(self, schedule_data):
         try:
@@ -271,7 +279,7 @@ class TaskExecutor:
         try:
             # Retrieve the schedule from Redis
             schedule_key = f"schedule_{schedule_id}"
-            schedule_json = self.redis.get(schedule_key)
+            schedule_json = await self.redis.get(schedule_key)
 
             if not schedule_json:
                 raise Exception(f"Schedule {schedule_id} not found in Redis")
@@ -281,15 +289,12 @@ class TaskExecutor:
 
             # Save the updated schedule back to Redis
             updated_schedule_json = json.dumps(schedule_doc)
-            self.redis.set(schedule_key, updated_schedule_json)
+            await self.redis.set(schedule_key, updated_schedule_json)
 
             # Publish the updated schedule
-            self.redis.publish(self.channel_name, schedule_json)
+            await self.redis.publish(self.channel_name, updated_schedule_json)
 
             logger.info(f"Schedule status updated: schedule_id={schedule_id}, status={status}")
-        except RedisError as e:
-            logger.error(f"Redis error updating schedule status for {schedule_id}: {str(e)}", exc_info=True)
-            raise
         except Exception as e:
             logger.error(f"Error updating schedule status for {schedule_id}: {str(e)}", exc_info=True)
             raise
@@ -364,10 +369,10 @@ class TaskExecutor:
             updated_schedule_json = json.dumps(schedule_doc)
 
             # Update the schedule in Redis
-            self.redis.set(schedule_key, updated_schedule_json)
+            await self.redis.set(schedule_key, updated_schedule_json)
 
             # Publish the updated schedule
-            self.redis.publish(self.channel_name, updated_schedule_json)
+            await self.redis.publish(self.channel_name, updated_schedule_json)
 
             logger.info(f"Updated schedule {schedule_id} with completed task {completed_app_id}")
         except Exception as e:
@@ -377,7 +382,7 @@ class TaskExecutor:
         delay = initial_delay
         for attempt in range(max_retries):
             try:
-                data = self.redis.get(key)
+                data = await self.redis.get(key)
                 if data is None:
                     raise KeyError(f"Data not found for key: {key}")
                 return data
@@ -389,9 +394,6 @@ class TaskExecutor:
                     f"Data not found for key {key}, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries})")
                 await asyncio.sleep(delay)
                 delay *= 2  # Exponential backoff
-            except RedisError as e:
-                logger.error(f"Redis error fetching data for key {key}: {str(e)}", exc_info=True)
-                raise
             except Exception as e:
                 logger.error(f"Unexpected error fetching data for key {key}: {str(e)}", exc_info=True)
                 raise
@@ -524,11 +526,11 @@ class TaskExecutor:
                     output_key = f"iot_data_{schedule_doc['workflow_id']}_{schedule_id}_{task_app_id}_output"
                     try:
                         # Check if the output exists in Redis
-                        exists = await self.loop.run_in_executor(self.thread_pool, self.redis.exists, output_key)
+                        exists = await self.redis.exists(output_key)
                         if not exists:
                             logger.info(f"Output not found for task {task_app_id} in schedule {schedule_id}")
                             return False
-                    except RedisError as e:
+                    except Exception as e:
                         logger.error(f"Redis error checking output for task {task_app_id}: {str(e)}", exc_info=True)
                         return False
 
@@ -580,13 +582,9 @@ class TaskExecutor:
                 pass
 
         # Close the Redis connection
-        if hasattr(self, 'redis') and self.redis:
+        if self.redis:
             await self.redis.close()
             logger.info("Redis connection closed")
-
-        if hasattr(self, 'pubsub') and self.pubsub:
-            await self.loop.run_in_executor(self.thread_pool, self.pubsub.close)
-            logger.info("Pubsub connection closed")
 
         # Close the Docker client (unchanged)
         if self.docker_client:
