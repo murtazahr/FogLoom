@@ -69,7 +69,7 @@ class TaskExecutor:
                 if messages:
                     for stream, message_list in messages:
                         for message_id, message_data in message_list:
-                            await self.process_schedule(message_data)
+                            await self.process_schedule(json.loads(message_data['data']))
                             last_id = message_id
 
             except asyncio.CancelledError:
@@ -86,7 +86,7 @@ class TaskExecutor:
 
     async def process_schedule(self, schedule_data):
         try:
-            schedule_id = schedule_data.get('_id')
+            schedule_id = schedule_data.get('schedule_id')
             current_status = schedule_data.get('status')
 
             if not schedule_id or not current_status:
@@ -122,15 +122,15 @@ class TaskExecutor:
             logger.error(f"Error processing schedule: {str(e)}", exc_info=True)
 
     async def handle_new_schedule(self, schedule_doc):
-        logger.info(f"Handling new schedule: {schedule_doc['_id']}")
+        logger.info(f"Handling new schedule: {schedule_doc['schedule_id']}")
         schedule = schedule_doc.get('schedule')
         if not schedule:
-            logger.warning(f"Schedule document {schedule_doc['_id']} does not contain a 'schedule' field")
+            logger.warning(f"Schedule document {schedule_doc['schedule_id']} does not contain a 'schedule' field")
             return
         node_schedule = schedule.get('node_schedule', {})
 
         workflow_id = schedule_doc.get('workflow_id')
-        schedule_id = schedule_doc['_id']
+        schedule_id = schedule_doc['schedule_id']
 
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
@@ -154,8 +154,8 @@ class TaskExecutor:
             logger.info(f"No tasks for current node {CURRENT_NODE} in this schedule")
 
     async def handle_task_completion(self, schedule_doc):
-        logger.info(f"Handling task completion for schedule: {schedule_doc['_id']}")
-        schedule_id = schedule_doc['_id']
+        logger.info(f"Handling task completion for schedule: {schedule_doc['schedule_id']}")
+        schedule_id = schedule_doc['schedule_id']
         completed_app_id = schedule_doc.get('completed_app_id')
 
         if not completed_app_id:
