@@ -62,8 +62,8 @@ class TaskExecutor:
 
     def schedule_event_handler(self, message):
         try:
-            schedule_data = json.loads(message)
-            asyncio.run(self.process_schedule(schedule_data))
+            logger.info(f"Received message: {message}")
+            asyncio.run(self.process_schedule(message))
         except asyncio.CancelledError:
             logger.info("Event listener cancelled")
         except Exception as e:
