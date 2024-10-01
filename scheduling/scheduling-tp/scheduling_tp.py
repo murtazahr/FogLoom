@@ -107,7 +107,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.info(f"Schedule {schedule_id} already exists in Redis. Proceeding with blockchain update.")
         else:
             scheduler = self._initialize_scheduler(context, workflow_id)
-            schedule_result = scheduler.schedule()
+            schedule_result = await scheduler.schedule()  # Await the coroutine here
 
             if await self._check_schedule_in_redis(schedule_id):
                 logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists. "
