@@ -66,7 +66,8 @@ class TaskExecutor:
 
         for message in self.pubsub.listen():
             try:
-                if message:
+                if message and message['type'] == 'message':
+                    logger.info(f"Received message: {message}")
                     schedule_data = json.loads(message['data'])
                     await self.process_schedule(schedule_data)
             except asyncio.CancelledError:
