@@ -295,7 +295,7 @@ class TaskExecutor:
                 self.thread_pool,
                 self.redis.xadd,
                 self.stream_name,
-                {'schedule_id': schedule_id, 'status': status}
+                {'schedule_id': schedule_id, 'data': schedule_json}
             )
 
             logger.info(f"Schedule status updated: schedule_id={schedule_id}, status={status}")
@@ -383,7 +383,7 @@ class TaskExecutor:
                 self.thread_pool,
                 self.redis.xadd,
                 self.stream_name,
-                {'schedule_id': schedule_id, 'status': 'TASK_COMPLETED', 'completed_app_id': completed_app_id}
+                {'schedule_id': schedule_id, 'data': updated_schedule_json}
             )
 
             logger.info(f"Updated schedule {schedule_id} with completed task {completed_app_id}")

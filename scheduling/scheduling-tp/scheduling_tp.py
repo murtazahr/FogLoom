@@ -152,7 +152,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 'workflow_id': workflow_id,
                 'source_url': source_url,
                 'source_public_key': source_public_key,
-                'timestamp': timestamp,
+                'timestamp': str(timestamp),
                 'status': 'ACTIVE'
             }
             schedule_json = json.dumps(schedule_data)
@@ -171,7 +171,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
             # Add the schedule data to the Redis Stream
             stream_data = {
-                'schedule_id': schedule_id,
+                'schedule_id': str(schedule_id),
                 'data': schedule_json  # Use the JSON string for the stream
             }
             stream_result = await self.loop.run_in_executor(
