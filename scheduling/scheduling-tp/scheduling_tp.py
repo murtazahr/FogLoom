@@ -7,7 +7,8 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 
 import couchdb
-from redis import RedisCluster, RedisError
+from coredis import RedisCluster
+from coredis.exceptions import RedisError
 from sawtooth_sdk.processor.core import TransactionProcessor
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
@@ -40,9 +41,9 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         self.couch = couchdb.Server(COUCHDB_URL)
         self.schedule_db = self.couch[COUCHDB_SCHEDULE_DB]
         self.data_db = self.couch[COUCHDB_DATA_DB]
-        self.redis = RedisCluster.from_url(REDIS_URL, decode_responses=True)
-        self.loop = asyncio.new_event_loop()
-        self.thread_pool = ThreadPoolExecutor(max_workers=3)
+        self.redis = None
+        self.loop = asyncio.get_event_loop()
+        self.thread_pool = ThreadPoolExecutor()
 
     @property
     def family_name(self):
@@ -91,11 +92,17 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
 
+    async def initialize_redis(self):
+        self.redis = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
+
     def _run_async_operations(self, schedule_id, workflow_id, source_url, source_public_key, timestamp, context):
         return self.loop.run_until_complete(self._async_operations(schedule_id, workflow_id, source_url,
                                                                    source_public_key, timestamp, context))
 
     async def _async_operations(self, schedule_id, workflow_id, source_url, source_public_key, timestamp, context):
+        if not self.redis:
+            await self.initialize_redis()
+
         if await self._check_schedule_in_redis(schedule_id):
             logger.info(f"Schedule {schedule_id} already exists in Redis. Proceeding with blockchain update.")
         else:
@@ -158,24 +165,11 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             key = f"schedule_{schedule_id}"
 
             # Set the schedule data in Redis
-            set_result = await self.loop.run_in_executor(
-                self.thread_pool,
-                self.redis.set,
-                key,
-                schedule_json
-            )
-
-            if not set_result:
-                raise Exception("Redis set operation failed")
+            await self.redis.set(key, schedule_json)
 
             # Publish the schedule data to the single "schedule" channel
             channel = "schedule"
-            publish_result = await self.loop.run_in_executor(
-                self.thread_pool,
-                self.redis.publish,
-                channel,
-                schedule_json
-            )
+            publish_result = await self.redis.publish(channel, schedule_json)
 
             if publish_result == 0:
                 logger.warning(f"No clients received the published message for schedule ID: {schedule_id}")
@@ -191,7 +185,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
     async def _check_schedule_in_redis(self, schedule_id):
         try:
             key = f"schedule_{schedule_id}"
-            schedule_data = self.redis.get(key)
+            schedule_data = await self.redis.get(key)
             return schedule_data is not None
         except RedisError as e:
             logger.error(f"Error checking schedule in Redis: {str(e)}")
@@ -201,7 +195,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         for attempt in range(max_retries):
             try:
                 # Try Redis first
-                redis_data = self.redis.get(f"schedule_{schedule_id}")
+                redis_data = await self.redis.get(f"schedule_{schedule_id}")
                 if redis_data:
                     return json.loads(redis_data)
 

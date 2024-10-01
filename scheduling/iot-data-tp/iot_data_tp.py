@@ -7,7 +7,8 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 
 import couchdb
-from redis import RedisCluster, RedisError
+from coredis import RedisCluster
+from coredis.exceptions import RedisError
 from sawtooth_sdk.processor.core import TransactionProcessor
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
@@ -33,9 +34,12 @@ class IoTDataTransactionHandler(TransactionHandler):
     def __init__(self):
         self.couch = couchdb.Server(COUCHDB_URL)
         self.data_db = self.couch[COUCHDB_DATA_DB]
-        self.redis = RedisCluster.from_url(REDIS_URL, decode_responses=True)
-        self.loop = asyncio.new_event_loop()
+        self.redis = None
+        self.loop = asyncio.get_event_loop()
         self.executor = ThreadPoolExecutor(max_workers=3)
+
+    async def initialize_redis(self):
+        self.redis = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
 
     @property
     def family_name(self):
@@ -67,7 +71,8 @@ class IoTDataTransactionHandler(TransactionHandler):
             iot_data_hash = self._calculate_hash(iot_data)
 
             # Run async operations in a separate thread
-            future = self.executor.submit(self._run_async_operations, context, workflow_id, schedule_id, iot_data, iot_data_hash)
+            future = self.executor.submit(self._run_async_operations, context, workflow_id, schedule_id, iot_data,
+                                          iot_data_hash)
             future.result()  # This will raise any exceptions that occurred in the async operations
 
             iot_data_address = self._make_iot_data_address(schedule_id)
@@ -91,9 +96,13 @@ class IoTDataTransactionHandler(TransactionHandler):
             raise InvalidTransaction(str(e))
 
     def _run_async_operations(self, context, workflow_id, schedule_id, iot_data, iot_data_hash):
-        return self.loop.run_until_complete(self._async_operations(context, workflow_id, schedule_id, iot_data, iot_data_hash))
+        return self.loop.run_until_complete(
+            self._async_operations(context, workflow_id, schedule_id, iot_data, iot_data_hash))
 
     async def _async_operations(self, context, workflow_id, schedule_id, iot_data, iot_data_hash):
+        if not self.redis:
+            await self.initialize_redis()
+
         dependency_graph = self._get_dependency_graph(context, workflow_id)
         data_id = self._generate_data_id(workflow_id, schedule_id, dependency_graph["start"], 'input')
 
@@ -111,7 +120,7 @@ class IoTDataTransactionHandler(TransactionHandler):
                 'workflow_id': workflow_id,
                 'schedule_id': schedule_id
             })
-            result = self.redis.set(f"iot_data_{data_id}", data_json)
+            result = await self.redis.set(f"iot_data_{data_id}", data_json)
             if result:
                 logger.info(f"Successfully stored IoT data in Redis for ID: {data_id}")
             else:

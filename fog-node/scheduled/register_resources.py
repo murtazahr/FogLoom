@@ -4,10 +4,12 @@ import os
 import sys
 import time
 import json
+import asyncio
 import psutil
 import couchdb
 from couchdb import ResourceNotFound, Unauthorized
-from redis.cluster import RedisCluster
+from coredis import RedisCluster
+from coredis.exceptions import RedisError
 
 from sawtooth_sdk.messaging.stream import Stream
 from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
@@ -108,36 +110,36 @@ def connect_to_couchdb(max_retries=5, retry_delay=5):
     return None
 
 
-def connect_to_redis(max_retries=5, retry_delay=5):
+async def connect_to_redis(max_retries=5, retry_delay=5):
     logger.info(f'Connecting to Redis cluster at {REDIS_URL}')
     for attempt in range(max_retries):
         try:
-            redis_cluster = RedisCluster.from_url(REDIS_URL, decode_responses=True)
+            redis_cluster = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
             logger.info("Successfully connected to Redis cluster.")
             return redis_cluster
-        except Exception as e:
+        except RedisError as e:
             logger.error(f"Error connecting to Redis cluster: {str(e)}")
             if attempt < max_retries - 1:
                 logger.warning(f"Retrying in {retry_delay} seconds. Attempt {attempt + 1}/{max_retries}")
-                time.sleep(retry_delay)
+                await asyncio.sleep(retry_delay)
             else:
                 logger.error(f"Failed to connect to Redis cluster after {max_retries} attempts.")
                 return None
 
 
-def update_redis(redis_cluster, node_id, resource_data):
+async def update_redis(redis_cluster, node_id, resource_data):
     try:
         key = f"resources_{node_id}"
-        # Measure the time taken for the CouchDB write operation
+        # Measure the time taken for the Redis write operation
         start_time = time.time()
-        redis_cluster.set(key, json.dumps(resource_data))
+        await redis_cluster.set(key, json.dumps(resource_data))
         end_time = time.time()
 
         write_time = end_time - start_time
         logger.info(f"Updated resource data for node {node_id} in Redis. Write time: {write_time:.4f} seconds")
 
         logger.info(f"Updated Redis with latest resource data for node {node_id}")
-    except Exception as e:
+    except RedisError as e:
         logger.error(f"Error updating Redis for node {node_id}: {str(e)}")
 
 
@@ -250,7 +252,7 @@ def submit_batch(batch):
     logger.info(f"Submitted batch to validator: {result}")
 
 
-def main():
+async def main():
     logger.info("Starting Resource Registration Client")
     node_id = os.getenv('NODE_ID', 'unrecognized_node')
 
@@ -268,7 +270,7 @@ def main():
         logger.error("Couldn't connect to CouchDB. Exiting.")
         sys.exit(1)
 
-    redis_cluster = connect_to_redis()
+    redis_cluster = await connect_to_redis()
     if not redis_cluster:
         logger.error("Couldn't connect to Redis cluster. Exiting.")
         sys.exit(1)
@@ -284,7 +286,7 @@ def main():
                     updates.append(update_info)
 
                     # Update Redis with the latest resource data
-                    update_redis(redis_cluster, node_id, resource_data)
+                    await update_redis(redis_cluster, node_id, resource_data)
 
                     if len(updates) >= BLOCKCHAIN_BATCH_SIZE:
                         transaction = create_transaction(node_id, updates, signer)
@@ -296,9 +298,9 @@ def main():
                 logger.warning("Failed to get resource data")
         except Exception as e:
             logger.error(f"Error in main loop: {str(e)}")
-        time.sleep(UPDATE_INTERVAL)
-
+        await asyncio.sleep(UPDATE_INTERVAL)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    main()
+    import asyncio
+    asyncio.run(main())
