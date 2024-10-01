@@ -28,12 +28,12 @@ class TaskExecutor:
         self.docker_client = docker.from_env()
         self.thread_pool = ThreadPoolExecutor()
         self.loop = asyncio.get_event_loop()
-        self.stream_listener_task = None
         self.process_tasks_task = None
         self.processed_changes = TTLCache(maxsize=1000, ttl=300)  # Cache for 5 minutes
         self.task_status = {}
         self.redis = None
-        self.stream_name = 'schedule_stream'
+        self.pubsub = None
+        self.channel_name = 'schedule'
         logger.info("TaskExecutor initialized")
 
     async def connect_to_redis(self):
@@ -43,7 +43,9 @@ class TaskExecutor:
                 self.thread_pool,
                 lambda: RedisCluster.from_url(REDIS_URL, decode_responses=True)
             )
-            logger.info("Connected to Redis cluster successfully")
+            self.pubsub = self.redis.pubsub()
+            self.pubsub.subscribe(**{self.channel_name: self.schedule_event_handler})
+            logger.info("Connected to Redis cluster and subscribed to channel successfully")
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
             raise
@@ -53,36 +55,19 @@ class TaskExecutor:
         await self.connect_to_redis()
 
         # Start the Redis Stream listener and task processor
-        self.stream_listener_task = self.loop.create_task(self.listen_for_stream_messages())
+        self.pubsub.run_in_thread(sleep_time=0.001)
         self.process_tasks_task = self.loop.create_task(self.process_tasks())
 
         logger.info("TaskExecutor initialization complete")
 
-    async def listen_for_stream_messages(self):
-        logger.info(f"Starting to listen for messages on the '{self.stream_name}' stream")
-        last_id = '0'  # Start with the earliest message
-        while True:
-            try:
-                # Read new messages from the stream
-                messages = self.redis.xread({self.stream_name: last_id}, count=1, block=0)
-
-                if messages:
-                    for stream, message_list in messages:
-                        for message_id, message_data in message_list:
-                            await self.process_schedule(json.loads(message_data['data']))
-                            last_id = message_id
-
-            except asyncio.CancelledError:
-                logger.info("Redis stream listener cancelled")
-                break
-            except RedisError as e:
-                logger.error(f"Redis error: {str(e)}")
-                await asyncio.sleep(1)  # Wait before retrying
-            except Exception as e:
-                logger.error(f"Error in Redis stream listener: {str(e)}", exc_info=True)
-                await asyncio.sleep(5)  # Wait before trying to reconnect
-
-        logger.info("Redis stream listener stopped")
+    def schedule_event_handler(self, message):
+        try:
+            schedule_data = json.loads(message)
+            asyncio.run(self.process_schedule(schedule_data))
+        except asyncio.CancelledError:
+            logger.info("Event listener cancelled")
+        except Exception as e:
+            logger.error(f"Error in event listener: {str(e)}", exc_info=True)
 
     async def process_schedule(self, schedule_data):
         try:
@@ -290,12 +275,12 @@ class TaskExecutor:
             updated_schedule_json = json.dumps(schedule_doc)
             await self.loop.run_in_executor(self.thread_pool, self.redis.set, schedule_key, updated_schedule_json)
 
-            # Publish the updated schedule to the Redis stream
+            # Publish the updated schedule
             await self.loop.run_in_executor(
                 self.thread_pool,
-                self.redis.xadd,
-                self.stream_name,
-                {'schedule_id': schedule_id, 'data': schedule_json}
+                self.redis.publish,
+                self.channel_name,
+                schedule_json
             )
 
             logger.info(f"Schedule status updated: schedule_id={schedule_id}, status={status}")
@@ -378,12 +363,12 @@ class TaskExecutor:
             # Update the schedule in Redis
             await self.loop.run_in_executor(self.thread_pool, self.redis.set, schedule_key, updated_schedule_json)
 
-            # Publish the updated schedule to the Redis stream
+            # Publish the updated schedule
             await self.loop.run_in_executor(
                 self.thread_pool,
-                self.redis.xadd,
-                self.stream_name,
-                {'schedule_id': schedule_id, 'data': updated_schedule_json}
+                self.redis.publish,
+                self.channel_name,
+                updated_schedule_json
             )
 
             logger.info(f"Updated schedule {schedule_id} with completed task {completed_app_id}")
@@ -582,14 +567,6 @@ class TaskExecutor:
     async def cleanup(self):
         logger.info("Cleaning up TaskExecutor")
 
-        # Cancel the Redis stream listener task
-        if hasattr(self, 'stream_listener_task') and self.stream_listener_task:
-            self.stream_listener_task.cancel()
-            try:
-                await self.stream_listener_task
-            except asyncio.CancelledError:
-                pass
-
         if self.process_tasks_task:
             self.process_tasks_task.cancel()
             try:
@@ -601,6 +578,10 @@ class TaskExecutor:
         if hasattr(self, 'redis') and self.redis:
             await self.redis.close()
             logger.info("Redis connection closed")
+
+        if hasattr(self, 'pubsub') and self.pubsub:
+            await self.loop.run_in_executor(self.thread_pool, self.pubsub.close)
+            logger.info("Pubsub connection closed")
 
         # Close the Docker client (unchanged)
         if self.docker_client:
