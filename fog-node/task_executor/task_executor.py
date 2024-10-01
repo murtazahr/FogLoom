@@ -41,16 +41,6 @@ class TaskExecutor:
         self.task_status = {}
         logger.info("TaskExecutor initialized")
 
-    async def initialize(self):
-        logger.info("Initializing TaskExecutor")
-        await self.connect_to_couchdb()
-
-        # Start the change feed listener and task processor
-        self.change_feed_task = self.loop.create_task(self.listen_for_changes())
-        self.process_tasks_task = self.loop.create_task(self.process_tasks())
-
-        logger.info("TaskExecutor initialization complete")
-
     async def connect_to_couchdb(self):
         try:
             self.couch_server = await self.loop.run_in_executor(self.thread_pool, couchdb.Server, COUCHDB_URL)
@@ -62,6 +52,16 @@ class TaskExecutor:
         except Exception as e:
             logger.error(f"Failed to connect to CouchDB: {str(e)}")
             raise
+
+    async def initialize(self):
+        logger.info("Initializing TaskExecutor")
+        await self.connect_to_couchdb()
+
+        # Start the change feed listener and task processor
+        self.change_feed_task = self.loop.create_task(self.listen_for_changes())
+        self.process_tasks_task = self.loop.create_task(self.process_tasks())
+
+        logger.info("TaskExecutor initialization complete")
 
     async def listen_for_changes(self):
         logger.info("Starting to listen for changes in the schedule database")

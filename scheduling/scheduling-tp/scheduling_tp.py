@@ -41,6 +41,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         self.schedule_db = self.couch[COUCHDB_SCHEDULE_DB]
         self.data_db = self.couch[COUCHDB_DATA_DB]
         self.redis = RedisCluster.from_url(REDIS_URL, decode_responses=True)
+        self.stream_name = 'schedule_stream'
         self.loop = asyncio.new_event_loop()
         self.thread_pool = ThreadPoolExecutor(max_workers=3)
 
@@ -168,21 +169,20 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             if not set_result:
                 raise Exception("Redis set operation failed")
 
-            # Publish the schedule data to the single "schedule" channel
-            channel = "schedule"
-            publish_result = await self.loop.run_in_executor(
+            # Add the schedule data to the Redis Stream
+            stream_result = await self.loop.run_in_executor(
                 self.thread_pool,
-                self.redis.publish,
-                channel,
-                schedule_json
+                self.redis.xadd,
+                self.stream_name,
+                schedule_data
             )
 
-            if publish_result == 0:
-                logger.warning(f"No clients received the published message for schedule ID: {schedule_id}")
+            if not stream_result:
+                raise Exception("Redis stream add operation failed")
 
-            logger.info(f"Successfully stored and published schedule in Redis for schedule ID: {schedule_id}")
+            logger.info(f"Successfully stored schedule in Redis and added to stream for schedule ID: {schedule_id}")
         except RedisError as e:
-            logger.error(f"Failed to store and publish schedule in Redis: {str(e)}")
+            logger.error(f"Failed to store schedule in Redis or add to stream: {str(e)}")
             raise
         except Exception as e:
             logger.error(f"Unexpected error in _store_schedule_in_redis: {str(e)}")
@@ -201,7 +201,11 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         for attempt in range(max_retries):
             try:
                 # Try Redis first
-                redis_data = self.redis.get(f"schedule_{schedule_id}")
+                redis_data = await self.loop.run_in_executor(
+                    self.thread_pool,
+                    self.redis.get,
+                    f"schedule_{schedule_id}"
+                )
                 if redis_data:
                     return json.loads(redis_data)
 
