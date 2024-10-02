@@ -101,7 +101,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # initiate IOTDeviceManager
-    iot_device_manager = IoTDeviceManager(5555)
+    iot_device_manager = IoTDeviceManager("ecg-sim", 5555)
     iot_device_manager.start()
 
     continuous_ecg_simulation(args.workflow_id)

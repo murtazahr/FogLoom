@@ -9,18 +9,19 @@ import logging
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
+
 class IoTDeviceManager:
-    def __init__(self, port):
+    def __init__(self, source, port):
         self.port = port
-        self._public_key, self._private_key = self._generate_keys()
+        self._public_key, self._private_key = self._generate_keys(source)
         self.is_running = False
         self.thread = None
         self.context = None
         self.socket = None
 
     @staticmethod
-    def _generate_keys():
-        keys_dir = os.path.join(os.getcwd(), 'keys')
+    def _generate_keys(source):
+        keys_dir = os.path.join(os.getcwd(), 'keys/', source)
         os.makedirs(keys_dir, exist_ok=True)
         server_public_file, server_secret_file = zmq.auth.create_certificates(keys_dir, "server")
         server_public, server_secret = zmq.auth.load_certificate(server_secret_file)
@@ -96,7 +97,7 @@ class IoTDeviceManager:
 
 # This part is optional, allowing the script to be run standalone for testing
 if __name__ == "__main__":
-    iot_device = IoTDeviceManager(5555)
+    iot_device = IoTDeviceManager("test", 5555)
     iot_device.start()
 
     try:

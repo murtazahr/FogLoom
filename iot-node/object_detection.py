@@ -56,7 +56,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Initialize IoTDeviceManager
-    iot_device_manager = IoTDeviceManager(5556)
+    iot_device_manager = IoTDeviceManager("object-detection", 5556)
     iot_device_manager.start()
 
     process_images(args.workflow_id, args.images)
