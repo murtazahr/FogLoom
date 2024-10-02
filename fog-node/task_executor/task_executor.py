@@ -131,21 +131,17 @@ class TaskExecutor:
             return
         node_schedule = schedule.get('node_schedule', {})
 
-        workflow_id = schedule_doc.get('workflow_id')
-        schedule_id = schedule_doc['schedule_id']
+        schedule_id = schedule_doc.get('schedule_id')
 
         if CURRENT_NODE in node_schedule:
             for app_id in node_schedule[CURRENT_NODE]:
-                timestamp = schedule_doc.get('timestamp')
-                source_url = schedule_doc.get('source_url')
-                source_public_key = schedule_doc.get('source_public_key')
                 task_key = (schedule_id, app_id)
 
                 logger.info(f"Checking dependencies for app_id: {app_id} in schedule {schedule_id}")
                 if await self.check_dependencies(schedule_id, app_id):
                     logger.info(
                         f"Dependencies met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
-                    await self.task_queue.put((source_url, source_public_key, timestamp, workflow_id, schedule_id, app_id))
+                    await self.task_queue.put((app_id, schedule_doc))
                     self.task_status[task_key] = 'QUEUED'
                 else:
                     logger.info(
@@ -157,7 +153,7 @@ class TaskExecutor:
 
     async def handle_task_completion(self, schedule_doc):
         logger.info(f"Handling task completion for schedule: {schedule_doc['schedule_id']}")
-        schedule_id = schedule_doc['schedule_id']
+        schedule_id = schedule_doc.get('schedule_id')
         completed_app_id = schedule_doc.get('completed_app_id')
 
         if not completed_app_id:
@@ -173,7 +169,6 @@ class TaskExecutor:
             logger.warning(f"Schedule document {schedule_id} does not contain a 'schedule' field")
             return
 
-        workflow_id = schedule_doc.get('workflow_id')
         node_schedule = schedule.get('node_schedule', {})
 
         if CURRENT_NODE in node_schedule:
@@ -189,10 +184,7 @@ class TaskExecutor:
                 if await self.check_dependencies(schedule_id, app_id):
                     logger.info(
                         f"Dependencies now met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
-                    timestamp = schedule_doc.get('timestamp')
-                    source_url = schedule_doc.get('source_url')
-                    source_public_key = schedule_doc.get('source_public_key')
-                    await self.task_queue.put((source_url, source_public_key, timestamp, workflow_id, schedule_id, app_id))
+                    await self.task_queue.put((app_id, schedule_doc))
                     self.task_status[task_key] = 'QUEUED'
                 else:
                     logger.debug(f"Dependencies not yet met for app_id: {app_id} in schedule {schedule_id}")
@@ -226,19 +218,24 @@ class TaskExecutor:
         logger.info("Starting task processing loop")
         while True:
             try:
-                source_url, source_public_key, timestamp, workflow_id, schedule_id, app_id = await self.task_queue.get()
+                app_id, schedule_doc = await self.task_queue.get()
+                workflow_id = schedule_doc.get('workflow_id')
+                schedule_id = schedule_doc.get('schedule_id')
+                source_url, source_public_key = schedule_doc.get('source_url'), schedule_doc.get('source_public_key')
+
                 logger.info(f"Processing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
 
                 response_manager = ResponseManager(source_url, source_public_key)
 
                 try:
                     connect_response_manager = self.loop.run_in_executor(self.thread_pool, response_manager.connect)
-                    execute_task = self.execute_task(workflow_id, schedule_id, app_id)
+
+                    execute_task = self.execute_task(workflow_id, schedule_id, app_id, schedule_doc)
 
                     result = (await asyncio.gather(connect_response_manager, execute_task))[1]
 
                     # Check if this was the final task in the schedule
-                    if await self.is_final_task(schedule_id, app_id):
+                    if await self.is_final_task(app_id, schedule_doc):
                         update_local_status = self.update_schedule_status(schedule_id, "FINALIZED")
                         update_blockchain_status = self.loop.run_in_executor(
                             self.thread_pool,
@@ -252,6 +249,9 @@ class TaskExecutor:
                             json.dumps(result))
 
                         await asyncio.gather(update_local_status, update_blockchain_status, send_response_to_client)
+                    else:
+                        # Update schedule status to TASK_COMPLETED only if it's not the final task
+                        await self.update_schedule_on_task_completion(schedule_id, app_id)
 
                 except Exception as e:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
@@ -300,14 +300,11 @@ class TaskExecutor:
             logger.error(f"Error updating schedule status for {schedule_id}: {str(e)}", exc_info=True)
             raise
 
-    async def execute_task(self, workflow_id, schedule_id, app_id):
+    async def execute_task(self, workflow_id, schedule_id, app_id, schedule_doc):
         logger.info(f"Executing task: workflow_id={workflow_id}, schedule_id={schedule_id}, app_id={app_id}")
         task_key = (schedule_id, app_id)
         self.task_status[task_key] = 'IN_PROGRESS'
 
-        schedule_key = f"schedule_{schedule_id}"
-        schedule_json = await self.fetch_data_with_retry(schedule_key)
-        schedule_doc = json.loads(schedule_json)
         schedule = schedule_doc.get('schedule', {})
 
         current_level, _ = await self.get_task_dependencies(schedule, app_id)
@@ -349,14 +346,12 @@ class TaskExecutor:
                 'workflow_id': workflow_id,
                 'schedule_id': schedule_id
             })
-            self.redis.set(output_key, output_json)
+            await self.redis.set(output_key, output_json)
             logger.info(f"Task output stored: {output_key}")
             self.task_status[task_key] = 'COMPLETED'
         except Exception as e:
             logger.error(f"Error storing task output for {output_key}: {str(e)}", exc_info=True)
             raise
-
-        await self.update_schedule_on_task_completion(schedule_id, app_id)
 
         return output_data
 
@@ -501,11 +496,9 @@ class TaskExecutor:
             logger.error(f"Unexpected error in run_docker_task for {container_name}: {str(e)}", exc_info=True)
             raise
 
-    async def is_final_task(self, schedule_id, app_id):
+    async def is_final_task(self, app_id, schedule_doc):
         try:
-            schedule_key = f"schedule_{schedule_id}"
-            schedule_json = await self.fetch_data_with_retry(schedule_key)
-            schedule_doc = json.loads(schedule_json)
+            schedule_id = schedule_doc.get('schedule_id')
             schedule = schedule_doc.get('schedule', {})
             level_info = schedule.get('level_info', {})
 
