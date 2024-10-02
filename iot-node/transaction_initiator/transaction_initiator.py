@@ -30,6 +30,7 @@ PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/clien
 VALIDATOR_URL = os.getenv('VALIDATOR_URL', 'tcp://validator:4004')
 IOT_URL = os.getenv('IOT_URL', 'tcp://iot')
 
+
 def load_private_key(key_file):
     try:
         with open(key_file, 'r') as key_reader:
@@ -154,6 +155,7 @@ class TransactionCreator:
         except Exception as ex:
             logger.error(f"Error creating and sending transactions: {str(ex)}")
             raise
+
 
 # This can be imported and used by various data sources
 transaction_creator = TransactionCreator()

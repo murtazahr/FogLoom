@@ -138,7 +138,7 @@ class TaskExecutor:
                 task_key = (schedule_id, app_id)
 
                 logger.info(f"Checking dependencies for app_id: {app_id} in schedule {schedule_id}")
-                if await self.check_dependencies(schedule_id, app_id):
+                if await self.check_dependencies(schedule_doc, app_id):
                     logger.info(
                         f"Dependencies met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
                     await self.task_queue.put((app_id, schedule_doc))
@@ -181,7 +181,7 @@ class TaskExecutor:
                     logger.debug(f"Skipping task: {app_id} for schedule {schedule_id}. Status: {current_status}")
                     continue
 
-                if await self.check_dependencies(schedule_id, app_id):
+                if await self.check_dependencies(schedule_doc, app_id):
                     logger.info(
                         f"Dependencies now met for app_id: {app_id} in schedule {schedule_id}. Adding to task queue.")
                     await self.task_queue.put((app_id, schedule_doc))
@@ -190,10 +190,8 @@ class TaskExecutor:
                     logger.debug(f"Dependencies not yet met for app_id: {app_id} in schedule {schedule_id}")
                     self.task_status[task_key] = 'WAITING'
 
-    async def check_dependencies(self, schedule_id, app_id):
-        schedule_key = f"schedule_{schedule_id}"
-        schedule_json = await self.fetch_data_with_retry(schedule_key)
-        schedule_doc = json.loads(schedule_json)
+    async def check_dependencies(self, schedule_doc, app_id):
+        schedule_id = schedule_doc.get('schedule_id')
         schedule = schedule_doc.get('schedule', {})
 
         current_level, dependencies = await self.get_task_dependencies(schedule, app_id)
@@ -236,7 +234,7 @@ class TaskExecutor:
 
                     # Check if this was the final task in the schedule
                     if await self.is_final_task(app_id, schedule_doc):
-                        update_local_status = self.update_schedule_status(schedule_id, "FINALIZED")
+                        update_local_status = self.update_schedule_status(schedule_doc, "FINALIZED")
                         update_blockchain_status = self.loop.run_in_executor(
                             self.thread_pool,
                             status_update_transactor.create_and_send_transaction,
@@ -256,7 +254,7 @@ class TaskExecutor:
                 except Exception as e:
                     logger.error(f"Error executing task {app_id}: {str(e)}", exc_info=True)
                     self.task_status[(schedule_id, app_id)] = 'FAILED'
-                    update_local_status = self.update_schedule_status(schedule_id, "FAILED")
+                    update_local_status = self.update_schedule_status(schedule_doc, "FAILED")
                     update_blockchain_status = self.loop.run_in_executor(
                         self.thread_pool,
                         status_update_transactor.create_and_send_transaction,
@@ -275,17 +273,12 @@ class TaskExecutor:
                 logger.error(f"Unexpected error in task processing loop: {str(e)}", exc_info=True)
                 await asyncio.sleep(5)  # Wait before continuing the loop
 
-    async def update_schedule_status(self, schedule_id, status):
-        logger.info(f"Updating schedule status: schedule_id={schedule_id}, status={status}")
+    async def update_schedule_status(self, schedule_doc, status):
+        schedule_id = schedule_doc.get('schedule_id')
         try:
-            # Retrieve the schedule from Redis
+            logger.info(f"Updating schedule status: schedule_id={schedule_id}, status={status}")
+
             schedule_key = f"schedule_{schedule_id}"
-            schedule_json = await self.redis.get(schedule_key)
-
-            if not schedule_json:
-                raise Exception(f"Schedule {schedule_id} not found in Redis")
-
-            schedule_doc = json.loads(schedule_json)
             schedule_doc['status'] = status
 
             # Save the updated schedule back to Redis
@@ -513,23 +506,32 @@ class TaskExecutor:
                 logger.info(f"Task {app_id} is not in the final level for schedule {schedule_id}")
                 return False
 
-            # Check if all tasks in the highest level are completed
-            for task in highest_level_tasks:
+            # Prepare async Redis checks
+            async def check_output(task):
                 if task['app_id'] != app_id:
                     task_app_id = task['app_id']
                     output_key = f"iot_data_{schedule_doc['workflow_id']}_{schedule_id}_{task_app_id}_output"
                     try:
-                        # Check if the output exists in Redis
                         exists = await self.redis.exists(output_key)
                         if not exists:
                             logger.info(f"Output not found for task {task_app_id} in schedule {schedule_id}")
                             return False
+                        return True
                     except Exception as e:
                         logger.error(f"Redis error checking output for task {task_app_id}: {str(e)}", exc_info=True)
                         return False
+                return True
 
-            logger.info(f"All final level tasks are completed for schedule {schedule_id}")
-            return True
+            # Run all Redis checks concurrently
+            results = await asyncio.gather(*[check_output(task) for task in highest_level_tasks])
+
+            # Check if all tasks are completed
+            if all(results):
+                logger.info(f"All final level tasks are completed for schedule {schedule_id}")
+                return True
+            else:
+                return False
+
         except Exception as e:
             logger.error(f"Error checking if task is final: {str(e)}", exc_info=True)
             return False

@@ -4,8 +4,14 @@ import cv2
 import numpy as np
 import asyncio
 import logging
+from datetime import datetime
 
-logging.basicConfig(level=logging.DEBUG)  # Change to DEBUG for more detailed logs
+# Configure logging with timestamp
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger(__name__)
 
 
