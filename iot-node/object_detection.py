@@ -1,6 +1,8 @@
 import argparse
 import logging
 import base64
+from time import sleep
+
 from transaction_initiator.transaction_initiator import transaction_creator
 from response_manager.response_manager import IoTDeviceManager
 
@@ -40,7 +42,7 @@ def process_images(workflow_id, image_paths):
             iot_device_manager.public_key
         )
         logger.info(f"Data sent to blockchain. Schedule ID: {schedule_id}")
-
+        sleep(20)
     except Exception as ex:
         logger.error(f"Error in image processing: {str(ex)}")
     finally:
