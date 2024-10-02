@@ -13,7 +13,7 @@ docker build -t arrhythmia-detection:latest -f Dockerfile .
 cd "$TEST_APP_DIR/object-detection/task1_object_detection" || exit
 docker build -t yolo-object-detection:latest -f Dockerfile .
 
-cd "$TEST_APP_DIR/output-image-generation/task2_output_image_generation" || exit
+cd "$TEST_APP_DIR/object-detection/task2_output_image_generation" || exit
 docker build -t bounding-box-image-generation:latest -f Dockerfile .
 
 # Make sure user is in the correct working directory
