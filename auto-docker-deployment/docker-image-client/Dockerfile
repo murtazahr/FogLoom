@@ -41,6 +41,8 @@ COPY docker_image_client.py .
 
 # Copy tar file
 COPY arrhythmia-detection.tar .
+COPY yolo-object-detection.tar .
+COPY bounding-box-image-generation.tar .
 
 ENV SAWTOOTH_PRIVATE_KEY /root/.sawtooth/keys/client.priv
 

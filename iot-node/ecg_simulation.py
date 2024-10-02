@@ -17,7 +17,7 @@ SAMPLE_RATE = 250  # 250 Hz
 N_SECONDS = 30  # Generate and send data every 30 seconds
 WINDOW_SIZE = 10  # 10 seconds
 OVERLAP = 5  # 5 seconds overlap
-CSV_FILE_PATH = 'datasets/ecg.csv'
+CSV_FILE_PATH = 'datasets/ecg/ecg.csv'
 
 
 class ECGSimulator:
