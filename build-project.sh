@@ -41,7 +41,7 @@ docker build -t $DOCKER_USERNAME/schedule-status-update-tp:latest ./scheduling/s
 # Build iot-data-tp image
 docker build -t $DOCKER_USERNAME/iot-data-tp:latest ./scheduling/iot-data-tp
 # Build iot-node image
-docker build -t $DOCKER_USERNAME/iot-node:latest ./iot-node
+docker build --no-cache -t $DOCKER_USERNAME/iot-node:latest ./iot-node
 # Build fog-node image
 docker build -t $DOCKER_USERNAME/fog-node:latest ./fog-node
 
