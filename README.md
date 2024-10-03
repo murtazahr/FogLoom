@@ -2,7 +2,7 @@
 
 ## Description
 
-Fogloom is a decentralized fog computing framework that offers Byzantine Fault Tolerance with automated docker deployment, pluggable scheduling algorithms, and smart context switching between fog and cloud. This framework is designed to be secure, maintain privacy, support auto-deployment, and handle dynamic scaling and scheduling.
+Fogloom is a decentralized fog computing framework that aims to offer Byzantine Fault Tolerance with automated docker deployment, pluggable scheduling algorithms, and smart context switching between fog and cloud. This framework is designed to be secure, maintain privacy, support auto-deployment, and handle dynamic scaling and scheduling.
 
 ## Features
 
