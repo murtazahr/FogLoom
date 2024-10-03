@@ -437,16 +437,17 @@ class TaskExecutor:
 
             logger.info(f"Found exposed port {exposed_port} for container {container_name}")
 
-            async with asyncio.timeout(5):
-                reader, writer = await asyncio.open_connection('localhost', exposed_port)
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection('localhost', exposed_port),
+                timeout=5
+            )
 
             try:
                 payload = json.dumps({'data': input_data}).encode()
                 writer.write(payload)
                 await writer.drain()
 
-                async with asyncio.timeout(30):
-                    response_data = await reader.read()
+                response_data = await asyncio.wait_for(reader.read(), timeout=30)
 
                 result = json.loads(response_data.decode())
                 logger.info(f"Successfully parsed JSON response from container {container_name}")
