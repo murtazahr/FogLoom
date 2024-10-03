@@ -3,7 +3,16 @@
 # Function to generate SSL certificates
 generate_ssl_certs() {
     mkdir -p ssl
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ssl/redis.key -out ssl/redis.crt -subj "/CN=redis-cluster"
+    # Generate CA key and certificate
+    openssl genrsa -out ssl/ca.key 4096
+    openssl req -x509 -new -nodes -key ssl/ca.key -sha256 -days 1024 -out ssl/ca.crt -subj "/CN=Redis-Cluster-CA"
+
+    # Generate server key and certificate signed by the CA
+    openssl genrsa -out ssl/redis.key 2048
+    openssl req -new -key ssl/redis.key -out ssl/redis.csr -subj "/CN=redis-cluster"
+    openssl x509 -req -in ssl/redis.csr -CA ssl/ca.crt -CAkey ssl/ca.key -CAcreateserial -out ssl/redis.crt -days 365 -sha256
+
+    # Create Kubernetes secret with all certificates
     kubectl create secret generic redis-certificates --from-file=ssl
 }
 
@@ -12,15 +21,13 @@ generate_password() {
     openssl rand -base64 32 | tr -d "=+/" | cut -c1-32
 }
 
-# function to generate Redis Cluster YAML with SSL and AUTH
+# Updated function to generate Redis Cluster YAML with SSL, AUTH, and CA cert
 generate_redis_cluster_yaml() {
     local num_redis_nodes=10
     local redis_password=$(generate_password)
 
     # Create a Kubernetes secret for the Redis password
     kubectl create secret generic redis-password --from-literal=password=$redis_password
-
-    sleep 2
 
     cat << EOF
 ---
@@ -34,6 +41,7 @@ data:
     tls-port 6379
     tls-cert-file /ssl/redis.crt
     tls-key-file /ssl/redis.key
+    tls-ca-cert-file /ssl/ca.crt
     tls-auth-clients no
     tls-replication yes
     tls-cluster yes
@@ -145,13 +153,14 @@ nodes=$(kubectl get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.sta
 # Get the Redis password
 redis_password=$(kubectl get secret redis-password -o jsonpath="{.data.password}" | base64 --decode)
 
-# Create the Redis Cluster with 3 shards, each with 1 master and 2 replicas
+# Modify the cluster creation command to use TLS
 echo "Creating Redis Cluster with 3 shards..."
-kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cluster-yes --cluster create $nodes --cluster-replicas 2 -a $redis_password
+kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt --cluster-yes --cluster create $nodes --cluster-replicas 2 -a $redis_password
 
-# Verify the cluster status
+# Modify the cluster status verification command
 echo "Verifying cluster status..."
-kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key -a $redis_password cluster info
+kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password cluster info
+
 
 echo "Secure Redis Cluster setup complete."
 
