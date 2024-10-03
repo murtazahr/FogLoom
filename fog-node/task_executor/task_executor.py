@@ -487,32 +487,23 @@ class TaskExecutor:
                 logger.info(f"Task {app_id} is not in the final level for schedule {schedule_id}")
                 return False
 
-            # Prepare async Redis checks
-            async def check_output(task):
+            # Check if all tasks in the highest level are completed
+            for task in highest_level_tasks:
                 if task['app_id'] != app_id:
                     task_app_id = task['app_id']
                     output_key = f"iot_data_{schedule_doc['workflow_id']}_{schedule_id}_{task_app_id}_output"
                     try:
+                        # Check if the output exists in Redis
                         exists = await self.redis.exists(output_key)
                         if not exists:
                             logger.info(f"Output not found for task {task_app_id} in schedule {schedule_id}")
                             return False
-                        return True
                     except Exception as e:
                         logger.error(f"Redis error checking output for task {task_app_id}: {str(e)}", exc_info=True)
                         return False
-                return True
 
-            # Run all Redis checks concurrently
-            results = await asyncio.gather(*[check_output(task) for task in highest_level_tasks])
-
-            # Check if all tasks are completed
-            if all(results):
-                logger.info(f"All final level tasks are completed for schedule {schedule_id}")
-                return True
-            else:
-                return False
-
+            logger.info(f"All final level tasks are completed for schedule {schedule_id}")
+            return True
         except Exception as e:
             logger.error(f"Error checking if task is final: {str(e)}", exc_info=True)
             return False
