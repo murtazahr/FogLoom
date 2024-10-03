@@ -16,20 +16,21 @@ generate_ssl_certs() {
     kubectl create secret generic redis-certificates --from-file=ssl
 }
 
-# Function to generate a strong password
 generate_password() {
     openssl rand -base64 32 | tr -d "=+/" | cut -c1-32
+}
+
+# Function to create Redis password secret
+create_redis_password_secret() {
+    local redis_password=$(generate_password)
+    kubectl create secret generic redis-password --from-literal=password=$redis_password
+    echo $redis_password
 }
 
 # Updated function to generate Redis Cluster YAML with SSL, AUTH, and CA cert
 generate_redis_cluster_yaml() {
     local num_redis_nodes=10
-    local redis_password=$(generate_password)
-
-    # Create a Kubernetes secret for the Redis password
-    kubectl create secret generic redis-password --from-literal=password=$redis_password
-
-    sleep 2
+    local redis_password=$1
 
     cat << EOF
 ---
@@ -138,11 +139,14 @@ spec:
 EOF
 }
 
-# Generate and apply SSL certificates
+# Main script execution
 generate_ssl_certs
 
+# Create Redis password secret and capture the password
+redis_password=$(create_redis_password_secret)
+
 # Generate and apply the Redis Cluster YAML
-generate_redis_cluster_yaml > redis-cluster.yaml
+generate_redis_cluster_yaml "$redis_password" > redis-cluster.yaml
 kubectl apply -f redis-cluster.yaml
 
 # Wait for all pods to be ready
