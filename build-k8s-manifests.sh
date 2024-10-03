@@ -165,6 +165,11 @@ items:"
                   membership=\$(curl -s -X GET \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_membership\") &&
                   echo \"Cluster membership: \${membership}\" &&
                   echo \"Creating \${RESOURCE_REGISTRY_DB} and \${TASK_DATA_DB} database on all nodes\" &&
+                  response=\$(curl -s -X PUT \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/\${RESOURCE_REGISTRY_DB}\") &&
+                  echo \"Creating \${RESOURCE_REGISTRY_DB} on couchdb-0 response: \${response}\" &&
+                  response=\$(curl -s -X PUT \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/\${TASK_DATA_DB}\") &&
+                  echo \"Creating \${TASK_DATA_DB} on couchdb-0 response: \${response}\" &&
+                  echo \"Waiting for \${RESOURCE_REGISTRY_DB} & \${TASK_DATA_DB} to be available on all nodes\" &&
                   for db in \${RESOURCE_REGISTRY_DB} \${TASK_DATA_DB}; do
                     for i in \$(seq 0 $((num_fog_nodes-1))); do
                       until curl -s \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984/\${db}\" | grep -q \"\${db}\"; do
