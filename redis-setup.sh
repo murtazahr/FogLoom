@@ -29,6 +29,8 @@ generate_redis_cluster_yaml() {
     # Create a Kubernetes secret for the Redis password
     kubectl create secret generic redis-password --from-literal=password=$redis_password
 
+    sleep 2
+
     cat << EOF
 ---
 apiVersion: v1
