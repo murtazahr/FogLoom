@@ -1,8 +1,8 @@
-# Fogbus v3 - A Hyperledger Sawtooth Based Fog Computing Framework
+# Fogloom - A Secure and Decentralized Fog Computing Framework
 
 ## Description
 
-Fogbus v3 is a decentralized fog computing framework that offers Byzantine Fault Tolerance with automated docker deployment, pluggable scheduling algorithms, and smart context switching between fog and cloud. This framework is designed to be secure, maintain privacy, support auto-deployment, and handle dynamic scaling and scheduling.
+Fogloom is a decentralized fog computing framework that offers Byzantine Fault Tolerance with automated docker deployment, pluggable scheduling algorithms, and smart context switching between fog and cloud. This framework is designed to be secure, maintain privacy, support auto-deployment, and handle dynamic scaling and scheduling.
 
 ## Features
 
