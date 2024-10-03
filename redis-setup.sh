@@ -12,7 +12,7 @@ generate_password() {
     openssl rand -base64 32 | tr -d "=+/" | cut -c1-32
 }
 
-# Function to generate Redis Cluster YAML with SSL and AUTH
+# function to generate Redis Cluster YAML with SSL and AUTH
 generate_redis_cluster_yaml() {
     local num_redis_nodes=10
     local redis_password=$(generate_password)
@@ -34,7 +34,7 @@ data:
     tls-port 6379
     tls-cert-file /ssl/redis.crt
     tls-key-file /ssl/redis.key
-    tls-auth-clients no  # Change to 'yes' to require client certificates
+    tls-auth-clients no
     tls-replication yes
     tls-cluster yes
     requirepass ${redis_password}
