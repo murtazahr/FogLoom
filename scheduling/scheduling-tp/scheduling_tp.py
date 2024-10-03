@@ -6,7 +6,6 @@ import os
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 
-import couchdb
 from coredis import RedisCluster
 from coredis.exceptions import RedisError
 from sawtooth_sdk.processor.core import TransactionProcessor
@@ -14,12 +13,6 @@ from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
 
 from scheduler import create_scheduler
-
-# CouchDB configuration
-COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
-COUCHDB_DB = 'resource_registry'
-COUCHDB_SCHEDULE_DB = 'schedules'
-COUCHDB_DATA_DB = 'task_data'
 
 # Redis configuration
 REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
@@ -38,9 +31,6 @@ logger = logging.getLogger(__name__)
 class IoTScheduleTransactionHandler(TransactionHandler):
     def __init__(self):
         self.scheduler = None
-        self.couch = couchdb.Server(COUCHDB_URL)
-        self.schedule_db = self.couch[COUCHDB_SCHEDULE_DB]
-        self.data_db = self.couch[COUCHDB_DATA_DB]
         self.redis = None
         self.loop = asyncio.get_event_loop()
         self.thread_pool = ThreadPoolExecutor()
@@ -113,13 +103,9 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 logger.info(f"Schedule {schedule_id} generated but won't be saved as record already exists. "
                             f"Proceeding with blockchain update.")
             else:
-                # Store in Redis and CouchDB
-                await asyncio.gather(
-                    self._store_schedule_in_redis(schedule_id, schedule_result, workflow_id,
-                                                  source_url, source_public_key, timestamp),
-                    self._store_schedule_in_couchdb(schedule_id, schedule_result, workflow_id,
+                # Store in Redis
+                await self._store_schedule_in_redis(schedule_id, schedule_result, workflow_id,
                                                     source_url, source_public_key, timestamp)
-                )
 
         schedule_doc = await self._fetch_data_with_retry(schedule_id)
         return {
@@ -130,24 +116,6 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             'source_public_key': source_public_key,
             'schedule': schedule_doc['schedule']
         }
-
-    async def _store_schedule_in_couchdb(self, schedule_id, schedule_result, workflow_id, source_url,
-                                         source_public_key, timestamp):
-        try:
-            document = {
-                '_id': schedule_id,
-                'schedule': schedule_result,
-                'workflow_id': workflow_id,
-                'source_url': source_url,
-                'source_public_key': source_public_key,
-                'timestamp': timestamp,
-                'status': 'ACTIVE'
-            }
-            self.schedule_db.save(document)
-            logger.info(f"Successfully stored schedule in CouchDB for schedule ID: {schedule_id}")
-        except Exception as e:
-            logger.error(f"Failed to store schedule in CouchDB: {str(e)}")
-            raise
 
     async def _store_schedule_in_redis(self, schedule_id, schedule_result, workflow_id, source_url,
                                        source_public_key, timestamp):
@@ -199,12 +167,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 if redis_data:
                     return json.loads(redis_data)
 
-                # If not in Redis, try CouchDB
-                couchdb_data = self.schedule_db.get(schedule_id)
-                if couchdb_data:
-                    return couchdb_data
-
-                raise Exception("Data not found in Redis or CouchDB")
+                raise Exception("Data not found in Redis")
             except Exception as e:
                 if attempt == max_retries - 1:
                     logger.error(f"Failed to fetch data after {max_retries} attempts: {str(e)}")
@@ -218,16 +181,11 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             for app_id in dependency_graph['nodes']:
                 app_requirements[app_id] = self._get_app_requirements(context, app_id)
 
-            db_config = {
-                "url": COUCHDB_URL,
-                "name": COUCHDB_DB
-            }
-
             redis_config = {
                 "url": REDIS_URL
             }
 
-            return create_scheduler("lcdwrr", dependency_graph, app_requirements, db_config, redis_config)
+            return create_scheduler("lcdwrr", dependency_graph, app_requirements, redis_config)
         except Exception as e:
             logger.error(f"Failed to initialize scheduler: {str(e)}")
             raise

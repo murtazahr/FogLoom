@@ -36,7 +36,7 @@ class IoTDataTransactionHandler(TransactionHandler):
         self.data_db = self.couch[COUCHDB_DATA_DB]
         self.redis = None
         self.loop = asyncio.get_event_loop()
-        self.executor = ThreadPoolExecutor(max_workers=3)
+        self.executor = ThreadPoolExecutor()
 
     async def initialize_redis(self):
         self.redis = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
@@ -59,6 +59,7 @@ class IoTDataTransactionHandler(TransactionHandler):
             iot_data = payload['iot_data']
             workflow_id = payload['workflow_id']
             schedule_id = payload['schedule_id']
+            persist_data = payload.get('persist_data', False)  # New line
 
             logger.info(f"Processing IoT data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
 
@@ -72,19 +73,20 @@ class IoTDataTransactionHandler(TransactionHandler):
 
             # Run async operations in a separate thread
             future = self.executor.submit(self._run_async_operations, context, workflow_id, schedule_id, iot_data,
-                                          iot_data_hash)
+                                          iot_data_hash, persist_data)  # Modified line
             future.result()  # This will raise any exceptions that occurred in the async operations
 
-            iot_data_address = self._make_iot_data_address(schedule_id)
-            iot_data_state = json.dumps({
-                'schedule_id': schedule_id,
-                'workflow_id': workflow_id,
-                'iot_data_hash': iot_data_hash
-            }).encode()
+            if persist_data:
+                iot_data_address = self._make_iot_data_address(schedule_id)
+                iot_data_state = json.dumps({
+                    'schedule_id': schedule_id,
+                    'workflow_id': workflow_id,
+                    'iot_data_hash': iot_data_hash
+                }).encode()
 
-            logger.info(f"Writing IoT data hash to blockchain for schedule ID: {schedule_id}")
-            context.set_state({iot_data_address: iot_data_state})
-            logger.info(f"Successfully wrote IoT data hash to blockchain for schedule ID: {schedule_id}")
+                logger.info(f"Writing IoT data hash to blockchain for schedule ID: {schedule_id}")
+                context.set_state({iot_data_address: iot_data_state})
+                logger.info(f"Successfully wrote IoT data hash to blockchain for schedule ID: {schedule_id}")
 
         except json.JSONDecodeError as _:
             raise InvalidTransaction("Invalid payload: not a valid JSON")
@@ -95,30 +97,31 @@ class IoTDataTransactionHandler(TransactionHandler):
             logger.error(traceback.format_exc())
             raise InvalidTransaction(str(e))
 
-    def _run_async_operations(self, context, workflow_id, schedule_id, iot_data, iot_data_hash):
+    def _run_async_operations(self, context, workflow_id, schedule_id, iot_data, iot_data_hash, persist_data):
         return self.loop.run_until_complete(
-            self._async_operations(context, workflow_id, schedule_id, iot_data, iot_data_hash))
+            self._async_operations(context, workflow_id, schedule_id, iot_data, iot_data_hash, persist_data))
 
-    async def _async_operations(self, context, workflow_id, schedule_id, iot_data, iot_data_hash):
+    async def _async_operations(self, context, workflow_id, schedule_id, iot_data, iot_data_hash, persist_data):
         if not self.redis:
             await self.initialize_redis()
 
         dependency_graph = self._get_dependency_graph(context, workflow_id)
         data_id = self._generate_data_id(workflow_id, schedule_id, dependency_graph["start"], 'input')
 
-        # Parallel storage in Redis and CouchDB
-        await asyncio.gather(
-            self._store_data_in_redis(data_id, iot_data, iot_data_hash, workflow_id, schedule_id),
-            self._store_data_in_couchdb(data_id, iot_data, iot_data_hash, workflow_id, schedule_id)
-        )
+        # Always store in Redis, but conditionally store in CouchDB
+        tasks = [self._store_data_in_redis(data_id, iot_data, iot_data_hash, workflow_id, schedule_id, persist_data)]
+        if persist_data:
+            tasks.append(self._store_data_in_couchdb(data_id, iot_data, iot_data_hash, workflow_id, schedule_id))
 
-    async def _store_data_in_redis(self, data_id, data, data_hash, workflow_id, schedule_id):
+        await asyncio.gather(*tasks)
+
+    async def _store_data_in_redis(self, data_id, data, data_hash, workflow_id, schedule_id, persist_data):
         try:
             data_json = json.dumps({
                 'data': data,
-                'data_hash': data_hash,
                 'workflow_id': workflow_id,
-                'schedule_id': schedule_id
+                'schedule_id': schedule_id,
+                'persist_data': persist_data
             })
             result = await self.redis.set(f"iot_data_{data_id}", data_json)
             if result:

@@ -1,10 +1,12 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+import couchdb
 import docker
 from cachetools import TTLCache
 from docker import errors
@@ -20,6 +22,11 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 
 CURRENT_NODE = os.getenv('NODE_ID')
+
+# CouchDB configuration
+COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
+COUCHDB_DATA_DB = 'task_data'
+
 REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
 
 
@@ -33,6 +40,8 @@ class TaskExecutor:
         self.process_tasks_task = None
         self.processed_changes = TTLCache(maxsize=1000, ttl=300)  # Cache for 5 minutes
         self.task_status = {}
+        self.couch = couchdb.Server(COUCHDB_URL)
+        self.data_db = self.couch[COUCHDB_DATA_DB]
         self.redis = None
         self.channel_name = 'schedule'
 
@@ -315,13 +324,14 @@ class TaskExecutor:
                 if 'data' not in input_doc:
                     raise Exception(f"'data' field not found in input document for key: {input_key}")
                 input_data = input_doc['data']
-                logger.debug(f"Input data fetched for task {app_id}: {str(input_data)[:100]}...")  # Log first 100 characters
+                persistence_flag = input_doc['persist_data']
+                logger.debug(f"Input data fetched for task {app_id}")
             except Exception as e:
                 logger.error(f"Error fetching input data for {input_key}: {str(e)}", exc_info=True)
                 raise
         else:
             try:
-                input_data = await self.fetch_dependency_outputs(workflow_id, schedule_id, app_id, schedule)
+                input_data, persistence_flag = await self.fetch_dependency_outputs(workflow_id, schedule_id, app_id, schedule)
             except Exception as e:
                 logger.error(f"Error fetching dependency outputs for task {app_id}: {str(e)}", exc_info=True)
                 raise
@@ -332,21 +342,51 @@ class TaskExecutor:
             logger.error(f"Error running Docker task for {app_id}: {str(e)}", exc_info=True)
             raise
 
-        output_key = f"iot_data_{workflow_id}_{schedule_id}_{app_id}_output"
+        data_id = f"{workflow_id}_{schedule_id}_{app_id}_output"
+        output_key = f"iot_data_{data_id}"
         try:
             output_json = json.dumps({
                 'data': output_data['data'],
                 'workflow_id': workflow_id,
-                'schedule_id': schedule_id
+                'schedule_id': schedule_id,
+                'persist_data': persistence_flag
             })
             await self.redis.set(output_key, output_json)
             logger.info(f"Task output stored: {output_key}")
+
+            if persistence_flag:
+                persistence_task = self.loop.create_task(self.persist_to_couchdb(data_id, output_data['data'],
+                                                                                 workflow_id, schedule_id))
+                persistence_task.add_done_callback(
+                    lambda t: logger.error(f"Error in persistence task: {t.exception()}") if t.exception() else None
+                )
+
             self.task_status[task_key] = 'COMPLETED'
         except Exception as e:
             logger.error(f"Error storing task output for {output_key}: {str(e)}", exc_info=True)
             raise
 
         return output_data
+
+    async def persist_to_couchdb(self, data_id, data, workflow_id, schedule_id):
+        try:
+            self.data_db.save({
+                '_id': data_id,
+                'data': data,
+                'data_hash': self._calculate_hash(data),
+                'workflow_id': workflow_id,
+                'schedule_id': schedule_id
+            })
+            logger.info(f"Successfully stored IoT data in CouchDB for ID: {data_id}")
+        except couchdb.http.ResourceConflict:
+            logger.info(f"Data for ID: {data_id} already exists in CouchDB. Skipping storage.")
+        except Exception as e:
+            logger.error(f"Unexpected error while storing data in CouchDB for ID {data_id}: {str(e)}")
+            raise
+
+    @staticmethod
+    def _calculate_hash(data):
+        return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
     async def update_schedule_on_task_completion(self, schedule_id, completed_app_id):
         try:
@@ -395,6 +435,8 @@ class TaskExecutor:
         if current_level is None or current_level == 0:
             raise Exception(f"Invalid level or no dependencies for task {app_id} in schedule {schedule_id}")
 
+        output_doc = None
+
         dependency_outputs = []
         for task in dependencies:
             dep_app_id = task['app_id']
@@ -416,7 +458,9 @@ class TaskExecutor:
         if not dependency_outputs:
             raise Exception(f"No dependency outputs found for task {app_id} in schedule {schedule_id}")
 
-        return dependency_outputs
+        persistence_flag = output_doc['persist_data']
+
+        return dependency_outputs, persistence_flag
 
     async def run_docker_task(self, app_id, input_data):
         container_name = f"sawtooth-{app_id}"

@@ -3,7 +3,6 @@ import time
 from collections import defaultdict
 from typing import Dict, List, Any
 from abc import ABC, abstractmethod
-import couchdb
 import random
 import logging
 import asyncio
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 class BaseScheduler(ABC):
     @abstractmethod
     def __init__(self, dependency_graph: Dict[str, Any], app_requirements: Dict[str, Dict[str, int]],
-                 db_config: Dict[str, str]):
+                 redis_config: Dict[str, str]):
         pass
 
     @abstractmethod
@@ -42,11 +41,9 @@ class NodeSelectionError(SchedulingError):
 
 class LCDWRRScheduler(BaseScheduler):
     def __init__(self, dependency_graph: Dict[str, Any], app_requirements: Dict[str, Dict[str, int]],
-                 db_config: Dict[str, str], redis_config: Dict[str, str]):
+                 redis_config: Dict[str, str]):
         self.dependency_graph = dependency_graph
         self.app_requirements = app_requirements
-        self.couch = couchdb.Server(db_config['url'])
-        self.db = self.couch[db_config['name']]
         self.redis = None
         self.redis_config = redis_config
         self.max_retries = 3
@@ -134,24 +131,6 @@ class LCDWRRScheduler(BaseScheduler):
 
         except RedisError as e:
             logger.error(f"Error accessing Redis Cluster: {str(e)}")
-            # Fall back to CouchDB here if needed
-
-        # If we didn't get any data from Redis, fall back to CouchDB
-        if not node_resources['rows']:
-            logger.warning("No data found in Redis, falling back to CouchDB")
-            for row in self.db.view('_all_docs', include_docs=True):
-                if row.id.startswith('sawtooth-'):
-                    doc = row.doc
-                    if 'resource_data_list' in doc and doc['resource_data_list']:
-                        latest_data = doc['resource_data_list'][-1]['data']
-                        doc['resource_data'] = latest_data
-                        # Update Redis with this data for future use
-                        redis_key = f"resources_{row.id}"
-                        await self.redis.set(redis_key, json.dumps(latest_data))
-                        logger.debug(f"Data for node {row.id} fetched from CouchDB and updated in Redis")
-                        node_resources['rows'].append({'id': row.id, 'doc': doc})
-                    else:
-                        logger.warning(f"No resource data available for node {row.id}")
 
         return node_resources
 
@@ -230,8 +209,8 @@ class LCDWRRScheduler(BaseScheduler):
 
 
 def create_scheduler(scheduler_type: str, dependency_graph: Dict, app_requirements: Dict,
-                     db_config: Dict, redis_config: Dict) -> BaseScheduler:
+                     redis_config: Dict) -> BaseScheduler:
     if scheduler_type == "lcdwrr":
-        return LCDWRRScheduler(dependency_graph, app_requirements, db_config, redis_config)
+        return LCDWRRScheduler(dependency_graph, app_requirements, redis_config)
     else:
         raise ValueError(f"Unknown scheduler type: {scheduler_type}")
