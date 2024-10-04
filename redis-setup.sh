@@ -24,7 +24,7 @@ generate_password() {
 create_redis_password_secret() {
     local redis_password=$(generate_password)
     kubectl create secret generic redis-password --from-literal=password=$redis_password
-    echo $redis_password
+    echo "$redis_password"
 }
 
 # Updated function to generate Redis Cluster YAML with SSL, AUTH, and CA cert
@@ -166,7 +166,6 @@ kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key 
 # Modify the cluster status verification command
 echo "Verifying cluster status..."
 kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password cluster info
-
 
 echo "Secure Redis Cluster setup complete."
 
