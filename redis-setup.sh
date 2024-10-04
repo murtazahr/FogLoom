@@ -138,6 +138,23 @@ spec:
 EOF
 }
 
+# Function to wait for all Redis Cluster pods to be running
+wait_for_redis_pods() {
+    echo "Waiting for all Redis Cluster pods to be running..."
+    while true; do
+        running_pods=$(kubectl get pods -l app=redis-cluster -o jsonpath='{range .items[*]}{.status.phase}{"\n"}{end}' | grep -c "Running")
+        total_pods=$(kubectl get pods -l app=redis-cluster -o jsonpath='{range .items[*]}{.status.phase}{"\n"}{end}' | wc -l)
+
+        if [ "$running_pods" -eq "$total_pods" ]; then
+            echo "All $total_pods Redis Cluster pods are now running."
+            break
+        else
+            echo "$running_pods out of $total_pods pods are running. Waiting..."
+            sleep 10
+        fi
+    done
+}
+
 # Main script execution
 generate_ssl_certs
 
@@ -151,9 +168,8 @@ create_redis_password_secret "$redis_password"
 generate_redis_cluster_yaml "$redis_password" > redis-cluster.yaml
 kubectl apply -f redis-cluster.yaml
 
-# Wait for all pods to be ready
-echo "Waiting for Redis Cluster pods to be ready..."
-kubectl wait --for=condition=Ready pod -l app=redis-cluster --timeout=300s
+# Wait for all pods to be in the running state
+wait_for_redis_pods
 
 # Get the list of Redis nodes
 nodes=$(kubectl get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.status.podIP}:6379 ')
