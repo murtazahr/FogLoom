@@ -117,11 +117,33 @@ def connect_to_couchdb(max_retries=5, retry_delay=5):
     return None
 
 
+def log_full_cert(cert_content, cert_type):
+    """
+    Log the full content of the certificate or key.
+    WARNING: This function logs sensitive data and should only be used for debugging.
+    Remove or disable before deploying to production.
+    """
+    if cert_content:
+        logger.debug(f"Full {cert_type} content:\n{cert_content}")
+    else:
+        logger.warning(f"{cert_type} is empty or not set")
+
+
 async def connect_to_redis():
     logger.info("Starting Redis initialization")
     temp_files = []
     try:
-        ssl_context = ssl.create_default_context()
+        # WARNING: The following logs contain sensitive data. Remove before production use.
+        logger.warning("SECURITY RISK: Logging full certificate content. Remove in production.")
+        log_full_cert(REDIS_SSL_CA, "CA Certificate")
+        log_full_cert(REDIS_SSL_CERT, "Client Certificate")
+        log_full_cert(REDIS_SSL_KEY, "Client Key")
+
+        ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        ssl_context.maximum_version = ssl.TLSVersion.TLSv1_3
 
         if REDIS_SSL_CA:
             ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
@@ -150,12 +172,8 @@ async def connect_to_redis():
         else:
             logger.warning("REDIS_SSL_CERT or REDIS_SSL_KEY is empty or not set")
 
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        logger.debug("SSL context configured: check_hostname=False, verify_mode=CERT_NONE")
-
         logger.info(f"Attempting to connect to Redis cluster at {REDIS_CLUSTER_URL}")
-        redis_cluster = await RedisCluster.from_url(
+        redis = await RedisCluster.from_url(
             REDIS_CLUSTER_URL,
             password=REDIS_PASSWORD,
             ssl=True,
@@ -164,14 +182,12 @@ async def connect_to_redis():
         )
         logger.info("Connected to Redis cluster successfully")
 
-        return redis_cluster
+        return redis
 
     except Exception as e:
         logger.error(f"Failed to connect to Redis: {str(e)}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
         raise
     finally:
-        # Clean up temporary files
         for file_path in temp_files:
             try:
                 os.unlink(file_path)
