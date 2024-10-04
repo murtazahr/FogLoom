@@ -6,7 +6,6 @@ import sys
 import tempfile
 import time
 import json
-import traceback
 
 import psutil
 import couchdb
@@ -33,7 +32,8 @@ COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD'
 COUCHDB_DB = 'resource_registry'
 
 # Redis configuration
-REDIS_CLUSTER_URL = os.getenv('REDIS_CLUSTER_URL', 'rediss://redis-cluster:6379')
+REDIS_HOST = os.getenv('REDIS_HOST', 'redis-cluster')
+REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 REDIS_SSL_CERT = os.getenv('REDIS_SSL_CERT')
 REDIS_SSL_KEY = os.getenv('REDIS_SSL_KEY')
@@ -117,18 +117,6 @@ def connect_to_couchdb(max_retries=5, retry_delay=5):
     return None
 
 
-def log_full_cert(cert_content, cert_type):
-    """
-    Log the full content of the certificate or key.
-    WARNING: This function logs sensitive data and should only be used for debugging.
-    Remove or disable before deploying to production.
-    """
-    if cert_content:
-        logger.debug(f"Full {cert_type} content:\n{cert_content}")
-    else:
-        logger.warning(f"{cert_type} is empty or not set")
-
-
 async def connect_to_redis():
     logger.info("Starting Redis initialization")
     temp_files = []
@@ -166,9 +154,10 @@ async def connect_to_redis():
         else:
             logger.warning("REDIS_SSL_CERT or REDIS_SSL_KEY is empty or not set")
 
-        logger.info(f"Attempting to connect to Redis cluster at {REDIS_CLUSTER_URL}")
-        redis = await RedisCluster.from_url(
-            REDIS_CLUSTER_URL,
+        logger.info(f"Attempting to connect to Redis cluster at {REDIS_HOST}:{REDIS_PORT}")
+        redis = await RedisCluster(
+            host=REDIS_HOST,
+            port=REDIS_PORT,
             password=REDIS_PASSWORD,
             ssl=True,
             ssl_context=ssl_context,
