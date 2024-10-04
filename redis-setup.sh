@@ -44,7 +44,7 @@ select_unique_fog_nodes() {
     echo $(shuf -e "${fog_nodes[@]}" | head -n $num_nodes)
 }
 
-# Updated function to generate Redis Cluster YAML with SSL, AUTH, and CA cert
+# Function to generate Redis Cluster YAML with SSL, AUTH, and CA cert
 generate_redis_cluster_yaml() {
     local num_redis_nodes=$1
     local redis_password=$2
@@ -111,7 +111,7 @@ EOF
     for node in "${selected_nodes[@]}"; do
         echo "                - $node" >> redis-cluster.yaml
     done
-    cat << EOF >> redis-cluster.yaml
+    cat << EOF
       containers:
       - name: redis
         image: redis:6.2
