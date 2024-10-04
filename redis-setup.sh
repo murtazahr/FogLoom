@@ -47,7 +47,8 @@ select_unique_fog_nodes() {
 generate_redis_cluster_yaml() {
     local num_redis_nodes=$1
     local redis_password=$2
-    local selected_nodes=("${@:3}")
+    shift 2
+    local selected_nodes=("$@")
 
     cat << EOF
 ---
