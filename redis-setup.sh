@@ -22,9 +22,8 @@ generate_password() {
 
 # Function to create Redis password secret
 create_redis_password_secret() {
-    local redis_password=$(generate_password)
+    local redis_password=$1
     kubectl create secret generic redis-password --from-literal=password=$redis_password
-    echo "$redis_password"
 }
 
 # Updated function to generate Redis Cluster YAML with SSL, AUTH, and CA cert
@@ -142,8 +141,11 @@ EOF
 # Main script execution
 generate_ssl_certs
 
-# Create Redis password secret and capture the password
-redis_password=$(create_redis_password_secret)
+# Generate password
+redis_password=$(generate_password)
+
+# Create Redis password secret
+create_redis_password_secret "$redis_password"
 
 # Generate and apply the Redis Cluster YAML
 generate_redis_cluster_yaml "$redis_password" > redis-cluster.yaml
@@ -155,9 +157,6 @@ kubectl wait --for=condition=Ready pod -l app=redis-cluster --timeout=300s
 
 # Get the list of Redis nodes
 nodes=$(kubectl get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.status.podIP}:6379 ')
-
-# Get the Redis password
-redis_password=$(kubectl get secret redis-password -o jsonpath="{.data.password}" | base64 --decode)
 
 # Modify the cluster creation command to use TLS
 echo "Creating Redis Cluster with 3 shards..."
