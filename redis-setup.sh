@@ -41,7 +41,7 @@ select_unique_fog_nodes() {
         exit 1
     fi
 
-    echo $(shuf -e "${fog_nodes[@]}" | head -n $num_nodes)
+    shuf -e "${fog_nodes[@]}" | head -n $num_nodes
 }
 
 generate_redis_cluster_yaml() {
