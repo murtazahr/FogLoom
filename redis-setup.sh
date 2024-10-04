@@ -159,6 +159,30 @@ wait_for_redis_pods() {
     done
 }
 
+# Function to check cluster status with retries
+check_cluster_status() {
+    local max_retries=5
+    local retry_interval=10
+    local retry_count=0
+
+    while [ $retry_count -lt $max_retries ]; do
+        echo "Checking cluster status (attempt $((retry_count+1))/$max_retries)..."
+        status=$(kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password cluster info | grep cluster_state | cut -d: -f2 | tr -d '[:space:]')
+
+        if [ "$status" = "ok" ]; then
+            echo "Cluster is now in OK state."
+            return 0
+        else
+            echo "Cluster state is still: $status. Waiting $retry_interval seconds before next check."
+            sleep $retry_interval
+            retry_count=$((retry_count+1))
+        fi
+    done
+
+    echo "Cluster failed to reach OK state after $max_retries attempts."
+    return 1
+}
+
 # Function to check Redis connectivity
 check_redis_connectivity() {
     local pod=$1
@@ -201,9 +225,15 @@ kubectl exec -it redis-cluster-0 -- redis-cli --cluster create --cluster-replica
     $(echo $node_ips | sed -e 's/\([0-9.]*\)/\1:6379/g') \
     --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password
 
-# Verify cluster status
-echo "Verifying cluster status..."
-kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password cluster info
+echo "Waiting for cluster to stabilize..."
+sleep 30  # Give the cluster some time to stabilize
+
+# Check cluster status with retries
+if check_cluster_status; then
+    echo "Redis Cluster is now fully operational."
+else
+    echo "Warning: Redis Cluster may not be fully operational. Please check manually."
+fi
 
 echo "Secure Redis Cluster setup complete."
 
