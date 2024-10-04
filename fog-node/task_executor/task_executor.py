@@ -4,7 +4,9 @@ import json
 import logging
 import os
 import ssl
+import tempfile
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 
 import couchdb
@@ -52,21 +54,43 @@ class TaskExecutor:
         self.channel_name = 'schedule'
 
     async def connect_to_redis(self):
+        logger.info("Starting Redis initialization")
+        temp_files = []
         try:
             ssl_context = ssl.create_default_context()
 
-            # Load CA cert
-            ssl_context.load_verify_locations(cadata=REDIS_SSL_CA)
+            if REDIS_SSL_CA:
+                ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+                ca_file.write(REDIS_SSL_CA)
+                ca_file.flush()
+                temp_files.append(ca_file.name)
+                ssl_context.load_verify_locations(cafile=ca_file.name)
+                logger.debug(f"CA certificate loaded from temp file: {ca_file.name}")
+            else:
+                logger.warning("REDIS_SSL_CA is empty or not set")
 
-            # Load client cert and key
-            ssl_context.load_cert_chain(
-                certfile=REDIS_SSL_CERT,
-                keyfile=REDIS_SSL_KEY
-            )
+            if REDIS_SSL_CERT and REDIS_SSL_KEY:
+                cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+                key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+                cert_file.write(REDIS_SSL_CERT)
+                key_file.write(REDIS_SSL_KEY)
+                cert_file.flush()
+                key_file.flush()
+                temp_files.extend([cert_file.name, key_file.name])
+                ssl_context.load_cert_chain(
+                    certfile=cert_file.name,
+                    keyfile=key_file.name
+                )
+                logger.debug(f"Client certificate loaded from temp file: {cert_file.name}")
+                logger.debug(f"Client key loaded from temp file: {key_file.name}")
+            else:
+                logger.warning("REDIS_SSL_CERT or REDIS_SSL_KEY is empty or not set")
 
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
+            logger.debug("SSL context configured: check_hostname=False, verify_mode=CERT_NONE")
 
+            logger.info(f"Attempting to connect to Redis cluster at {REDIS_CLUSTER_URL}")
             self.redis = await RedisCluster.from_url(
                 REDIS_CLUSTER_URL,
                 password=REDIS_PASSWORD,
@@ -75,9 +99,19 @@ class TaskExecutor:
                 decode_responses=True
             )
             logger.info("Connected to Redis cluster successfully")
+
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise
+        finally:
+            # Clean up temporary files
+            for file_path in temp_files:
+                try:
+                    os.unlink(file_path)
+                    logger.debug(f"Temporary file deleted: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete temporary file {file_path}: {str(e)}")
 
     async def initialize(self):
         logger.info("Initializing TaskExecutor")

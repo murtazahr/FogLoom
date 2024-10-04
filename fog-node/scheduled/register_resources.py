@@ -3,9 +3,11 @@ import logging
 import os
 import ssl
 import sys
+import tempfile
 import time
 import json
-import asyncio
+import traceback
+
 import psutil
 import couchdb
 from couchdb import ResourceNotFound, Unauthorized
@@ -115,41 +117,67 @@ def connect_to_couchdb(max_retries=5, retry_delay=5):
     return None
 
 
-async def connect_to_redis(max_retries=5, retry_delay=5):
-    logger.info(f'Connecting to Redis cluster at {REDIS_CLUSTER_URL}')
-    for attempt in range(max_retries):
-        try:
-            ssl_context = ssl.create_default_context()
+async def connect_to_redis():
+    logger.info("Starting Redis initialization")
+    temp_files = []
+    try:
+        ssl_context = ssl.create_default_context()
 
-            # Load CA cert
-            ssl_context.load_verify_locations(cadata=REDIS_SSL_CA)
+        if REDIS_SSL_CA:
+            ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+            ca_file.write(REDIS_SSL_CA)
+            ca_file.flush()
+            temp_files.append(ca_file.name)
+            ssl_context.load_verify_locations(cafile=ca_file.name)
+            logger.debug(f"CA certificate loaded from temp file: {ca_file.name}")
+        else:
+            logger.warning("REDIS_SSL_CA is empty or not set")
 
-            # Load client cert and key
+        if REDIS_SSL_CERT and REDIS_SSL_KEY:
+            cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+            key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+            cert_file.write(REDIS_SSL_CERT)
+            key_file.write(REDIS_SSL_KEY)
+            cert_file.flush()
+            key_file.flush()
+            temp_files.extend([cert_file.name, key_file.name])
             ssl_context.load_cert_chain(
-                certfile=REDIS_SSL_CERT,
-                keyfile=REDIS_SSL_KEY
+                certfile=cert_file.name,
+                keyfile=key_file.name
             )
+            logger.debug(f"Client certificate loaded from temp file: {cert_file.name}")
+            logger.debug(f"Client key loaded from temp file: {key_file.name}")
+        else:
+            logger.warning("REDIS_SSL_CERT or REDIS_SSL_KEY is empty or not set")
 
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        logger.debug("SSL context configured: check_hostname=False, verify_mode=CERT_NONE")
 
-            redis_cluster = await RedisCluster.from_url(
-                REDIS_CLUSTER_URL,
-                password=REDIS_PASSWORD,
-                ssl=True,
-                ssl_context=ssl_context,
-                decode_responses=True
-            )
-            logger.info("Connected to Redis cluster successfully")
-            return redis_cluster
-        except RedisError as e:
-            logger.error(f"Error connecting to Redis cluster: {str(e)}")
-            if attempt < max_retries - 1:
-                logger.warning(f"Retrying in {retry_delay} seconds. Attempt {attempt + 1}/{max_retries}")
-                await asyncio.sleep(retry_delay)
-            else:
-                logger.error(f"Failed to connect to Redis cluster after {max_retries} attempts.")
-                return None
+        logger.info(f"Attempting to connect to Redis cluster at {REDIS_CLUSTER_URL}")
+        redis_cluster = await RedisCluster.from_url(
+            REDIS_CLUSTER_URL,
+            password=REDIS_PASSWORD,
+            ssl=True,
+            ssl_context=ssl_context,
+            decode_responses=True
+        )
+        logger.info("Connected to Redis cluster successfully")
+
+        return redis_cluster
+
+    except Exception as e:
+        logger.error(f"Failed to connect to Redis: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise
+    finally:
+        # Clean up temporary files
+        for file_path in temp_files:
+            try:
+                os.unlink(file_path)
+                logger.debug(f"Temporary file deleted: {file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temporary file {file_path}: {str(e)}")
 
 
 async def update_redis(redis_cluster, node_id, resource_data):
