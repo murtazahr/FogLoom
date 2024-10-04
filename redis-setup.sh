@@ -232,8 +232,8 @@ readarray -t selected_nodes < <(select_unique_fog_nodes $num_redis_nodes)
 echo "Selected fog nodes: ${selected_nodes[*]}"
 
 # Generate and apply the Redis Cluster YAML
-generate_redis_cluster_yaml $num_redis_nodes "$redis_password" "${selected_nodes[@]}" > redis-cluster.yaml
-kubectl apply -f redis-cluster.yaml
+generate_redis_cluster_yaml $num_redis_nodes "$redis_password" "${selected_nodes[@]}" > kubernetes-manifests/generated/redis-cluster.yaml
+kubectl apply -f kubernetes-manifests/generated/redis-cluster.yaml
 
 # Wait for all pods to be in the running state
 wait_for_redis_pods
@@ -265,11 +265,4 @@ else
     echo "Warning: Redis Cluster may not be fully operational. Please check manually."
 fi
 
-# Print connection information
-echo "To connect to your Redis Cluster:"
-echo "1. Use kubectl port-forward to access a Redis node:"
-echo "   kubectl port-forward redis-cluster-0 6379:6379"
-echo "2. Then use redis-cli with TLS and password:"
-echo "   redis-cli -h 127.0.0.1 -p 6379 --tls --cert ./ssl/redis.crt --key ./ssl/redis.key --cacert ./ssl/ca.crt -a $redis_password"
-echo "3. In your application, ensure you're using a Redis client that supports TLS and clustering."
-echo "   Configure it with the cluster nodes, TLS certificates, and password."
+rm -r ssl/

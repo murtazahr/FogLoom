@@ -700,9 +700,12 @@ done
 
 echo "All required nodes are present in the cluster."
 
-# Part 2: Generate YAML file for config and secrets
+# Part 2: Create redis cluster
 mkdir -p kubernetes-manifests/generated
 
+/bin/bash ./redis-setup.sh
+
+# Part 3: Generate YAML file for config and secrets
 # Create the PBFT key generation job YAML
 cat << EOF > kubernetes-manifests/generated/pbft-key-generation-job.yaml
 apiVersion: batch/v1
@@ -786,7 +789,7 @@ EOF
 
 echo "Generated YAML file for config and secrets has been saved to kubernetes-manifests/generated/config-and-secrets.yaml"
 
-# Part 3: Generate CouchDB cluster deployment YAML
+# Part 4: Generate CouchDB cluster deployment YAML
 couchdb_yaml=$(generate_couchdb_yaml "$num_fog_nodes")
 
 # Save the generated CouchDB YAML to a file
@@ -794,12 +797,20 @@ echo "$couchdb_yaml" > kubernetes-manifests/generated/couchdb-cluster-deployment
 
 echo "Generated CouchDB cluster deployment YAML has been saved to kubernetes-manifests/generated/couchdb-cluster-deployment.yaml"
 
-# Part 4: Generate blockchain network deployment YAML
+# Part 5: Generate blockchain network deployment YAML
 blockchain_network_yaml=$(generate_blockchain_network_yaml "$num_fog_nodes" "$num_iot_nodes")
 
 # Save the generated blockchain network YAML to a file
 echo "$blockchain_network_yaml" > kubernetes-manifests/generated/blockchain-network-deployment.yaml
 
 echo "Generated blockchain network deployment YAML has been saved to kubernetes-manifests/generated/blockchain-network-deployment.yaml"
+
+# Part 6: deploy network
+echo "Deploying Network"
+# Apply to kubernetes environment.
+kubectl apply -f kubernetes-manifests/generated/config-and-secrets.yaml
+kubectl apply -f kubernetes-manifests/generated/couchdb-cluster-deployment.yaml
+kubectl apply -f kubernetes-manifests/static/local-docker-registry-deployment.yaml
+kubectl apply -f kubernetes-manifests/generated/blockchain-network-deployment.yaml
 
 echo "Script execution completed successfully."
