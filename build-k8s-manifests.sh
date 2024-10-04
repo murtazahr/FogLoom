@@ -319,24 +319,52 @@ items:"
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: REDIS_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-password
+                      key: password
+                - name: REDIS_SSL_CERT
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-certificates
+                      key: redis.crt
+                - name: REDIS_SSL_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-certificates
+                      key: redis.key
+                - name: REDIS_SSL_CA
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-certificates
+                      key: ca.crt
 
             - name: scheduling-tp
               image: murtazahr/scheduling-tp:latest
               env:
                 - name: VALIDATOR_URL
                   value: \"tcp://$service_name:4004\"
-                - name: COUCHDB_HOST
-                  value: \"couchdb-$i.default.svc.cluster.local:5984\"
-                - name: COUCHDB_USER
+                - name: REDIS_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: couchdb-secrets
-                      key: COUCHDB_USER
-                - name: COUCHDB_PASSWORD
+                      name: redis-password
+                      key: password
+                - name: REDIS_SSL_CERT
                   valueFrom:
                     secretKeyRef:
-                      name: couchdb-secrets
-                      key: COUCHDB_PASSWORD
+                      name: redis-certificates
+                      key: redis.crt
+                - name: REDIS_SSL_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-certificates
+                      key: redis.key
+                - name: REDIS_SSL_CA
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-certificates
+                      key: ca.crt
 
             - name: sawtooth-pbft-engine
               image: hyperledger/sawtooth-pbft-engine:chime
@@ -413,6 +441,26 @@ items:"
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: REDIS_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-password
+                      key: password
+                - name: REDIS_SSL_CERT
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-certificates
+                      key: redis.crt
+                - name: REDIS_SSL_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-certificates
+                      key: redis.key
+                - name: REDIS_SSL_CA
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-certificates
+                      key: ca.crt
                 - name: IS_NEW_ADDITION
                   value: \"false\"
 

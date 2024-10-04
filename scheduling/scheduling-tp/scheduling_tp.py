@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import os
+import ssl
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 
@@ -15,7 +16,11 @@ from sawtooth_sdk.processor.handler import TransactionHandler
 from scheduler import create_scheduler
 
 # Redis configuration
-REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
+REDIS_CLUSTER_URL = os.getenv('REDIS_CLUSTER_URL', 'rediss://redis-cluster:6379')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+REDIS_SSL_CERT = os.getenv('REDIS_SSL_CERT')
+REDIS_SSL_KEY = os.getenv('REDIS_SSL_KEY')
+REDIS_SSL_CA = os.getenv('REDIS_SSL_CA')
 
 # Sawtooth configuration
 FAMILY_NAME = 'iot-schedule'
@@ -83,7 +88,32 @@ class IoTScheduleTransactionHandler(TransactionHandler):
             raise InvalidTransaction(str(e))
 
     async def initialize_redis(self):
-        self.redis = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
+        try:
+            ssl_context = ssl.create_default_context()
+
+            # Load CA cert
+            ssl_context.load_verify_locations(cadata=REDIS_SSL_CA)
+
+            # Load client cert and key
+            ssl_context.load_cert_chain(
+                certfile=REDIS_SSL_CERT,
+                keyfile=REDIS_SSL_KEY
+            )
+
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+            self.redis = await RedisCluster.from_url(
+                REDIS_CLUSTER_URL,
+                password=REDIS_PASSWORD,
+                ssl=True,
+                ssl_context=ssl_context,
+                decode_responses=True
+            )
+            logger.info("Connected to Redis cluster successfully")
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {str(e)}")
+            raise
 
     def _run_async_operations(self, schedule_id, workflow_id, source_url, source_public_key, timestamp, context):
         return self.loop.run_until_complete(self._async_operations(schedule_id, workflow_id, source_url,
@@ -182,7 +212,7 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                 app_requirements[app_id] = self._get_app_requirements(context, app_id)
 
             redis_config = {
-                "url": REDIS_URL
+                "redis-client": self.redis
             }
 
             return create_scheduler("lcdwrr", dependency_graph, app_requirements, redis_config)

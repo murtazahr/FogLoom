@@ -7,7 +7,6 @@ import random
 import logging
 import asyncio
 
-from coredis import RedisCluster
 from coredis.exceptions import RedisError
 
 logger = logging.getLogger(__name__)
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 class BaseScheduler(ABC):
     @abstractmethod
     def __init__(self, dependency_graph: Dict[str, Any], app_requirements: Dict[str, Dict[str, int]],
-                 redis_config: Dict[str, str]):
+                 redis_config: Dict[str, Any]):
         pass
 
     @abstractmethod
@@ -41,16 +40,12 @@ class NodeSelectionError(SchedulingError):
 
 class LCDWRRScheduler(BaseScheduler):
     def __init__(self, dependency_graph: Dict[str, Any], app_requirements: Dict[str, Dict[str, int]],
-                 redis_config: Dict[str, str]):
+                 redis_config: Dict[str, Any]):
         self.dependency_graph = dependency_graph
         self.app_requirements = app_requirements
-        self.redis = None
-        self.redis_config = redis_config
+        self.redis = redis_config.get("redis-client")
         self.max_retries = 3
         self.retry_delay = 5  # seconds
-
-    async def initialize_redis(self):
-        self.redis = await RedisCluster.from_url(self.redis_config['url'], decode_responses=True)
 
     @staticmethod
     def calculate_load(node: Dict) -> float:
@@ -107,9 +102,6 @@ class LCDWRRScheduler(BaseScheduler):
         return False
 
     async def get_latest_node_data(self):
-        if not self.redis:
-            await self.initialize_redis()
-
         node_resources = {'rows': []}
 
         try:

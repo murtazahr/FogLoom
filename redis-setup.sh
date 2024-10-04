@@ -68,7 +68,7 @@ data:
     tls-cluster yes
     requirepass ${redis_password}
     masterauth ${redis_password}
-    protected-mode no
+    protected-mode yes
     cluster-enabled yes
     cluster-config-file nodes.conf
     cluster-node-timeout 5000

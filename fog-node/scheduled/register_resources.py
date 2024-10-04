@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import ssl
 import sys
 import time
 import json
@@ -30,7 +31,11 @@ COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD'
 COUCHDB_DB = 'resource_registry'
 
 # Redis configuration
-REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
+REDIS_CLUSTER_URL = os.getenv('REDIS_CLUSTER_URL', 'rediss://redis-cluster:6379')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+REDIS_SSL_CERT = os.getenv('REDIS_SSL_CERT')
+REDIS_SSL_KEY = os.getenv('REDIS_SSL_KEY')
+REDIS_SSL_CA = os.getenv('REDIS_SSL_CA')
 
 UPDATE_INTERVAL = int(os.getenv('RESOURCE_UPDATE_INTERVAL', 300))
 BLOCKCHAIN_BATCH_SIZE = int(os.getenv('RESOURCE_UPDATE_BATCH_SIZE', 5))
@@ -111,11 +116,31 @@ def connect_to_couchdb(max_retries=5, retry_delay=5):
 
 
 async def connect_to_redis(max_retries=5, retry_delay=5):
-    logger.info(f'Connecting to Redis cluster at {REDIS_URL}')
+    logger.info(f'Connecting to Redis cluster at {REDIS_CLUSTER_URL}')
     for attempt in range(max_retries):
         try:
-            redis_cluster = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
-            logger.info("Successfully connected to Redis cluster.")
+            ssl_context = ssl.create_default_context()
+
+            # Load CA cert
+            ssl_context.load_verify_locations(cadata=REDIS_SSL_CA)
+
+            # Load client cert and key
+            ssl_context.load_cert_chain(
+                certfile=REDIS_SSL_CERT,
+                keyfile=REDIS_SSL_KEY
+            )
+
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+            redis_cluster = await RedisCluster.from_url(
+                REDIS_CLUSTER_URL,
+                password=REDIS_PASSWORD,
+                ssl=True,
+                ssl_context=ssl_context,
+                decode_responses=True
+            )
+            logger.info("Connected to Redis cluster successfully")
             return redis_cluster
         except RedisError as e:
             logger.error(f"Error connecting to Redis cluster: {str(e)}")

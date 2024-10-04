@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import os
+import ssl
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -27,7 +28,12 @@ CURRENT_NODE = os.getenv('NODE_ID')
 COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
 COUCHDB_DATA_DB = 'task_data'
 
-REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
+# Redis configuration
+REDIS_CLUSTER_URL = os.getenv('REDIS_CLUSTER_URL', 'rediss://redis-cluster:6379')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+REDIS_SSL_CERT = os.getenv('REDIS_SSL_CERT')
+REDIS_SSL_KEY = os.getenv('REDIS_SSL_KEY')
+REDIS_SSL_CA = os.getenv('REDIS_SSL_CA')
 
 
 class TaskExecutor:
@@ -47,7 +53,27 @@ class TaskExecutor:
 
     async def connect_to_redis(self):
         try:
-            self.redis = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
+            ssl_context = ssl.create_default_context()
+
+            # Load CA cert
+            ssl_context.load_verify_locations(cadata=REDIS_SSL_CA)
+
+            # Load client cert and key
+            ssl_context.load_cert_chain(
+                certfile=REDIS_SSL_CERT,
+                keyfile=REDIS_SSL_KEY
+            )
+
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+            self.redis = await RedisCluster.from_url(
+                REDIS_CLUSTER_URL,
+                password=REDIS_PASSWORD,
+                ssl=True,
+                ssl_context=ssl_context,
+                decode_responses=True
+            )
             logger.info("Connected to Redis cluster successfully")
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")

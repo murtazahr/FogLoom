@@ -1,8 +1,10 @@
 import asyncio
 import hashlib
+import io
 import json
 import logging
 import os
+import ssl
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 
@@ -18,7 +20,11 @@ COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD'
 COUCHDB_DATA_DB = 'task_data'
 
 # Redis configuration
-REDIS_URL = os.getenv('REDIS_URL', 'redis://redis-cluster:6379')
+REDIS_CLUSTER_URL = os.getenv('REDIS_CLUSTER_URL', 'rediss://redis-cluster:6379')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
+REDIS_SSL_CERT = os.getenv('REDIS_SSL_CERT')
+REDIS_SSL_KEY = os.getenv('REDIS_SSL_KEY')
+REDIS_SSL_CA = os.getenv('REDIS_SSL_CA')
 
 # Sawtooth configuration
 FAMILY_NAME = 'iot-data'
@@ -39,7 +45,32 @@ class IoTDataTransactionHandler(TransactionHandler):
         self.executor = ThreadPoolExecutor()
 
     async def initialize_redis(self):
-        self.redis = await RedisCluster.from_url(REDIS_URL, decode_responses=True)
+        try:
+            ssl_context = ssl.create_default_context()
+
+            # Load CA cert
+            ssl_context.load_verify_locations(cadata=REDIS_SSL_CA)
+
+            # Load client cert and key
+            ssl_context.load_cert_chain(
+                certfile=REDIS_SSL_CERT,
+                keyfile=REDIS_SSL_KEY
+            )
+
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+            self.redis = await RedisCluster.from_url(
+                REDIS_CLUSTER_URL,
+                password=REDIS_PASSWORD,
+                ssl=True,
+                ssl_context=ssl_context,
+                decode_responses=True
+            )
+            logger.info("Connected to Redis cluster successfully")
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {str(e)}")
+            raise
 
     @property
     def family_name(self):
@@ -59,7 +90,7 @@ class IoTDataTransactionHandler(TransactionHandler):
             iot_data = payload['iot_data']
             workflow_id = payload['workflow_id']
             schedule_id = payload['schedule_id']
-            persist_data = payload.get('persist_data', False)  # New line
+            persist_data = payload.get('persist_data', False)
 
             logger.info(f"Processing IoT data for workflow ID: {workflow_id}, schedule ID: {schedule_id}")
 
@@ -71,10 +102,9 @@ class IoTDataTransactionHandler(TransactionHandler):
 
             iot_data_hash = self._calculate_hash(iot_data)
 
-            # Run async operations in a separate thread
             future = self.executor.submit(self._run_async_operations, context, workflow_id, schedule_id, iot_data,
-                                          iot_data_hash, persist_data)  # Modified line
-            future.result()  # This will raise any exceptions that occurred in the async operations
+                                          iot_data_hash, persist_data)
+            future.result()
 
             if persist_data:
                 iot_data_address = self._make_iot_data_address(schedule_id)
@@ -108,7 +138,6 @@ class IoTDataTransactionHandler(TransactionHandler):
         dependency_graph = self._get_dependency_graph(context, workflow_id)
         data_id = self._generate_data_id(workflow_id, schedule_id, dependency_graph["start"], 'input')
 
-        # Always store in Redis, but conditionally store in CouchDB
         tasks = [self._store_data_in_redis(data_id, iot_data, iot_data_hash, workflow_id, schedule_id, persist_data)]
         if persist_data:
             tasks.append(self._store_data_in_couchdb(data_id, iot_data, iot_data_hash, workflow_id, schedule_id))
