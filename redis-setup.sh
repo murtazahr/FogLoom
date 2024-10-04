@@ -26,10 +26,29 @@ create_redis_password_secret() {
     kubectl create secret generic redis-password --from-literal=password=$redis_password
 }
 
+# Function to get a list of available fog nodes
+get_fog_nodes() {
+    kubectl get nodes --no-headers | awk '/^fog-node-/ {print $1}'
+}
+
+# Function to randomly select unique fog nodes
+select_unique_fog_nodes() {
+    local num_nodes=$1
+    local fog_nodes=($(get_fog_nodes))
+
+    if [ ${#fog_nodes[@]} -lt $num_nodes ]; then
+        echo "Error: Not enough fog nodes available. Found ${#fog_nodes[@]}, need $num_nodes." >&2
+        exit 1
+    fi
+
+    echo $(shuf -e "${fog_nodes[@]}" | head -n $num_nodes)
+}
+
 # Updated function to generate Redis Cluster YAML with SSL, AUTH, and CA cert
 generate_redis_cluster_yaml() {
-    local num_redis_nodes=10
-    local redis_password=$1
+    local num_redis_nodes=$1
+    local redis_password=$2
+    local selected_nodes=("${@:3}")
 
     cat << EOF
 ---
@@ -74,13 +93,25 @@ spec:
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app
-                    operator: In
-                    values:
-                      - redis-cluster
-              topologyKey: "kubernetes.io/hostname"
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - redis-cluster
+            topologyKey: "kubernetes.io/hostname"
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+EOF
+    for node in "${selected_nodes[@]}"; do
+        echo "                - $node" >> redis-cluster.yaml
+    done
+    cat << EOF >> redis-cluster.yaml
       containers:
       - name: redis
         image: redis:6.2
@@ -138,10 +169,6 @@ spec:
 EOF
 }
 
-#!/bin/bash
-
-# ... [Previous functions remain the same] ...
-
 # Function to wait for all Redis Cluster pods to be running
 wait_for_redis_pods() {
     echo "Waiting for all Redis Cluster pods to be running..."
@@ -183,18 +210,6 @@ check_cluster_status() {
     return 1
 }
 
-# Function to check Redis connectivity
-check_redis_connectivity() {
-    local pod=$1
-    echo "Checking Redis connectivity for $pod..."
-    kubectl exec $pod -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password ping
-}
-
-# Function to get pod IPs
-get_pod_ips() {
-    kubectl get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.status.podIP}{" "}{end}'
-}
-
 # Main script execution
 generate_ssl_certs
 
@@ -204,26 +219,41 @@ redis_password=$(generate_password)
 # Create Redis password secret
 create_redis_password_secret "$redis_password"
 
+# Get the number of available fog nodes
+fog_node_count=$(get_fog_nodes | wc -l)
+echo "Number of available fog nodes: $fog_node_count"
+
+# Calculate the number of Redis nodes (minimum 4, maximum 10)
+num_redis_nodes=$(( fog_node_count > 10 ? 10 : fog_node_count ))
+echo "Number of Redis nodes to be created: $num_redis_nodes"
+
+# Randomly select unique fog nodes
+readarray -t selected_nodes < <(select_unique_fog_nodes $num_redis_nodes)
+echo "Selected fog nodes: ${selected_nodes[*]}"
+
 # Generate and apply the Redis Cluster YAML
-generate_redis_cluster_yaml "$redis_password" > redis-cluster.yaml
+generate_redis_cluster_yaml $num_redis_nodes "$redis_password" "${selected_nodes[@]}" > redis-cluster.yaml
 kubectl apply -f redis-cluster.yaml
 
 # Wait for all pods to be in the running state
 wait_for_redis_pods
 
-# Check connectivity for each pod
-for pod in $(kubectl get pods -l app=redis-cluster -o name); do
-    check_redis_connectivity $pod
-done
-
 # Get the list of Redis node IPs
-node_ips=$(get_pod_ips)
+node_ips=$(kubectl get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.status.podIP}{" "}{end}')
 
-# Modify the cluster creation command to use pod IPs
-echo "Creating Redis Cluster with 3 shards..."
-kubectl exec -it redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 2 \
-    $(echo $node_ips | sed -e 's/\([0-9.]*\)/\1:6379/g') \
-    --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password
+# Create the Redis Cluster
+echo "Creating Redis Cluster with $num_redis_nodes nodes..."
+if [ $num_redis_nodes -lt 6 ]; then
+    # For 4-5 nodes, use 1 replica
+    kubectl exec -it redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 1 \
+        $(echo $node_ips | sed -e 's/\([0-9.]*\)/\1:6379/g') \
+        --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password
+else
+    # For 6-10 nodes, use 2 replicas
+    kubectl exec -it redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 2 \
+        $(echo $node_ips | sed -e 's/\([0-9.]*\)/\1:6379/g') \
+        --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password
+fi
 
 echo "Waiting for cluster to stabilize..."
 sleep 30  # Give the cluster some time to stabilize
@@ -234,8 +264,6 @@ if check_cluster_status; then
 else
     echo "Warning: Redis Cluster may not be fully operational. Please check manually."
 fi
-
-echo "Secure Redis Cluster setup complete."
 
 # Print connection information
 echo "To connect to your Redis Cluster:"
