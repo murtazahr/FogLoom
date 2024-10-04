@@ -133,7 +133,6 @@ async def connect_to_redis():
             ca_file.flush()
             temp_files.append(ca_file.name)
             ssl_context.load_verify_locations(cafile=ca_file.name)
-            logger.debug(f"CA certificate loaded from temp file: {ca_file.name}")
         else:
             logger.warning("REDIS_SSL_CA is empty or not set")
 
@@ -149,8 +148,6 @@ async def connect_to_redis():
                 certfile=cert_file.name,
                 keyfile=key_file.name
             )
-            logger.debug(f"Client certificate loaded from temp file: {cert_file.name}")
-            logger.debug(f"Client key loaded from temp file: {key_file.name}")
         else:
             logger.warning("REDIS_SSL_CERT or REDIS_SSL_KEY is empty or not set")
 

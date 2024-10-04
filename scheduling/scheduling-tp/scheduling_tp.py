@@ -17,7 +17,8 @@ from sawtooth_sdk.processor.handler import TransactionHandler
 from scheduler import create_scheduler
 
 # Redis configuration
-REDIS_CLUSTER_URL = os.getenv('REDIS_CLUSTER_URL', 'rediss://redis-cluster:6379')
+REDIS_HOST = os.getenv('REDIS_HOST', 'redis-cluster')
+REDIS_PORT = int(os.getenv('REDIS_PORT', '6379'))
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD')
 REDIS_SSL_CERT = os.getenv('REDIS_SSL_CERT')
 REDIS_SSL_KEY = os.getenv('REDIS_SSL_KEY')
@@ -93,21 +94,24 @@ class IoTScheduleTransactionHandler(TransactionHandler):
         logger.info("Starting Redis initialization")
         temp_files = []
         try:
-            ssl_context = ssl.create_default_context()
+            ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            ssl_context.maximum_version = ssl.TLSVersion.TLSv1_3
 
             if REDIS_SSL_CA:
-                ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+                ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
                 ca_file.write(REDIS_SSL_CA)
                 ca_file.flush()
                 temp_files.append(ca_file.name)
                 ssl_context.load_verify_locations(cafile=ca_file.name)
-                logger.debug(f"CA certificate loaded from temp file: {ca_file.name}")
             else:
                 logger.warning("REDIS_SSL_CA is empty or not set")
 
             if REDIS_SSL_CERT and REDIS_SSL_KEY:
-                cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
-                key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+                cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
+                key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.key')
                 cert_file.write(REDIS_SSL_CERT)
                 key_file.write(REDIS_SSL_KEY)
                 cert_file.flush()
@@ -117,18 +121,13 @@ class IoTScheduleTransactionHandler(TransactionHandler):
                     certfile=cert_file.name,
                     keyfile=key_file.name
                 )
-                logger.debug(f"Client certificate loaded from temp file: {cert_file.name}")
-                logger.debug(f"Client key loaded from temp file: {key_file.name}")
             else:
                 logger.warning("REDIS_SSL_CERT or REDIS_SSL_KEY is empty or not set")
 
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-            logger.debug("SSL context configured: check_hostname=False, verify_mode=CERT_NONE")
-
-            logger.info(f"Attempting to connect to Redis cluster at {REDIS_CLUSTER_URL}")
-            self.redis = RedisCluster.from_url(
-                REDIS_CLUSTER_URL,
+            logger.info(f"Attempting to connect to Redis cluster at {REDIS_HOST}:{REDIS_PORT}")
+            self.redis = RedisCluster(
+                host=REDIS_HOST,
+                port=REDIS_PORT,
                 password=REDIS_PASSWORD,
                 ssl=True,
                 ssl_context=ssl_context,
@@ -138,10 +137,8 @@ class IoTScheduleTransactionHandler(TransactionHandler):
 
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {str(e)}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
             raise
         finally:
-            # Clean up temporary files
             for file_path in temp_files:
                 try:
                     os.unlink(file_path)
