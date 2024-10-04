@@ -138,6 +138,10 @@ spec:
 EOF
 }
 
+#!/bin/bash
+
+# ... [Previous functions remain the same] ...
+
 # Function to wait for all Redis Cluster pods to be running
 wait_for_redis_pods() {
     echo "Waiting for all Redis Cluster pods to be running..."
@@ -153,6 +157,18 @@ wait_for_redis_pods() {
             sleep 10
         fi
     done
+}
+
+# Function to check Redis connectivity
+check_redis_connectivity() {
+    local pod=$1
+    echo "Checking Redis connectivity for $pod..."
+    kubectl exec $pod -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password ping
+}
+
+# Function to get pod IPs
+get_pod_ips() {
+    kubectl get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.status.podIP}{" "}{end}'
 }
 
 # Main script execution
@@ -171,14 +187,21 @@ kubectl apply -f redis-cluster.yaml
 # Wait for all pods to be in the running state
 wait_for_redis_pods
 
-# Get the list of Redis nodes
-nodes=$(kubectl get pods -l app=redis-cluster -o jsonpath='{range.items[*]}{.status.podIP}:6379 ')
+# Check connectivity for each pod
+for pod in $(kubectl get pods -l app=redis-cluster -o name); do
+    check_redis_connectivity $pod
+done
 
-# Modify the cluster creation command to use TLS
+# Get the list of Redis node IPs
+node_ips=$(get_pod_ips)
+
+# Modify the cluster creation command to use pod IPs
 echo "Creating Redis Cluster with 3 shards..."
-kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt --cluster-yes --cluster create $nodes --cluster-replicas 2 -a $redis_password
+kubectl exec -it redis-cluster-0 -- redis-cli --cluster create --cluster-replicas 2 \
+    $(echo $node_ips | sed -e 's/\([0-9.]*\)/\1:6379/g') \
+    --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password
 
-# Modify the cluster status verification command
+# Verify cluster status
 echo "Verifying cluster status..."
 kubectl exec -it redis-cluster-0 -- redis-cli --tls --cert /ssl/redis.crt --key /ssl/redis.key --cacert /ssl/ca.crt -a $redis_password cluster info
 
@@ -189,6 +212,6 @@ echo "To connect to your Redis Cluster:"
 echo "1. Use kubectl port-forward to access a Redis node:"
 echo "   kubectl port-forward redis-cluster-0 6379:6379"
 echo "2. Then use redis-cli with TLS and password:"
-echo "   redis-cli -h 127.0.0.1 -p 6379 --tls --cert ./ssl/redis.crt --key ./ssl/redis.key -a $redis_password"
+echo "   redis-cli -h 127.0.0.1 -p 6379 --tls --cert ./ssl/redis.crt --key ./ssl/redis.key --cacert ./ssl/ca.crt -a $redis_password"
 echo "3. In your application, ensure you're using a Redis client that supports TLS and clustering."
 echo "   Configure it with the cluster nodes, TLS certificates, and password."
