@@ -91,10 +91,10 @@ spec:
         resources:
           requests:
             cpu: 500m
-            memory: 1Gi
+            memory: 750Mi
           limits:
             cpu: 1
-            memory: 2Gi
+            memory: 1Gi
         volumeMounts:
         - name: conf
           mountPath: /conf
@@ -121,7 +121,7 @@ spec:
       accessModes: ["ReadWriteOnce"]
       resources:
         requests:
-          storage: 5Gi
+          storage: 2Gi
 ---
 apiVersion: v1
 kind: Service
