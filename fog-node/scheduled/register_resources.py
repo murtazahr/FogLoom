@@ -133,12 +133,6 @@ async def connect_to_redis():
     logger.info("Starting Redis initialization")
     temp_files = []
     try:
-        # WARNING: The following logs contain sensitive data. Remove before production use.
-        logger.warning("SECURITY RISK: Logging full certificate content. Remove in production.")
-        log_full_cert(REDIS_SSL_CA, "CA Certificate")
-        log_full_cert(REDIS_SSL_CERT, "Client Certificate")
-        log_full_cert(REDIS_SSL_KEY, "Client Key")
-
         ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         ssl_context.check_hostname = False
         ssl_context.verify_mode = ssl.CERT_NONE
@@ -146,7 +140,7 @@ async def connect_to_redis():
         ssl_context.maximum_version = ssl.TLSVersion.TLSv1_3
 
         if REDIS_SSL_CA:
-            ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+            ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
             ca_file.write(REDIS_SSL_CA)
             ca_file.flush()
             temp_files.append(ca_file.name)
@@ -156,8 +150,8 @@ async def connect_to_redis():
             logger.warning("REDIS_SSL_CA is empty or not set")
 
         if REDIS_SSL_CERT and REDIS_SSL_KEY:
-            cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
-            key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+')
+            cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
+            key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.key')
             cert_file.write(REDIS_SSL_CERT)
             key_file.write(REDIS_SSL_KEY)
             cert_file.flush()
@@ -181,7 +175,6 @@ async def connect_to_redis():
             decode_responses=True
         )
         logger.info("Connected to Redis cluster successfully")
-
         return redis
 
     except Exception as e:
