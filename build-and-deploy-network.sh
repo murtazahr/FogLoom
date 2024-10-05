@@ -154,9 +154,11 @@ items:"
       selector:
         app: couchdb-${i}
       ports:
-        - port: 5984
+        - name: http
+          port: 5984
           targetPort: 5984
-        - port: 6984
+        - name: https
+          port: 6984
           targetPort: 6984"
     done
 
