@@ -91,7 +91,7 @@ items:"
           initContainers:
             - name: init-config
               image: busybox
-              command: ['sh', '-c', 'cp /tmp/couchdb-config/* /opt/couchdb/etc/local.d/']
+              command: ['sh', '-c', 'cp /tmp/couchdb-config/* /opt/couchdb/etc/local.d/ && echo \"Config files copied\" && ls -la /opt/couchdb/etc/local.d']
               volumeMounts:
                 - name: couchdb-config
                   mountPath: /tmp/couchdb-config
@@ -100,6 +100,19 @@ items:"
           containers:
             - name: couchdb
               image: couchdb:3
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  echo "Starting CouchDB with verbose logging"
+                  echo "Debugging: Listing /opt/couchdb/etc/local.d"
+                  ls -la /opt/couchdb/etc/local.d
+                  echo "Debugging: Contents of ssl.ini"
+                  cat /opt/couchdb/etc/local.d/ssl.ini
+                  echo "Debugging: Listing /opt/couchdb/certs"
+                  ls -la /opt/couchdb/certs
+                  echo "Debugging: Environment variables"
+                  env | grep COUCH
+                  /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.ini /opt/couchdb/etc/local.d/ssl.ini -vv
               ports:
                 - containerPort: 5984
                 - containerPort: 6984
@@ -137,8 +150,22 @@ items:"
                   path: /
                   port: 6984
                   scheme: HTTPS
-                initialDelaySeconds: 5
+                initialDelaySeconds: 30
                 periodSeconds: 10
+                failureThreshold: 3
+            - name: logger
+              image: busybox
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  mkdir -p /opt/couchdb/log
+                  touch /opt/couchdb/log/couch.log
+                  tail -f /opt/couchdb/log/* /opt/couchdb/etc/local.d/*
+              volumeMounts:
+                - name: couchdb-data
+                  mountPath: /opt/couchdb/log
+                - name: config-storage
+                  mountPath: /opt/couchdb/etc/local.d
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
