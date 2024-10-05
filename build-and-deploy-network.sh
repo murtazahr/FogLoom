@@ -106,8 +106,8 @@ items:"
                   echo \"Checking for existing CouchDB processes\"
                   pkill -9 beam.smp || true
                   echo \"Checking if ports are in use\"
-                  netstat -tlpn | grep :5984 && fuser -k 5984/tcp || true
-                  netstat -tlpn | grep :6984 && fuser -k 6984/tcp || true
+                  lsof -i :5984 | grep LISTEN && kill \$(lsof -t -i:5984) || true
+                  lsof -i :6984 | grep LISTEN && kill \$(lsof -t -i:6984) || true
                   echo \"Waiting for ports to be freed\"
                   sleep 10
                   echo \"Starting CouchDB with verbose logging\"
