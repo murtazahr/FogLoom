@@ -125,6 +125,14 @@ items:"
                   mountPath: /opt/couchdb/data
                 - name: couchdb-ssl
                   mountPath: /opt/couchdb/ssl
+              readinessProbe:
+                httpGet:
+                  path: /
+                  port: 5984
+                initialDelaySeconds: 30
+                timeoutSeconds: 5
+                periodSeconds: 10
+                failureThreshold: 3
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
