@@ -207,6 +207,24 @@ items:"
     metadata:
       name: couchdb-config
     data:
+      local.ini: |
+        [admins]
+        \${COUCHDB_USER} = \${COUCHDB_PASSWORD}
+
+        [couchdb]
+        uuid = couch
+
+        [chttpd]
+        bind_address = 0.0.0.0
+        port = 5984
+
+        [httpd]
+        bind_address = 0.0.0.0
+        port = 5984
+
+        [couch_httpd_auth]
+        require_valid_user = true
+
       ssl.ini: |
         [ssl]
         enable = true
@@ -217,14 +235,7 @@ items:"
 
         [chttpd]
         bind_address = 0.0.0.0
-        port = 6984
-
-        [httpd]
-        bind_address = 0.0.0.0
-        port = 5984
-
-        [couch_httpd_auth]
-        require_valid_user = true"
+        port = 6984"
 
     # Generate CouchDB Cluster Setup Job
     yaml_content+="
