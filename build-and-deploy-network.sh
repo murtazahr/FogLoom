@@ -41,10 +41,10 @@ generate_ssl_certificates() {
         openssl x509 -req -in "$cert_dir/node$i.csr" -CA "$cert_dir/ca.crt" -CAkey "$cert_dir/ca.key" -CAcreateserial -out "$cert_dir/node$i.crt" -days 365
     done
 
-    # Create Kubernetes secrets for certificates
+    # Create Kubernetes secret for certificates
     kubectl create secret generic couchdb-certs \
         --from-file="$cert_dir/ca.crt" \
-        "$(for ((i=0; i<num_nodes; i++)); do echo "--from-file=node$i.crt=$cert_dir/node$i.crt --from-file=node$i.key=$cert_dir/node$i.key"; done)"
+        $(for ((i=0; i<num_nodes; i++)); do echo "--from-file=node${i}_crt=$cert_dir/node$i.crt --from-file=node${i}_key=$cert_dir/node$i.key"; done)
 }
 
 generate_couchdb_yaml() {
@@ -170,8 +170,8 @@ items:"
       ssl.ini: |
         [ssl]
         enable = true
-        cert_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}.crt
-        key_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}.key
+        cert_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
+        key_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
         cacert_file = /opt/couchdb/certs/ca.crt
         verify_ssl = false
 
