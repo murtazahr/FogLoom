@@ -24,7 +24,29 @@ check_node_exists() {
     return $?
 }
 
-# Function to generate CouchDB cluster deployment YAML
+generate_ssl_certificates() {
+    local num_nodes=$1
+    local cert_dir="kubernetes-manifests/generated/certs"
+
+    mkdir -p "$cert_dir"
+
+    # Generate CA key and certificate
+    openssl genrsa -out "$cert_dir/ca.key" 4096
+    openssl req -new -x509 -key "$cert_dir/ca.key" -out "$cert_dir/ca.crt" -days 365 -subj "/CN=CouchDB CA"
+
+    # Generate certificates for each node
+    for ((i=0; i<num_nodes; i++)); do
+        openssl genrsa -out "$cert_dir/node$i.key" 2048
+        openssl req -new -key "$cert_dir/node$i.key" -out "$cert_dir/node$i.csr" -subj "/CN=couchdb-$i.default.svc.cluster.local"
+        openssl x509 -req -in "$cert_dir/node$i.csr" -CA "$cert_dir/ca.crt" -CAkey "$cert_dir/ca.key" -CAcreateserial -out "$cert_dir/node$i.crt" -days 365
+    done
+
+    # Create Kubernetes secrets for certificates
+    kubectl create secret generic couchdb-certs \
+        --from-file="$cert_dir/ca.crt" \
+        "$(for ((i=0; i<num_nodes; i++)); do echo "--from-file=node$i.crt=$cert_dir/node$i.crt --from-file=node$i.key=$cert_dir/node$i.key"; done)"
+}
+
 generate_couchdb_yaml() {
     local num_fog_nodes=$1
     local yaml_content="apiVersion: v1
@@ -71,6 +93,7 @@ items:"
               image: couchdb:3
               ports:
                 - containerPort: 5984
+                - containerPort: 6984
               env:
                 - name: COUCHDB_USER
                   valueFrom:
@@ -91,19 +114,32 @@ items:"
                   value: \"-setcookie \\\"\${ERLANG_COOKIE}\\\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
                 - name: NODENAME
                   value: \"couchdb-${i}.default.svc.cluster.local\"
+                - name: COUCHDB_NODE_ID
+                  value: \"${i}\"
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
+                - name: couchdb-config
+                  mountPath: /opt/couchdb/etc/local.d
+                - name: couchdb-certs
+                  mountPath: /opt/couchdb/certs
               readinessProbe:
                 httpGet:
                   path: /
-                  port: 5984
+                  port: 6984
+                  scheme: HTTPS
                 initialDelaySeconds: 5
                 periodSeconds: 10
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
-                claimName: couchdb${i}-data"
+                claimName: couchdb${i}-data
+            - name: couchdb-config
+              configMap:
+                name: couchdb-config
+            - name: couchdb-certs
+              secret:
+                secretName: couchdb-certs"
     done
 
     # Generate Services
@@ -119,8 +155,36 @@ items:"
         app: couchdb-${i}
       ports:
         - port: 5984
-          targetPort: 5984"
+          targetPort: 5984
+        - port: 6984
+          targetPort: 6984"
     done
+
+    # Generate ConfigMap for CouchDB configuration
+    yaml_content+="
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: couchdb-config
+    data:
+      ssl.ini: |
+        [ssl]
+        enable = true
+        cert_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}.crt
+        key_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}.key
+        cacert_file = /opt/couchdb/certs/ca.crt
+        verify_ssl = false
+
+        [chttpd]
+        bind_address = 0.0.0.0
+        port = 6984
+
+        [httpd]
+        bind_address = 0.0.0.0
+        port = 5984
+
+        [couch_httpd_auth]
+        require_valid_user = true"
 
     # Generate CouchDB Cluster Setup Job
     yaml_content+="
@@ -144,8 +208,8 @@ items:"
                 - |
                   echo \"Starting CouchDB cluster setup\" &&
                   for i in \$(seq 0 $((num_fog_nodes-1))); do
-                    echo \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984\"
-                    until curl -s \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984\" > /dev/null; do
+                    echo \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:6984\"
+                    until curl -k -s \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:6984\" > /dev/null; do
                       echo \"Waiting for CouchDB on couchdb-\${i} to be ready...\"
                       sleep 5
                     done
@@ -153,26 +217,26 @@ items:"
                   done &&
                   echo \"Adding nodes to the cluster\" &&
                   for num in \$(seq 1 $((num_fog_nodes-1))); do
-                    response=\$(curl -X POST -H 'Content-Type: application/json' \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup\" -d \"{\\\"action\\\": \\\"enable_cluster\\\", \\\"bind_address\\\":\\\"0.0.0.0\\\", \\\"username\\\": \\\"\${COUCHDB_USER}\\\", \\\"password\\\":\\\"\${COUCHDB_PASSWORD}\\\", \\\"port\\\": 5984, \\\"node_count\\\": \\\"$num_fog_nodes\\\", \\\"remote_node\\\": \\\"couchdb-\${num}.default.svc.cluster.local\\\", \\\"remote_current_user\\\": \\\"\${COUCHDB_USER}\\\", \\\"remote_current_password\\\": \\\"\${COUCHDB_PASSWORD}\\\" }\")
+                    response=\$(curl -k -X POST -H 'Content-Type: application/json' \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:6984/_cluster_setup\" -d \"{\\\"action\\\": \\\"enable_cluster\\\", \\\"bind_address\\\":\\\"0.0.0.0\\\", \\\"username\\\": \\\"\${COUCHDB_USER}\\\", \\\"password\\\":\\\"\${COUCHDB_PASSWORD}\\\", \\\"port\\\": 6984, \\\"node_count\\\": \\\"$num_fog_nodes\\\", \\\"remote_node\\\": \\\"couchdb-\${num}.default.svc.cluster.local\\\", \\\"remote_current_user\\\": \\\"\${COUCHDB_USER}\\\", \\\"remote_current_password\\\": \\\"\${COUCHDB_PASSWORD}\\\" }\")
                     echo \"Enable cluster on couchdb-\${num} response: \${response}\"
-                    response=\$(curl -s -X POST -H 'Content-Type: application/json' \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup\" -d \"{\\\"action\\\": \\\"add_node\\\", \\\"host\\\":\\\"couchdb-\${num}.default.svc.cluster.local\\\", \\\"port\\\": 5984, \\\"username\\\": \\\"\${COUCHDB_USER}\\\", \\\"password\\\":\\\"\${COUCHDB_PASSWORD}\\\"}\")
+                    response=\$(curl -k -s -X POST -H 'Content-Type: application/json' \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:6984/_cluster_setup\" -d \"{\\\"action\\\": \\\"add_node\\\", \\\"host\\\":\\\"couchdb-\${num}.default.svc.cluster.local\\\", \\\"port\\\": 6984, \\\"username\\\": \\\"\${COUCHDB_USER}\\\", \\\"password\\\":\\\"\${COUCHDB_PASSWORD}\\\"}\")
                     echo \"Adding node couchdb-\${num} response: \${response}\"
                   done &&
                   echo \"Finishing cluster setup\" &&
-                  response=\$(curl -s -X POST -H 'Content-Type: application/json' \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_cluster_setup\" -d \"{\\\"action\\\": \\\"finish_cluster\\\"}\") &&
+                  response=\$(curl -k -s -X POST -H 'Content-Type: application/json' \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:6984/_cluster_setup\" -d \"{\\\"action\\\": \\\"finish_cluster\\\"}\") &&
                   echo \"Finish cluster response: \${response}\" &&
                   echo \"Checking cluster membership\" &&
-                  membership=\$(curl -s -X GET \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/_membership\") &&
+                  membership=\$(curl -k -s -X GET \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:6984/_membership\") &&
                   echo \"Cluster membership: \${membership}\" &&
                   echo \"Creating \${RESOURCE_REGISTRY_DB} and \${TASK_DATA_DB} database on all nodes\" &&
-                  response=\$(curl -s -X PUT \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/\${RESOURCE_REGISTRY_DB}\") &&
+                  response=\$(curl -k -s -X PUT \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:6984/\${RESOURCE_REGISTRY_DB}\") &&
                   echo \"Creating \${RESOURCE_REGISTRY_DB} on couchdb-0 response: \${response}\" &&
-                  response=\$(curl -s -X PUT \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:5984/\${TASK_DATA_DB}\") &&
+                  response=\$(curl -k -s -X PUT \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:6984/\${TASK_DATA_DB}\") &&
                   echo \"Creating \${TASK_DATA_DB} on couchdb-0 response: \${response}\" &&
                   echo \"Waiting for \${RESOURCE_REGISTRY_DB} & \${TASK_DATA_DB} to be available on all nodes\" &&
                   for db in \${RESOURCE_REGISTRY_DB} \${TASK_DATA_DB}; do
                     for i in \$(seq 0 $((num_fog_nodes-1))); do
-                      until curl -s \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984/\${db}\" | grep -q \"\${db}\"; do
+                      until curl -k -s \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:6984/\${db}\" | grep -q \"\${db}\"; do
                         echo \"Waiting for \${db} on couchdb-\${i}...\"
                         sleep 5
                       done
@@ -699,6 +763,9 @@ for ((i=1; i<=num_iot_nodes; i++)); do
 done
 
 echo "All required nodes are present in the cluster."
+
+# Generate SSL/TLS certificates
+generate_ssl_certificates "$num_fog_nodes"
 
 # Part 2: Create redis cluster
 mkdir -p kubernetes-manifests/generated
