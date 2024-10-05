@@ -103,13 +103,6 @@ items:"
               command: [\"/bin/bash\", \"-c\"]
               args:
                 - |
-                  echo \"Checking for existing CouchDB processes\"
-                  pkill -9 beam.smp || true
-                  echo \"Checking if ports are in use\"
-                  lsof -i :5984 | grep LISTEN && kill \$(lsof -t -i:5984) || true
-                  lsof -i :6984 | grep LISTEN && kill \$(lsof -t -i:6984) || true
-                  echo \"Waiting for ports to be freed\"
-                  sleep 10
                   echo \"Starting CouchDB with verbose logging\"
                   echo \"Debugging: Listing /opt/couchdb/etc/local.d\"
                   ls -la /opt/couchdb/etc/local.d
@@ -122,8 +115,8 @@ items:"
                   echo \"Debugging: Environment variables\"
                   env | grep COUCH
                   echo \"Setting up admin user\"
-                  echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
-                  echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
+                  echo \"[admins]\" > /opt/couchdb/etc/local.d/local.ini
+                  echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/local.ini
                   /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
               ports:
                 - containerPort: 5984
