@@ -103,6 +103,13 @@ items:"
               command: [\"/bin/bash\", \"-c\"]
               args:
                 - |
+                  echo \"Checking for existing CouchDB processes\"
+                  pkill -9 beam.smp || true
+                  echo \"Checking if ports are in use\"
+                  netstat -tlpn | grep :5984 && fuser -k 5984/tcp || true
+                  netstat -tlpn | grep :6984 && fuser -k 6984/tcp || true
+                  echo \"Waiting for ports to be freed\"
+                  sleep 10
                   echo \"Starting CouchDB with verbose logging\"
                   echo \"Debugging: Listing /opt/couchdb/etc/local.d\"
                   ls -la /opt/couchdb/etc/local.d
@@ -116,7 +123,7 @@ items:"
                   env | grep COUCH
                   echo \"Setting up admin user\"
                   echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
-                  echo \"\${COUCHDB_USER} = \${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
+                  echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
                   /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
               ports:
                 - containerPort: 5984
@@ -158,6 +165,8 @@ items:"
                 initialDelaySeconds: 30
                 periodSeconds: 10
                 failureThreshold: 3
+              securityContext:
+                privileged: true
             - name: logger
               image: busybox
               command: [\"/bin/sh\", \"-c\"]
@@ -239,16 +248,7 @@ items:"
 
         [chttpd]
         bind_address = 0.0.0.0
-        port = 6984
-
-        [httpd]
-        enable_cors = true
-
-        [cors]
-        origins = *
-        credentials = true
-        methods = GET, PUT, POST, HEAD, DELETE
-        headers = accept, authorization, content-type, origin, referer"
+        port = 6984"
 
     # Generate CouchDB Cluster Setup Job
     yaml_content+="
