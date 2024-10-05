@@ -11,4 +11,4 @@ kubectl delete secret redis-certificates
 kubectl delete secret redis-password
 kubectl delete pvc -l app=redis-cluster
 
-sudo rm -f kubernetes-manifests/generated
+sudo rm -r -f kubernetes-manifests/generated
