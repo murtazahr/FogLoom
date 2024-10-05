@@ -100,17 +100,17 @@ items:"
           containers:
             - name: couchdb
               image: couchdb:3
-              command: ["/bin/bash", "-c"]
+              command: [\"/bin/bash\", \"-c\"]
               args:
                 - |
-                  echo "Starting CouchDB with verbose logging"
-                  echo "Debugging: Listing /opt/couchdb/etc/local.d"
+                  echo \"Starting CouchDB with verbose logging\"
+                  echo \"Debugging: Listing /opt/couchdb/etc/local.d\"
                   ls -la /opt/couchdb/etc/local.d
-                  echo "Debugging: Contents of ssl.ini"
+                  echo \"Debugging: Contents of ssl.ini\"
                   cat /opt/couchdb/etc/local.d/ssl.ini
-                  echo "Debugging: Listing /opt/couchdb/certs"
+                  echo \"Debugging: Listing /opt/couchdb/certs\"
                   ls -la /opt/couchdb/certs
-                  echo "Debugging: Environment variables"
+                  echo \"Debugging: Environment variables\"
                   env | grep COUCH
                   /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.ini /opt/couchdb/etc/local.d/ssl.ini -vv
               ports:
