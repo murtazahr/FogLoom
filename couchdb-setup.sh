@@ -128,11 +128,10 @@ items:"
               readinessProbe:
                 httpGet:
                   path: /
-                  port: 5984
-                initialDelaySeconds: 30
-                timeoutSeconds: 5
+                  port: 6984
+                  scheme: HTTPS
+                initialDelaySeconds: 5
                 periodSeconds: 10
-                failureThreshold: 3
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
