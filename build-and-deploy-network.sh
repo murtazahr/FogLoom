@@ -106,13 +106,18 @@ items:"
                   echo \"Starting CouchDB with verbose logging\"
                   echo \"Debugging: Listing /opt/couchdb/etc/local.d\"
                   ls -la /opt/couchdb/etc/local.d
+                  echo \"Debugging: Contents of local.ini\"
+                  cat /opt/couchdb/etc/local.d/local.ini
                   echo \"Debugging: Contents of ssl.ini\"
                   cat /opt/couchdb/etc/local.d/ssl.ini
                   echo \"Debugging: Listing /opt/couchdb/certs\"
                   ls -la /opt/couchdb/certs
                   echo \"Debugging: Environment variables\"
                   env | grep COUCH
-                  /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.ini /opt/couchdb/etc/local.d/ssl.ini -vv
+                  echo \"Setting up admin user\"
+                  echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
+                  echo \"\${COUCHDB_USER} = \${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
+                  /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
               ports:
                 - containerPort: 5984
                 - containerPort: 6984
@@ -155,7 +160,7 @@ items:"
                 failureThreshold: 3
             - name: logger
               image: busybox
-              command: ["/bin/sh", "-c"]
+              command: [\"/bin/sh\", \"-c\"]
               args:
                 - |
                   mkdir -p /opt/couchdb/log
@@ -208,22 +213,21 @@ items:"
       name: couchdb-config
     data:
       local.ini: |
-        [admins]
-        \${COUCHDB_USER} = \${COUCHDB_PASSWORD}
-
         [couchdb]
         uuid = couch
 
         [chttpd]
-        bind_address = 0.0.0.0
         port = 5984
+        bind_address = 0.0.0.0
 
         [httpd]
-        bind_address = 0.0.0.0
-        port = 5984
+        enable_cors = true
 
-        [couch_httpd_auth]
-        require_valid_user = true
+        [cors]
+        origins = *
+        credentials = true
+        methods = GET, PUT, POST, HEAD, DELETE
+        headers = accept, authorization, content-type, origin, referer
 
       ssl.ini: |
         [ssl]
@@ -235,7 +239,16 @@ items:"
 
         [chttpd]
         bind_address = 0.0.0.0
-        port = 6984"
+        port = 6984
+
+        [httpd]
+        enable_cors = true
+
+        [cors]
+        origins = *
+        credentials = true
+        methods = GET, PUT, POST, HEAD, DELETE
+        headers = accept, authorization, content-type, origin, referer"
 
     # Generate CouchDB Cluster Setup Job
     yaml_content+="
