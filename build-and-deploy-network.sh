@@ -106,6 +106,11 @@ items:"
                   echo \"Starting CouchDB with verbose logging\"
                   echo \"Debugging: Listing /opt/couchdb/etc/local.d\"
                   ls -la /opt/couchdb/etc/local.d
+                  echo \"Setting up admin user\"
+                  echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
+                  echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
+                  echo \"[admins]\" > /opt/couchdb/etc/local.d/local.ini
+                  echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/local.ini
                   echo \"Debugging: Contents of local.ini\"
                   cat /opt/couchdb/etc/local.d/local.ini
                   echo \"Debugging: Contents of ssl.ini\"
@@ -114,11 +119,6 @@ items:"
                   ls -la /opt/couchdb/certs
                   echo \"Debugging: Environment variables\"
                   env | grep COUCH
-                  echo \"Setting up admin user\"
-                  echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
-                  echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
-                  echo \"[admins]\" > /opt/couchdb/etc/local.d/local.ini
-                  echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/local.ini
                   /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
               ports:
                 - containerPort: 5984
