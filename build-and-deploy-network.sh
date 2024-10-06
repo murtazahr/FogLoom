@@ -117,6 +117,8 @@ items:"
                   echo \"Setting up admin user\"
                   echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
                   echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
+                  echo \"[admins]\" > /opt/couchdb/etc/local.d/local.ini
+                  echo \"${COUCHDB_USER} = ${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/local.ini
                   /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
               ports:
                 - containerPort: 5984
@@ -241,7 +243,13 @@ items:"
 
         [chttpd]
         bind_address = 0.0.0.0
-        port = 6984"
+        port = 6984
+
+        [cors]
+        origins = *
+        credentials = true
+        methods = GET, PUT, POST, HEAD, DELETE
+        headers = accept, authorization, content-type, origin, referer"
 
     # Generate CouchDB Cluster Setup Job
     yaml_content+="
