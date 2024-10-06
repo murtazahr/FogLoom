@@ -117,6 +117,8 @@ items:"
                   cat /opt/couchdb/etc/local.d/local.ini
                   echo \"Debugging: Contents of ssl.ini\"
                   cat /opt/couchdb/etc/local.d/ssl.ini
+                  echo \"Debugging: Contents of default.ini\"
+                  cat /opt/couchdb/etc/default.ini
                   echo \"Debugging: Listing /opt/couchdb/certs\"
                   ls -la /opt/couchdb/certs
                   /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
