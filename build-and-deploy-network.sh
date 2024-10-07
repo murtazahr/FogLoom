@@ -269,11 +269,8 @@ items:"
                   echo \"Creating \${RESOURCE_REGISTRY_DB} on couchdb-0 response: \${response}\" &&
                   response=\$(curl --cacert /certs/ca.crt --cert /certs/node0_crt --key /certs/node0_key -s -X PUT \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:6984/\${TASK_DATA_DB}\") &&
                   echo \"Creating \${TASK_DATA_DB} on couchdb-0 response: \${response}\" &&
-                  echo \"Creating _users database\" &&
-                  response=\$(curl --cacert /certs/ca.crt --cert /certs/node0_crt --key /certs/node0_key -s -X PUT \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-0.default.svc.cluster.local:6984/_users\") &&
-                  echo \"Creating _users database response: \${response}\" &&
                   echo \"Waiting for \${RESOURCE_REGISTRY_DB} & \${TASK_DATA_DB} to be available on all nodes\" &&
-                  for db in \${RESOURCE_REGISTRY_DB} \${TASK_DATA_DB} _users; do
+                  for db in \${RESOURCE_REGISTRY_DB} \${TASK_DATA_DB}; do
                     for i in \$(seq 0 $((num_fog_nodes-1))); do
                       until curl --cacert /certs/ca.crt --cert /certs/node\${i}_crt --key /certs/node\${i}_key -s \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:6984/\${db}\" | grep -q \"\${db}\"; do
                         echo \"Waiting for \${db} on couchdb-\${i}...\"
@@ -282,7 +279,7 @@ items:"
                       echo \"\${db} is available on couchdb-\${i}\"
                     done
                   done &&
-                  echo \"CouchDB cluster setup completed and \${RESOURCE_REGISTRY_DB}, \${TASK_DATA_DB}, and _users databases are available on all nodes\"
+                  echo \"CouchDB cluster setup completed and \${RESOURCE_REGISTRY_DB}, \${TASK_DATA_DB} databases are available on all nodes\"
               env:
                 - name: RESOURCE_REGISTRY_DB
                   value: \"resource_registry\"
