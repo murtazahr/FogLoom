@@ -123,7 +123,7 @@ items:"
                   cat /opt/couchdb/etc/default.ini
                   echo \"Debugging: Listing /opt/couchdb/certs\"
                   ls -la /opt/couchdb/certs
-                  /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
+                  /opt/couchdb/bin/couchdb -name \${NODENAME} -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
               ports:
                 - containerPort: 5984
                 - containerPort: 6984
