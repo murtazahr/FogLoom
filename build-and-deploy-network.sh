@@ -107,6 +107,7 @@ items:"
               image: couchdb:3
               ports:
                 - containerPort: 5984
+                - containerPort: 6984
               env:
                 - name: COUCHDB_USER
                   valueFrom:
@@ -130,8 +131,6 @@ items:"
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
-                - name: couchdb-certs
-                  mountPath: /opt/couchdb/certs
               readinessProbe:
                 httpGet:
                   path: /
@@ -141,10 +140,7 @@ items:"
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
-                claimName: couchdb${i}-data
-            - name: couchdb-certs
-              secret:
-                secretName: couchdb-certs"
+                claimName: couchdb${i}-data"
 
     done
 
@@ -162,7 +158,10 @@ items:"
       ports:
         - name: http
           port: 5984
-          targetPort: 5984"
+          targetPort: 5984
+        - name: https
+          port: 6984
+          targetPort: 6984"
     done
 
     # Generate CouchDB Cluster Setup Job
