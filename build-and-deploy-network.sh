@@ -108,6 +108,8 @@ items:"
                   ls -la /opt/couchdb/etc/local.d
                   echo \"Debugging: Environment variables\"
                   env | grep COUCH
+                  echo \"Echoing nodename\"
+                  echo \$NODENAME
                   echo \"Setting up admin user\"
                   echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
                   echo \"\${COUCHDB_USER} = \${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
@@ -146,7 +148,7 @@ items:"
                 - name: ERL_FLAGS
                   value: \"-setcookie \\\"\${ERLANG_COOKIE}\\\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
                 - name: NODENAME
-                  value: \"couchdb-${i}.default.svc.cluster.local\"
+                  value: \"couchdb@couchdb-${i}.default.svc.cluster.local\"
                 - name: COUCHDB_NODE_ID
                   value: \"${i}\"
               volumeMounts:
