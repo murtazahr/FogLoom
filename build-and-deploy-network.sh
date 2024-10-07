@@ -24,6 +24,42 @@ check_node_exists() {
     return $?
 }
 
+generate_ssl_certificates() {
+    local num_nodes=$1
+    local cert_dir="kubernetes-manifests/generated/certs"
+
+    mkdir -p "$cert_dir"
+
+    # Generate CA key and certificate
+    openssl genrsa -out "$cert_dir/ca.key" 4096
+    openssl req -new -x509 -key "$cert_dir/ca.key" -out "$cert_dir/ca.crt" -days 365 -subj "/CN=CouchDB CA"
+    chmod 600 "$cert_dir/ca.key" "$cert_dir/ca.crt"
+
+    # Generate certificates for each node
+    for ((i=0; i<num_nodes; i++)); do
+        openssl genrsa -out "$cert_dir/node$i.key" 2048
+        openssl req -new -key "$cert_dir/node$i.key" -out "$cert_dir/node$i.csr" \
+            -subj "/CN=couchdb-$i.default.svc.cluster.local"
+
+        cat > "$cert_dir/node$i.ext" << EOF
+subjectAltName = DNS:couchdb-$i.default.svc.cluster.local, \
+                 DNS:couchdb@couchdb-$i.default.svc.cluster.local, \
+                 DNS:couchdb-$i, \
+                 DNS:localhost
+EOF
+
+        openssl x509 -req -in "$cert_dir/node$i.csr" -CA "$cert_dir/ca.crt" -CAkey "$cert_dir/ca.key" \
+            -CAcreateserial -out "$cert_dir/node$i.crt" -days 365 -extfile "$cert_dir/node$i.ext"
+
+        chmod 600 "$cert_dir/node$i.key" "$cert_dir/node$i.csr" "$cert_dir/node$i.crt" "$cert_dir/node$i.ext"
+    done
+
+    # Create Kubernetes secret for certificates
+    kubectl create secret generic couchdb-certs \
+        --from-file="$cert_dir/ca.crt" \
+        $(for ((i=0; i<num_nodes; i++)); do echo "--from-file=node${i}_crt=$cert_dir/node$i.crt --from-file=node${i}_key=$cert_dir/node$i.key"; done)
+}
+
 # Function to generate CouchDB cluster deployment YAML
 generate_couchdb_yaml() {
     local num_fog_nodes=$1
@@ -71,6 +107,7 @@ items:"
               image: couchdb:3
               ports:
                 - containerPort: 5984
+                - containerPort: 6984
               env:
                 - name: COUCHDB_USER
                   valueFrom:
@@ -88,12 +125,14 @@ items:"
                       name: couchdb-secrets
                       key: COUCHDB_SECRET
                 - name: ERL_FLAGS
-                  value: \"-setcookie \\\"\${ERLANG_COOKIE}\\\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
+                  value: \"-setcookie \\\"jT7egojgnPLzOncq9MQUzqwqHm6ZiPUU7xJfFLA8MA\\\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
                 - name: NODENAME
                   value: \"couchdb-${i}.default.svc.cluster.local\"
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
+                - name: couchdb-certs
+                  mountPath: /opt/couchdb/certs
               readinessProbe:
                 httpGet:
                   path: /
@@ -103,7 +142,11 @@ items:"
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
-                claimName: couchdb${i}-data"
+                claimName: couchdb${i}-data
+            - name: couchdb-certs
+              secrets:
+                secretName: couchdb-certs"
+
     done
 
     # Generate Services
@@ -118,8 +161,12 @@ items:"
       selector:
         app: couchdb-${i}
       ports:
-        - port: 5984
-          targetPort: 5984"
+        - name: http
+          port: 5984
+          targetPort: 5984
+        - name: https
+          port: 6984
+          targetPort: 6984"
     done
 
     # Generate CouchDB Cluster Setup Job
@@ -703,7 +750,7 @@ echo "All required nodes are present in the cluster."
 # Part 2: Create redis cluster
 mkdir -p kubernetes-manifests/generated
 
-/bin/bash ./redis-setup.sh
+# /bin/bash ./redis-setup.sh
 
 # Part 3: Generate YAML file for config and secrets
 # Create the PBFT key generation job YAML
@@ -775,7 +822,6 @@ $indented_keys
       COUCHDB_USER: fogbus
       COUCHDB_PASSWORD: mwg478jR04vAonMu2QnFYF3sVyVKUujYrGrzVsrq3I
       COUCHDB_SECRET: LEv+K7x24ITqcAYp0R0e1GzBqiE98oSSarPD1sdeOyM=
-      ERLANG_COOKIE: jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA=
 
   # --------------------------=== Docker Registry Secret ===----------------------
   - apiVersion: v1
