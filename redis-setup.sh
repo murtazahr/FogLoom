@@ -256,7 +256,7 @@ else
 fi
 
 echo "Waiting for cluster to stabilize..."
-sleep 30  # Give the cluster some time to stabilize
+sleep 10  # Give the cluster some time to stabilize
 
 # Check cluster status with retries
 if check_cluster_status; then
