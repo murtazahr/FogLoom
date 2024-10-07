@@ -538,7 +538,7 @@ items:"
                 - name: NODE_ID
                   value: \"sawtooth-fog-node-$i\"
                 - name: COUCHDB_HOST
-                  value: \"couchdb-$i.default.svc.cluster.local:5984\"
+                  value: \"couchdb-$i.default.svc.cluster.local:6984\"
                 - name: RESOURCE_UPDATE_INTERVAL
                   value: \"300\"
                 - name: RESOURCE_UPDATE_BATCH_SIZE
