@@ -216,7 +216,6 @@ items:"
         keyfile = /home/couchdb-certs/node${i}_key
         cacertfile = /home/couchdb-certs/ca.crt
         verify_ssl = true
-        verify_ssl_hosts = false
         tls_versions = [tlsv1, 'tlsv1.1', 'tlsv1.2', 'tlsv1.3']
         ssl_log_level = debug"
 
