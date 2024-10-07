@@ -134,7 +134,7 @@ items:"
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
                 - name: couchdb-certs
-                  mountPath: /opt/couchdb/certs
+                  mountPath: /home/couchdb-certs
                   readOnly: true
               readinessProbe:
                 httpGet:
