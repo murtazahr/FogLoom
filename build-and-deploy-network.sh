@@ -783,24 +783,24 @@ EOF
 echo "Generated PBFT key generation job YAML has been saved to kubernetes-manifests/generated/pbft-key-generation-job.yaml"
 
 # Apply the job YAML
-kubectl apply -f kubernetes-manifests/generated/pbft-key-generation-job.yaml
+#kubectl apply -f kubernetes-manifests/generated/pbft-key-generation-job.yaml
 
 # Wait for the job to complete
-wait_for_job pbft-keys
+#wait_for_job pbft-keys
 
 # Get the pod name
-pod_name=$(kubectl get pods --selector=job-name=pbft-keys --output=jsonpath='{.items[*].metadata.name}')
+#pod_name=$(kubectl get pods --selector=job-name=pbft-keys --output=jsonpath='{.items[*].metadata.name}')
 
 # Fetch the keys from the pod logs
-generated_keys=$(kubectl logs "$pod_name")
+#generated_keys=$(kubectl logs "$pod_name")
 
 # Delete the job YAML
-kubectl delete -f kubernetes-manifests/generated/pbft-key-generation-job.yaml
+#kubectl delete -f kubernetes-manifests/generated/pbft-key-generation-job.yaml
 
 echo "PBFT key generation job has been deleted."
 
 # Process the generated keys to add proper indentation
-indented_keys=$(echo "$generated_keys" | sed 's/^/      /')
+#indented_keys=$(echo "$generated_keys" | sed 's/^/      /')
 
 # Create the config and secrets YAML
 cat << EOF > kubernetes-manifests/generated/config-and-secrets.yaml
@@ -847,19 +847,19 @@ echo "$couchdb_yaml" > kubernetes-manifests/generated/couchdb-cluster-deployment
 echo "Generated CouchDB cluster deployment YAML has been saved to kubernetes-manifests/generated/couchdb-cluster-deployment.yaml"
 
 # Part 5: Generate blockchain network deployment YAML
-blockchain_network_yaml=$(generate_blockchain_network_yaml "$num_fog_nodes" "$num_iot_nodes")
+#blockchain_network_yaml=$(generate_blockchain_network_yaml "$num_fog_nodes" "$num_iot_nodes")
 
 # Save the generated blockchain network YAML to a file
-echo "$blockchain_network_yaml" > kubernetes-manifests/generated/blockchain-network-deployment.yaml
+#echo "$blockchain_network_yaml" > kubernetes-manifests/generated/blockchain-network-deployment.yaml
 
-echo "Generated blockchain network deployment YAML has been saved to kubernetes-manifests/generated/blockchain-network-deployment.yaml"
+#echo "Generated blockchain network deployment YAML has been saved to kubernetes-manifests/generated/blockchain-network-deployment.yaml"
 
 # Part 6: deploy network
 echo "Deploying Network"
 # Apply to kubernetes environment.
 kubectl apply -f kubernetes-manifests/generated/config-and-secrets.yaml
 kubectl apply -f kubernetes-manifests/generated/couchdb-cluster-deployment.yaml
-kubectl apply -f kubernetes-manifests/static/local-docker-registry-deployment.yaml
-kubectl apply -f kubernetes-manifests/generated/blockchain-network-deployment.yaml
+#kubectl apply -f kubernetes-manifests/static/local-docker-registry-deployment.yaml
+#kubectl apply -f kubernetes-manifests/generated/blockchain-network-deployment.yaml
 
 echo "Script execution completed successfully."
