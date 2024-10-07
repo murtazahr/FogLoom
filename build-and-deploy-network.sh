@@ -144,7 +144,7 @@ items:"
               persistentVolumeClaim:
                 claimName: couchdb${i}-data
             - name: couchdb-certs
-              secrets:
+              secret:
                 secretName: couchdb-certs"
 
     done
