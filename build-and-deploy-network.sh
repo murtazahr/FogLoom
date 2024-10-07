@@ -125,12 +125,6 @@ items:"
                   -proto_dist inet_tls
                   -kernel inet_dist_listen_min 9100
                   -kernel inet_dist_listen_max 9200
-                  +A 16
-                  +K true
-                  +P 262144
-                  +sbwt none
-                  +sbwtdcpu none
-                  +sbwtdio none
                   -kernel error_logger silent
                   -sasl sasl_error_logger false
                   -kernel prevent_overlapping_partitions false
@@ -155,7 +149,7 @@ items:"
                   cat /opt/couchdb/etc/local.d/local.ini
                   echo \"Debugging: Listing /opt/couchdb/certs\"
                   ls -la /opt/couchdb/certs
-                  /opt/couchdb/bin/couchdb -name \${NODENAME} -erlang_version '[{ssl, [{debug, true}]}]' -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini -vv
+                  /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini -vv
               ports:
                 - containerPort: 5984
                 - containerPort: 6984
