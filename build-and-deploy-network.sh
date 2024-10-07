@@ -105,6 +105,8 @@ items:"
           containers:
             - name: couchdb
               image: couchdb:3
+              command: [\"/bin/sh\"]
+              args: [\"-c\", \"while true; do sleep 30; done;\"]
               ports:
                 - containerPort: 5984
                 - containerPort: 6984
