@@ -33,12 +33,14 @@ generate_ssl_certificates() {
     # Generate CA key and certificate
     openssl genrsa -out "$cert_dir/ca.key" 4096
     openssl req -new -x509 -key "$cert_dir/ca.key" -out "$cert_dir/ca.crt" -days 365 -subj "/CN=CouchDB CA"
+    chmod 600 "$cert_dir/ca.key" "$cert_dir/ca.crt"
 
     # Generate certificates for each node
     for ((i=0; i<num_nodes; i++)); do
         openssl genrsa -out "$cert_dir/node$i.key" 2048
-        openssl req -new -key "$cert_dir/node$i.key" -out "$cert_dir/node$i.csr" -subj "/CN=couchdb-$i.default.svc.cluster.local"
+        openssl req -new -key "$cert_dir/node$i.key" -out "$cert_dir/node$i.csr" -subj "/CN=couchdb@couchdb-$i.default.svc.cluster.local"
         openssl x509 -req -in "$cert_dir/node$i.csr" -CA "$cert_dir/ca.crt" -CAkey "$cert_dir/ca.key" -CAcreateserial -out "$cert_dir/node$i.crt" -days 365
+        chmod 600 "$cert_dir/node$i.key" "$cert_dir/node$i.csr" "$cert_dir/node$i.crt"
     done
 
     # Create Kubernetes secret for certificates
@@ -142,7 +144,7 @@ items:"
                       name: couchdb-secrets
                       key: COUCHDB_SECRET
                 - name: ERL_FLAGS
-                  value: \"-setcookie \\\"\${ERLANG_COOKIE}\\\" -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
+                  value: \"-setcookie \\\"\${ERLANG_COOKIE}\\\" -proto_dist inet_tls -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
                 - name: NODENAME
                   value: \"couchdb@couchdb-${i}.default.svc.cluster.local\"
                 - name: COUCHDB_NODE_ID
