@@ -346,6 +346,9 @@ items:"
             - name: sys
               hostPath:
                 path: /sys
+            - name: couchdb-certs
+              secret:
+                secretName: couchdb-certs
           initContainers:
             - name: wait-for-registry
               image: busybox
@@ -358,7 +361,7 @@ items:"
                 - |
                   for db in \${RESOURCE_REGISTRY_DB} \${TASK_DATA_DB}; do
                     for i in \$(seq 0 $((num_fog_nodes-1))); do
-                      until curl -s \"http://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:5984/\${db}\" | grep -q \"\${db}\"; do
+                      until curl --cacert /certs/ca.crt --cert /certs/node\${i}_crt --key /certs/node\${i}_key -s \"https://\${COUCHDB_USER}:\${COUCHDB_PASSWORD}@couchdb-\${i}.default.svc.cluster.local:6984/\${db}\" | grep -q \"\${db}\"; do
                         echo \"Waiting for \${db} on couchdb-\${i}...\"
                         sleep 5
                       done
@@ -381,6 +384,9 @@ items:"
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+              volumeMounts:
+                - name: couchdb-certs
+                  mountPath: /certs
           containers:
             - name: peer-registry-tp
               image: murtazahr/peer-registry-tp:latest
@@ -414,7 +420,7 @@ items:"
                 - name: VALIDATOR_URL
                   value: \"tcp://$service_name:4004\"
                 - name: COUCHDB_HOST
-                  value: \"couchdb-$i.default.svc.cluster.local:5984\"
+                  value: \"couchdb-$i.default.svc.cluster.local:6984\"
                 - name: COUCHDB_USER
                   valueFrom:
                     secretKeyRef:
@@ -547,6 +553,21 @@ items:"
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: COUCHDB_SSL_CERT
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-certs
+                      key: node${i}_crt
+                - name: COUCHDB_SSL_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-certs
+                      key: node${i}_key
+                - name: COUCHDB_SSL_CA
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-certs
+                      key: ca.crt
                 - name: REDIS_PASSWORD
                   valueFrom:
                     secretKeyRef:

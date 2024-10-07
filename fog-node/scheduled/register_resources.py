@@ -9,6 +9,7 @@ import json
 
 import psutil
 import couchdb
+import requests
 from couchdb import ResourceNotFound, Unauthorized
 from coredis import RedisCluster
 from coredis.exceptions import RedisError
@@ -28,8 +29,11 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
 
 # Couchdb configuration
-COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
+COUCHDB_URL = f"https://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:6984')}"
 COUCHDB_DB = 'resource_registry'
+COUCHDB_SSL_CA = os.getenv('COUCHDB_SSL_CA')
+COUCHDB_SSL_CERT = os.getenv('COUCHDB_SSL_CERT')
+COUCHDB_SSL_KEY = os.getenv('COUCHDB_SSL_KEY')
 
 # Redis configuration
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis-cluster')
@@ -91,30 +95,52 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(e)}") from e
 
 
-def connect_to_couchdb(max_retries=5, retry_delay=5):
-    logger.info('Connecting to couchdb at %s', COUCHDB_URL)
-    for attempt in range(max_retries):
-        try:
-            couch = couchdb.Server(COUCHDB_URL)
-            db = couch[COUCHDB_DB]
-            logger.info(f"Successfully connected to database '{COUCHDB_DB}'.")
-            return db
-        except ResourceNotFound:
-            logger.error(f"Database '{COUCHDB_DB}' not found. Ensure it has been created during cluster setup.")
-            return None
-        except Unauthorized:
-            logger.error("Unauthorized: Check your CouchDB credentials.")
-            return None
-        except Exception as e:
-            logger.error(f"Error connecting to CouchDB: {str(e)}")
-            if attempt < max_retries - 1:
-                logger.warning(f"Retrying in {retry_delay} seconds. Attempt {attempt + 1}/{max_retries}")
-                time.sleep(retry_delay**attempt)
-            else:
-                logger.error(f"Failed to connect to CouchDB after {max_retries} attempts.")
-                return None
+def connect_to_couchdb():
+    logger.info("Starting Couchdb initialization")
+    temp_files = []
+    try:
+        session = requests.Session()
 
-    return None
+        if COUCHDB_SSL_CA:
+            ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
+            ca_file.write(COUCHDB_SSL_CA)
+            ca_file.flush()
+            temp_files.append(ca_file.name)
+            session.verify = ca_file.name
+        else:
+            session.verify = False
+            logger.warning("COUCHDB_SSL_CA is empty or not set")
+
+        if COUCHDB_SSL_CERT and COUCHDB_SSL_KEY:
+            cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
+            key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.key')
+            cert_file.write(COUCHDB_SSL_CERT)
+            key_file.write(COUCHDB_SSL_KEY)
+            cert_file.flush()
+            key_file.flush()
+            temp_files.extend([cert_file.name, key_file.name])
+            session.cert = (cert_file.name, key_file.name)
+        else:
+            session.cert = None
+            logger.warning("COUCHDB_SSL_CERT or COUCHDB_SSL_KEY is empty or not set")
+
+        # Create the CouchDB server instance with the custom session
+        couch = couchdb.Server(COUCHDB_URL, session=session)
+
+        db = couch[COUCHDB_DB]
+        logger.info(f"Successfully connected to database '{COUCHDB_DB}'.")
+        return db
+
+    except Exception as e:
+        logger.error(f"Failed to connect to Redis: {str(e)}")
+        raise
+    finally:
+        for file_path in temp_files:
+            try:
+                os.unlink(file_path)
+                logger.debug(f"Temporary file deleted: {file_path}")
+            except Exception as e:
+                logger.warning(f"Failed to delete temporary file {file_path}: {str(e)}")
 
 
 async def connect_to_redis():
