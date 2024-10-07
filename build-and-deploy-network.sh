@@ -38,9 +38,20 @@ generate_ssl_certificates() {
     # Generate certificates for each node
     for ((i=0; i<num_nodes; i++)); do
         openssl genrsa -out "$cert_dir/node$i.key" 2048
-        openssl req -new -key "$cert_dir/node$i.key" -out "$cert_dir/node$i.csr" -subj "/CN=couchdb@couchdb-$i.default.svc.cluster.local"
-        openssl x509 -req -in "$cert_dir/node$i.csr" -CA "$cert_dir/ca.crt" -CAkey "$cert_dir/ca.key" -CAcreateserial -out "$cert_dir/node$i.crt" -days 365
-        chmod 600 "$cert_dir/node$i.key" "$cert_dir/node$i.csr" "$cert_dir/node$i.crt"
+        openssl req -new -key "$cert_dir/node$i.key" -out "$cert_dir/node$i.csr" \
+            -subj "/CN=couchdb-$i.default.svc.cluster.local"
+
+        cat > "$cert_dir/node$i.ext" << EOF
+subjectAltName = DNS:couchdb-$i.default.svc.cluster.local, \
+                 DNS:couchdb@couchdb-$i.default.svc.cluster.local, \
+                 DNS:couchdb-$i, \
+                 DNS:localhost
+EOF
+
+        openssl x509 -req -in "$cert_dir/node$i.csr" -CA "$cert_dir/ca.crt" -CAkey "$cert_dir/ca.key" \
+            -CAcreateserial -out "$cert_dir/node$i.crt" -days 365 -extfile "$cert_dir/node$i.ext"
+
+        chmod 600 "$cert_dir/node$i.key" "$cert_dir/node$i.csr" "$cert_dir/node$i.crt" "$cert_dir/node$i.ext"
     done
 
     # Create Kubernetes secret for certificates
@@ -144,7 +155,7 @@ items:"
                       name: couchdb-secrets
                       key: COUCHDB_SECRET
                 - name: ERL_FLAGS
-                  value: \"-setcookie \\\"\${ERLANG_COOKIE}\\\" -proto_dist inet_tls -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
+                  value: \"-setcookie \\\"\${ERLANG_COOKIE}\\\" -ssl_dist_opt server_certfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt -ssl_dist_opt server_keyfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt -proto_dist inet_tls -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
                 - name: NODENAME
                   value: \"couchdb@couchdb-${i}.default.svc.cluster.local\"
                 - name: COUCHDB_NODE_ID
@@ -231,7 +242,8 @@ items:"
         cert_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
         key_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
         cacert_file = /opt/couchdb/certs/ca.crt
-        verify_ssl = false
+        verify_ssl = true
+        verify_ssl_hosts = false
         tls_versions = [tlsv1, 'tlsv1.1', 'tlsv1.2', 'tlsv1.3']
         ssl_log_level = debug"
 
