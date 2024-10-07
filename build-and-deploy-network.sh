@@ -214,8 +214,6 @@ items:"
         [chttpd]
         port = 5984
         bind_address = 0.0.0.0
-
-        [httpd]
         enable_cors = true
 
         [cors]
@@ -233,7 +231,8 @@ items:"
         cert_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
         key_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
         cacert_file = /opt/couchdb/certs/ca.crt
-        verify_ssl = false"
+        verify_ssl = false
+        tls_versions = [tlsv1, 'tlsv1.1', 'tlsv1.2', 'tlsv1.3']"
 
     # Generate CouchDB Cluster Setup Job
     yaml_content+="
