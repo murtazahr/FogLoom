@@ -124,7 +124,7 @@ items:"
                       name: couchdb-secrets
                       key: COUCHDB_SECRET
                 - name: ERL_FLAGS
-                  value: \"-setcookie jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA= -couch_log level debug -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200 -proto_dist inet_tls -ssl_dist_opt server_certfile /opt/couchdb/certs/node${i}_crt -ssl_dist_opt server_keyfile /opt/couchdb/certs/node${i}_key -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt\"
+                  value: \"-setcookie \\\"jT7egojgnPLzOncq9MQUzqwqHm6ZiPUU7xJfFLA8MA\\\" -couch_log level debug -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200 -proto_dist inet_tls -ssl_dist_opt server_certfile /opt/couchdb/certs/node${i}_crt -ssl_dist_opt server_keyfile /opt/couchdb/certs/node${i}_key -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt\"
                 - name: NODENAME
                   value: \"couchdb-${i}.default.svc.cluster.local\"
               volumeMounts:
