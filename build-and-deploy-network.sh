@@ -747,6 +747,9 @@ done
 
 echo "All required nodes are present in the cluster."
 
+# Generate SSL/TLS certificates
+generate_ssl_certificates "$num_fog_nodes"
+
 # Part 2: Create redis cluster
 mkdir -p kubernetes-manifests/generated
 
