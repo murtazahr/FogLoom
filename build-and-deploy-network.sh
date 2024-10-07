@@ -111,6 +111,8 @@ items:"
                   echo \"Setting up admin user\"
                   echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
                   echo \"\${COUCHDB_USER} = \${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
+                  echo \"Replacing COUCHDB_NODE_ID in ssl.ini\"
+                  sed -i \"s/\${COUCHDB_NODE_ID}/\${COUCHDB_NODE_ID}/g\" /opt/couchdb/etc/local.d/ssl.ini
                   echo \"Debugging: Contents of docker.ini\"
                   cat /opt/couchdb/etc/local.d/docker.ini
                   echo \"Debugging: Contents of local.ini\"
