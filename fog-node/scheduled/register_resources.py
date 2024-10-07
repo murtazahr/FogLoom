@@ -1,22 +1,20 @@
 import hashlib
+import json
 import logging
 import os
 import ssl
 import sys
 import tempfile
 import time
-import json
 
-import psutil
 import couchdb
+import psutil
 import requests
-from couchdb import ResourceNotFound, Unauthorized
 from coredis import RedisCluster
 from coredis.exceptions import RedisError
-
 from sawtooth_sdk.messaging.stream import Stream
-from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_sdk.protobuf.batch_pb2 import BatchHeader, Batch, BatchList
+from sawtooth_sdk.protobuf.transaction_pb2 import TransactionHeader, Transaction
 from sawtooth_signing import create_context, CryptoFactory, secp256k1
 
 logger = logging.getLogger(__name__)
@@ -132,7 +130,7 @@ def connect_to_couchdb():
         return db
 
     except Exception as e:
-        logger.error(f"Failed to connect to Redis: {str(e)}")
+        logger.error(f"Failed to connect to CouchDB: {str(e)}")
         raise
     finally:
         for file_path in temp_files:

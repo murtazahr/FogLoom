@@ -8,3 +8,4 @@ secp256k1==0.14.0
 cachetools==5.5.0
 flask==3.0.3
 coredis==4.17.0
+requests==2.7.0
