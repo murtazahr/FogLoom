@@ -224,6 +224,9 @@ items:"
         methods = GET, PUT, POST, HEAD, DELETE
         headers = accept, authorization, content-type, origin, referer
 
+        [cluster]
+        enable_ssl = true
+
       ssl.ini: |
         [ssl]
         enable = true
