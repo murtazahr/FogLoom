@@ -113,19 +113,15 @@ items:"
                   echo \"Setting up admin user\"
                   echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
                   echo \"\${COUCHDB_USER} = \${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
-                  echo \"Replacing COUCHDB_NODE_ID in ssl.ini\"
-                  sed -i \"s/\\\${COUCHDB_NODE_ID}/\${COUCHDB_NODE_ID}/g\" /opt/couchdb/etc/local.d/ssl.ini
+                  echo \"Replacing COUCHDB_NODE_ID in local.ini\"
+                  sed -i \"s/\\\${COUCHDB_NODE_ID}/\${COUCHDB_NODE_ID}/g\" /opt/couchdb/etc/local.d/local.ini
                   echo \"Debugging: Contents of docker.ini\"
                   cat /opt/couchdb/etc/local.d/docker.ini
                   echo \"Debugging: Contents of local.ini\"
                   cat /opt/couchdb/etc/local.d/local.ini
-                  echo \"Debugging: Contents of ssl.ini\"
-                  cat /opt/couchdb/etc/local.d/ssl.ini
-                  echo \"Debugging: Contents of default.ini\"
-                  cat /opt/couchdb/etc/default.ini
                   echo \"Debugging: Listing /opt/couchdb/certs\"
                   ls -la /opt/couchdb/certs
-                  /opt/couchdb/bin/couchdb -name \${NODENAME} -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini /opt/couchdb/etc/local.d/ssl.ini -vv
+                  /opt/couchdb/bin/couchdb -name \${NODENAME} -erlang_version '[{ssl, [{debug, true}]}]' -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini -vv
               ports:
                 - containerPort: 5984
                 - containerPort: 6984
@@ -225,14 +221,17 @@ items:"
         [cluster]
         enable_ssl = true
 
-      ssl.ini: |
+        [log]
+        level = debug
+
         [ssl]
         enable = true
         cert_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
         key_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
         cacert_file = /opt/couchdb/certs/ca.crt
         verify_ssl = false
-        tls_versions = [tlsv1, 'tlsv1.1', 'tlsv1.2', 'tlsv1.3']"
+        tls_versions = [tlsv1, 'tlsv1.1', 'tlsv1.2', 'tlsv1.3']
+        ssl_log_level = debug"
 
     # Generate CouchDB Cluster Setup Job
     yaml_content+="
