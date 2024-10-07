@@ -131,6 +131,8 @@ items:"
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
+                - name: couchdb-certs
+                  mountPath: /opt/couchdb/certs
               readinessProbe:
                 httpGet:
                   path: /
@@ -140,7 +142,10 @@ items:"
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
-                claimName: couchdb${i}-data"
+                claimName: couchdb${i}-data
+            - name: couchdb-certs
+              secret:
+                secretName: couchdb-certs"
 
     done
 
