@@ -315,6 +315,7 @@ items:"
                 secretName: couchdb-certs"
 
     echo "$yaml_content"
+}
 
 # Function to generate blockchain network deployment YAML
 generate_blockchain_network_yaml() {
