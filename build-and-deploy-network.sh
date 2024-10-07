@@ -112,7 +112,7 @@ items:"
                   mountPath: /opt/couchdb/etc/local.d
           containers:
             - name: couchdb
-              image: couchdb:3
+              image: couchdb:latest
               ports:
                 - containerPort: 5984
                 - containerPort: 6984
@@ -143,14 +143,6 @@ items:"
                   mountPath: /opt/couchdb/etc/local.d
                 - name: couchdb-certs
                   mountPath: /opt/couchdb/certs
-              readinessProbe:
-                httpGet:
-                  path: /
-                  port: 6984
-                  scheme: HTTPS
-                initialDelaySeconds: 30
-                periodSeconds: 10
-                failureThreshold: 3
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
