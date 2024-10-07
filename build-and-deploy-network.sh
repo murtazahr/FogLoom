@@ -26,7 +26,7 @@ check_node_exists() {
 
 generate_ssl_certificates() {
     local num_nodes=$1
-    local cert_dir="kubernetes-manifests/generated/certs"
+    local cert_dir="tls/couchdb"
 
     mkdir -p "$cert_dir"
 
@@ -53,16 +53,12 @@ EOF
 
         chmod 600 "$cert_dir/node$i.key" "$cert_dir/node$i.csr" "$cert_dir/node$i.crt" "$cert_dir/node$i.ext"
     done
-
-    # Create Kubernetes secret for certificates
-    kubectl create secret generic couchdb-certs \
-        --from-file="$cert_dir/ca.crt" \
-        $(for ((i=0; i<num_nodes; i++)); do echo "--from-file=node${i}_crt=$cert_dir/node$i.crt --from-file=node${i}_key=$cert_dir/node$i.key"; done)
 }
 
 # Function to generate CouchDB cluster deployment YAML
 generate_couchdb_yaml() {
     local num_fog_nodes=$1
+    local cert_dir="tls/couchdb"
     local yaml_content="apiVersion: v1
 kind: List
 
@@ -133,6 +129,7 @@ items:"
                   mountPath: /opt/couchdb/data
                 - name: couchdb-certs
                   mountPath: /opt/couchdb/certs
+                  readOnly: true
               readinessProbe:
                 httpGet:
                   path: /
@@ -144,8 +141,9 @@ items:"
               persistentVolumeClaim:
                 claimName: couchdb${i}-data
             - name: couchdb-certs
-              secret:
-                secretName: couchdb-certs"
+              hostPath:
+                path: $(pwd)/${cert_dir}
+                type: Directory"
 
     done
 
