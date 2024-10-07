@@ -149,7 +149,7 @@ items:"
                 claimName: couchdb${i}-data
             - name: couchdb-config
               configMap:
-                name: couchdb-config
+                name: couchdb-config-${i}
             - name: config-storage
               emptyDir: {}
             - name: couchdb-certs
@@ -177,12 +177,13 @@ items:"
           targetPort: 6984"
     done
 
+    for ((i=0; i<num_fog_nodes; i++)); do
     # Generate ConfigMap for CouchDB configuration
     yaml_content+="
   - apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: couchdb-config
+      name: couchdb-config-${i}
     data:
       local.ini: |
         [couchdb]
@@ -218,6 +219,8 @@ items:"
         verify_ssl_hosts = false
         tls_versions = [tlsv1, 'tlsv1.1', 'tlsv1.2', 'tlsv1.3']
         ssl_log_level = debug"
+
+      done
 
     # Generate CouchDB Cluster Setup Job
     yaml_content+="
