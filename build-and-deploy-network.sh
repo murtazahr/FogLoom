@@ -101,15 +101,6 @@ items:"
         spec:
           nodeSelector:
             kubernetes.io/hostname: fog-node-$((i+1))
-          initContainers:
-            - name: init-config
-              image: busybox
-              command: ['sh', '-c', 'cp /tmp/couchdb-config/* /opt/couchdb/etc/local.d/ && echo \"Config files copied\" && ls -la /opt/couchdb/etc/local.d']
-              volumeMounts:
-                - name: couchdb-config
-                  mountPath: /tmp/couchdb-config
-                - name: config-storage
-                  mountPath: /opt/couchdb/etc/local.d
           containers:
             - name: couchdb
               image: couchdb:latest
@@ -139,8 +130,6 @@ items:"
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
-                - name: config-storage
-                  mountPath: /opt/couchdb/etc/local.d
                 - name: couchdb-certs
                   mountPath: /opt/couchdb/certs
           volumes:
@@ -150,8 +139,6 @@ items:"
             - name: couchdb-config
               configMap:
                 name: couchdb-config
-            - name: config-storage
-              emptyDir: {}
             - name: couchdb-certs
               secret:
                 secretName: couchdb-certs"
