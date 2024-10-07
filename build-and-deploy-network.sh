@@ -116,8 +116,27 @@ items:"
               command: [\"/bin/bash\", \"-c\"]
               args:
                 - |
-                  export ERL_FLAGS=\"-setcookie \\\"\${ERLANG_COOKIE}\\\" -ssl_dist_opt server_certfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt -ssl_dist_opt server_keyfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt -proto_dist inet_tls -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
-                  echo \"ERL_FLAGS: \$ERL_FLAGS\"
+                  cat > /opt/couchdb/etc/vm.args << EOF
+                  -name \${NODENAME}
+                  -setcookie \${ERLANG_COOKIE}
+                  -ssl_dist_opt server_certfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
+                  -ssl_dist_opt server_keyfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
+                  -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt
+                  -proto_dist inet_tls
+                  -kernel inet_dist_listen_min 9100
+                  -kernel inet_dist_listen_max 9200
+                  +A 16
+                  +K true
+                  +P 262144
+                  +sbwt none
+                  +sbwtdcpu none
+                  +sbwtdio none
+                  -kernel error_logger silent
+                  -sasl sasl_error_logger false
+                  -kernel prevent_overlapping_partitions false
+                  EOF
+                  echo \"vm.args updated:\"
+                  cat /opt/couchdb/etc/vm.args
                   echo \"Starting CouchDB with verbose logging\"
                   echo \"Debugging: Listing /opt/couchdb/etc/local.d\"
                   ls -la /opt/couchdb/etc/local.d
@@ -244,9 +263,13 @@ items:"
 
         [ssl]
         enable = true
+        port = 6984
         cert_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
         key_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
         cacert_file = /opt/couchdb/certs/ca.crt
+        certfile = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
+        keyfile = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
+        cacertfile = /opt/couchdb/certs/ca.crt
         verify_ssl = true
         verify_ssl_hosts = false
         tls_versions = [tlsv1, 'tlsv1.1', 'tlsv1.2', 'tlsv1.3']
