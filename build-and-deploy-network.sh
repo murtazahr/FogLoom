@@ -113,43 +113,6 @@ items:"
           containers:
             - name: couchdb
               image: couchdb:3
-              command: [\"/bin/bash\", \"-c\"]
-              args:
-                - |
-                  cat > /opt/couchdb/etc/vm.args << EOF
-                  -name \${NODENAME}
-                  -setcookie \${ERLANG_COOKIE}
-                  -ssl_dist_opt server_certfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
-                  -ssl_dist_opt server_keyfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
-                  -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt
-                  -proto_dist inet_tls
-                  -kernel inet_dist_listen_min 9100
-                  -kernel inet_dist_listen_max 9200
-                  -kernel error_logger silent
-                  -sasl sasl_error_logger false
-                  -kernel prevent_overlapping_partitions false
-                  EOF
-                  echo \"vm.args updated:\"
-                  cat /opt/couchdb/etc/vm.args
-                  echo \"Starting CouchDB with verbose logging\"
-                  echo \"Debugging: Listing /opt/couchdb/etc/local.d\"
-                  ls -la /opt/couchdb/etc/local.d
-                  echo \"Debugging: Environment variables\"
-                  env | grep COUCH
-                  echo \"Echoing nodename\"
-                  echo \$NODENAME
-                  echo \"Setting up admin user\"
-                  echo \"[admins]\" > /opt/couchdb/etc/local.d/docker.ini
-                  echo \"\${COUCHDB_USER} = \${COUCHDB_PASSWORD}\" >> /opt/couchdb/etc/local.d/docker.ini
-                  echo \"Replacing COUCHDB_NODE_ID in local.ini\"
-                  sed -i \"s/\\\${COUCHDB_NODE_ID}/\${COUCHDB_NODE_ID}/g\" /opt/couchdb/etc/local.d/local.ini
-                  echo \"Debugging: Contents of docker.ini\"
-                  cat /opt/couchdb/etc/local.d/docker.ini
-                  echo \"Debugging: Contents of local.ini\"
-                  cat /opt/couchdb/etc/local.d/local.ini
-                  echo \"Debugging: Listing /opt/couchdb/certs\"
-                  ls -la /opt/couchdb/certs
-                  /opt/couchdb/bin/couchdb -couch_ini /opt/couchdb/etc/default.ini /opt/couchdb/etc/local.d/local.ini /opt/couchdb/etc/local.d/docker.ini -vv
               ports:
                 - containerPort: 5984
                 - containerPort: 6984
@@ -169,15 +132,10 @@ items:"
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_SECRET
-                - name: ERLANG_COOKIE
-                  valueFrom:
-                    secretKeyRef:
-                      name: couchdb-secrets
-                      key: ERLANG_COOKIE
+                - name: ERL_FLAGS
+                  value: \"-setcookie jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA= -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200 -proto_dist inet_tls -ssl_dist_opt server_certfile /opt/couchdb/certs/node${i}_crt -ssl_dist_opt server_keyfile /opt/couchdb/certs/node${i}_key -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt\"
                 - name: NODENAME
-                  value: \"couchdb@couchdb-${i}.default.svc.cluster.local\"
-                - name: COUCHDB_NODE_ID
-                  value: \"${i}\"
+                  value: \"couchdb-${i}.default.svc.cluster.local\"
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
@@ -258,11 +216,11 @@ items:"
         [ssl]
         enable = true
         port = 6984
-        cert_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
-        key_file = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
+        cert_file = /opt/couchdb/certs/node${i}_crt
+        key_file = /opt/couchdb/certs/node${i}_key
         cacert_file = /opt/couchdb/certs/ca.crt
-        certfile = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt
-        keyfile = /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key
+        certfile = /opt/couchdb/certs/node${i}_crt
+        keyfile = /opt/couchdb/certs/node${i}_key
         cacertfile = /opt/couchdb/certs/ca.crt
         verify_ssl = true
         verify_ssl_hosts = false
@@ -935,7 +893,6 @@ $indented_keys
       COUCHDB_USER: fogbus
       COUCHDB_PASSWORD: mwg478jR04vAonMu2QnFYF3sVyVKUujYrGrzVsrq3I
       COUCHDB_SECRET: LEv+K7x24ITqcAYp0R0e1GzBqiE98oSSarPD1sdeOyM=
-      ERLANG_COOKIE: jT7egojgnPLzOncq9MQU/zqwqHm6ZiPUU7xJfFLA8MA=
 
   # --------------------------=== Docker Registry Secret ===----------------------
   - apiVersion: v1
