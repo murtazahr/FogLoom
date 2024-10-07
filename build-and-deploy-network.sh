@@ -124,14 +124,14 @@ items:"
                       name: couchdb-secrets
                       key: COUCHDB_SECRET
                 - name: ERL_FLAGS
-                  value: \"-setcookie \\\"jT7egojgnPLzOncq9MQUzqwqHm6ZiPUU7xJfFLA8MA\\\" -couch_log level debug -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200 -proto_dist inet_tls -ssl_dist_opt server_certfile /opt/couchdb/certs/node${i}_crt -ssl_dist_opt server_keyfile /opt/couchdb/certs/node${i}_key -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt\"
+                  value: \"-setcookie \\\"jT7egojgnPLzOncq9MQUzqwqHm6ZiPUU7xJfFLA8MA\\\" -couch_log level debug -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200 -proto_dist inet_tls -ssl_dist_opt server_certfile /home/couchdb-certs/node${i}_crt -ssl_dist_opt server_keyfile /home/couchdb-certs/node${i}_key -ssl_dist_opt server_cacertfile /home/couchdb-certs/ca.crt\"
                 - name: NODENAME
                   value: \"couchdb-${i}.default.svc.cluster.local\"
               volumeMounts:
                 - name: couchdb-data
                   mountPath: /opt/couchdb/data
                 - name: couchdb-certs
-                  mountPath: /opt/couchdb/certs
+                  mountPath: /home/couchdb-certs
           volumes:
             - name: couchdb-data
               persistentVolumeClaim:
@@ -195,12 +195,12 @@ items:"
         [ssl]
         enable = true
         port = 6984
-        cert_file = /opt/couchdb/certs/node${i}_crt
-        key_file = /opt/couchdb/certs/node${i}_key
-        cacert_file = /opt/couchdb/certs/ca.crt
-        certfile = /opt/couchdb/certs/node${i}_crt
-        keyfile = /opt/couchdb/certs/node${i}_key
-        cacertfile = /opt/couchdb/certs/ca.crt
+        cert_file = /home/couchdb-certs/node${i}_crt
+        key_file = /home/couchdb-certs/node${i}_key
+        cacert_file = /home/couchdb-certs/ca.crt
+        certfile = /home/couchdb-certs/node${i}_crt
+        keyfile = /home/couchdb-certs/node${i}_key
+        cacertfile = /home/couchdb-certs/ca.crt
         verify_ssl = true
         verify_ssl_hosts = false
         tls_versions = [tlsv1, 'tlsv1.1', 'tlsv1.2', 'tlsv1.3']
