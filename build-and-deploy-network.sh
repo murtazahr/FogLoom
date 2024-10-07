@@ -116,6 +116,8 @@ items:"
               command: [\"/bin/bash\", \"-c\"]
               args:
                 - |
+                  export ERL_FLAGS=\"-setcookie \\\"\${ERLANG_COOKIE}\\\" -ssl_dist_opt server_certfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt -ssl_dist_opt server_keyfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt -proto_dist inet_tls -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
+                  echo \"ERL_FLAGS: \$ERL_FLAGS\"
                   echo \"Starting CouchDB with verbose logging\"
                   echo \"Debugging: Listing /opt/couchdb/etc/local.d\"
                   ls -la /opt/couchdb/etc/local.d
@@ -154,8 +156,11 @@ items:"
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_SECRET
-                - name: ERL_FLAGS
-                  value: \"-setcookie \\\"\${ERLANG_COOKIE}\\\" -ssl_dist_opt server_certfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_crt -ssl_dist_opt server_keyfile /opt/couchdb/certs/node\${COUCHDB_NODE_ID}_key -ssl_dist_opt server_cacertfile /opt/couchdb/certs/ca.crt -proto_dist inet_tls -kernel inet_dist_listen_min 9100 -kernel inet_dist_listen_max 9200\"
+                - name: ERLANG_COOKIE
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-secrets
+                      key: ERLANG_COOKIE
                 - name: NODENAME
                   value: \"couchdb@couchdb-${i}.default.svc.cluster.local\"
                 - name: COUCHDB_NODE_ID
