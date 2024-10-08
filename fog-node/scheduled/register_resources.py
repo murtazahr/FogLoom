@@ -8,7 +8,10 @@ import tempfile
 import time
 import psutil
 import requests
-import couchdb
+import asyncio
+from ibmcloudant.cloudant_v1 import CloudantV1
+from ibm_cloud_sdk_core.authenticators import BasicAuthenticator
+from ibm_cloud_sdk_core.api_exception import ApiException
 from coredis import RedisCluster
 from coredis.exceptions import RedisError
 from sawtooth_sdk.messaging.stream import Stream
@@ -25,12 +28,14 @@ NAMESPACE = hashlib.sha512(FAMILY_NAME.encode()).hexdigest()[:6]
 # Path to the private key file
 PRIVATE_KEY_FILE = os.getenv('SAWTOOTH_PRIVATE_KEY', '/root/.sawtooth/keys/root.priv')
 
-# Couchdb configuration
-COUCHDB_URL = f"https://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:6984')}"
-COUCHDB_DB = 'resource_registry'
-COUCHDB_SSL_CA = os.getenv('COUCHDB_SSL_CA')
-COUCHDB_SSL_CERT = os.getenv('COUCHDB_SSL_CERT')
-COUCHDB_SSL_KEY = os.getenv('COUCHDB_SSL_KEY')
+# Cloudant configuration
+CLOUDANT_URL = f"https://{os.getenv('COUCHDB_HOST', 'couch-db-0:6984')}"
+CLOUDANT_USERNAME = os.getenv('COUCHDB_USER')
+CLOUDANT_PASSWORD = os.getenv('COUCHDB_PASSWORD')
+CLOUDANT_DB = 'resource_registry'
+CLOUDANT_SSL_CA = os.getenv('COUCHDB_SSL_CA')
+CLOUDANT_SSL_CERT = os.getenv('COUCHDB_SSL_CERT')
+CLOUDANT_SSL_KEY = os.getenv('COUCHDB_SSL_KEY')
 
 # Redis configuration
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis-cluster')
@@ -92,44 +97,54 @@ def load_private_key(key_file):
         raise IOError(f"Failed to load private key from {key_file}: {str(e)}") from e
 
 
-def connect_to_couchdb():
-    logger.info("Starting Couchdb initialization")
+def connect_to_cloudant():
+    logger.info("Starting Cloudant initialization")
     temp_files = []
     try:
-        session = requests.Session()
+        authenticator = BasicAuthenticator(CLOUDANT_USERNAME, CLOUDANT_PASSWORD)
+        client = CloudantV1(authenticator=authenticator)
+        client.set_service_url(CLOUDANT_URL)
 
-        if COUCHDB_SSL_CA:
+        # Set up SSL context
+        ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+
+        if CLOUDANT_SSL_CA:
             ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
-            ca_file.write(COUCHDB_SSL_CA)
+            ca_file.write(CLOUDANT_SSL_CA)
             ca_file.flush()
             temp_files.append(ca_file.name)
-            session.verify = ca_file.name
+            ssl_context.load_verify_locations(cafile=ca_file.name)
         else:
-            session.verify = False
-            logger.warning("COUCHDB_SSL_CA is empty or not set")
+            logger.warning("CLOUDANT_SSL_CA is empty or not set")
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
 
-        if COUCHDB_SSL_CERT and COUCHDB_SSL_KEY:
+        if CLOUDANT_SSL_CERT and CLOUDANT_SSL_KEY:
             cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
             key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.key')
-            cert_file.write(COUCHDB_SSL_CERT)
-            key_file.write(COUCHDB_SSL_KEY)
+            cert_file.write(CLOUDANT_SSL_CERT)
+            key_file.write(CLOUDANT_SSL_KEY)
             cert_file.flush()
             key_file.flush()
             temp_files.extend([cert_file.name, key_file.name])
-            session.cert = (cert_file.name, key_file.name)
+            ssl_context.load_cert_chain(certfile=cert_file.name, keyfile=key_file.name)
         else:
-            session.cert = None
-            logger.warning("COUCHDB_SSL_CERT or COUCHDB_SSL_KEY is empty or not set")
+            logger.warning("CLOUDANT_SSL_CERT or CLOUDANT_SSL_KEY is empty or not set")
 
-        # Create the CouchDB server instance with the custom session
-        couch = couchdb.Server(COUCHDB_URL, session=session)
+        # Set the SSL context for the client
+        client.set_http_config({'ssl_context': ssl_context})
 
-        db = couch[COUCHDB_DB]
-        logger.info(f"Successfully connected to database '{COUCHDB_DB}'.")
-        return db
+        # Test the connection
+        try:
+            db_info = client.get_database_information(db=CLOUDANT_DB).get_result()
+            logger.info(f"Successfully connected to database '{CLOUDANT_DB}'.")
+            return client
+        except ApiException as e:
+            logger.error(f"Failed to connect to Cloudant database: {str(e)}")
+            raise
 
     except Exception as e:
-        logger.error(f"Failed to connect to CouchDB: {str(e)}")
+        logger.error(f"Failed to initialize Cloudant connection: {str(e)}")
         raise
     finally:
         for file_path in temp_files:
@@ -214,49 +229,50 @@ async def update_redis(redis_cluster, node_id, resource_data):
         logger.error(f"Error updating Redis for node {node_id}: {str(e)}")
 
 
-def store_resource_data(db, node_id, resource_data):
+def store_resource_data(client, node_id, resource_data):
     try:
         doc_id = node_id
         timestamp = int(time.time())
         data_hash = hashlib.sha256(json.dumps(resource_data, sort_keys=True).encode()).hexdigest()
 
-        if doc_id in db:
-            doc = db[doc_id]
-            if 'resource_data_list' not in doc:
-                doc['resource_data_list'] = []
-            doc['resource_data_list'].append({
-                'timestamp': timestamp,
-                'data': resource_data,
-                'data_hash': data_hash
-            })
-            doc['latest_update'] = {
-                'timestamp': timestamp,
-                'data_hash': data_hash
-            }
-        else:
+        # Try to get the existing document
+        try:
+            doc = client.get_document(db=CLOUDANT_DB, doc_id=doc_id).get_result()
+        except ApiException:
+            # Document doesn't exist, create a new one
             doc = {
-                'resource_data_list': [{
-                    'timestamp': timestamp,
-                    'data': resource_data,
-                    'data_hash': data_hash
-                }],
-                'latest_update': {
-                    'timestamp': timestamp,
-                    'data_hash': data_hash
-                }
+                '_id': doc_id,
+                'resource_data_list': [],
+                'latest_update': {}
             }
 
-        # Measure the time taken for the CouchDB write operation
+        # Update the document
+        if 'resource_data_list' not in doc:
+            doc['resource_data_list'] = []
+        doc['resource_data_list'].append({
+            'timestamp': timestamp,
+            'data': resource_data,
+            'data_hash': data_hash
+        })
+        doc['latest_update'] = {
+            'timestamp': timestamp,
+            'data_hash': data_hash
+        }
+
+        # Measure the time taken for the Cloudant write operation
         start_time = time.time()
-        db[doc_id] = doc
+        if '_rev' in doc:
+            response = client.put_document(db=CLOUDANT_DB, doc_id=doc_id, document=doc).get_result()
+        else:
+            response = client.post_document(db=CLOUDANT_DB, document=doc).get_result()
         end_time = time.time()
 
         write_time = end_time - start_time
-        logger.info(f"Appended resource data for node {node_id} in CouchDB. Write time: {write_time:.4f} seconds")
+        logger.info(f"Appended resource data for node {node_id} in Cloudant. Write time: {write_time:.4f} seconds")
 
         return {'timestamp': timestamp, 'data_hash': data_hash, 'write_time': write_time}
     except Exception as e:
-        logger.error(f"Error storing resource data for node {node_id} in CouchDB: {str(e)}")
+        logger.error(f"Error storing resource data for node {node_id} in Cloudant: {str(e)}")
         return None
 
 
@@ -336,9 +352,9 @@ async def main():
     context = create_context('secp256k1')
     signer = CryptoFactory(context).new_signer(private_key)
 
-    db = connect_to_couchdb()
-    if not db:
-        logger.error("Couldn't connect to CouchDB. Exiting.")
+    client = connect_to_cloudant()
+    if not client:
+        logger.error("Couldn't connect to Cloudant. Exiting.")
         sys.exit(1)
 
     redis_cluster = await connect_to_redis()
@@ -352,7 +368,7 @@ async def main():
             resource_data = get_resource_data()
             if resource_data:
                 logger.debug(f"Resource data: {json.dumps(resource_data, indent=2)}")
-                update_info = store_resource_data(db, node_id, resource_data)
+                update_info = store_resource_data(client, node_id, resource_data)
                 if update_info:
                     updates.append(update_info)
 
@@ -371,7 +387,7 @@ async def main():
             logger.error(f"Error in main loop: {str(e)}")
         await asyncio.sleep(UPDATE_INTERVAL)
 
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    import asyncio
     asyncio.run(main())
