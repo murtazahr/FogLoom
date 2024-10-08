@@ -105,27 +105,26 @@ def connect_to_cloudant():
         client = CloudantV1(authenticator=authenticator)
         client.set_service_url(CLOUDANT_URL)
 
-        ssl_verify = True
         cert_files = None
 
         if CLOUDANT_SSL_CA:
-            ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
+            ca_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.crt', delete=False)
             ca_file.write(CLOUDANT_SSL_CA)
             ca_file.flush()
-            temp_files.append(ca_file.name)
+            temp_files.append(ca_file)
             ssl_verify = ca_file.name
         else:
             logger.warning("CLOUDANT_SSL_CA is empty or not set")
             ssl_verify = False
 
         if CLOUDANT_SSL_CERT and CLOUDANT_SSL_KEY:
-            cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
-            key_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.key')
+            cert_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.crt', delete=False)
+            key_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.key', delete=False)
             cert_file.write(CLOUDANT_SSL_CERT)
             key_file.write(CLOUDANT_SSL_KEY)
             cert_file.flush()
             key_file.flush()
-            temp_files.extend([cert_file.name, key_file.name])
+            temp_files.extend([cert_file, key_file])
             cert_files = (cert_file.name, key_file.name)
         else:
             logger.warning("CLOUDANT_SSL_CERT or CLOUDANT_SSL_KEY is empty or not set")
@@ -140,21 +139,17 @@ def connect_to_cloudant():
         try:
             db_info = client.get_database_information(db=CLOUDANT_DB).get_result()
             logger.info(f"Successfully connected to database '{CLOUDANT_DB}'.")
-            return client
+            return client, temp_files
         except ApiException as e:
             logger.error(f"Failed to connect to Cloudant database: {str(e)}")
             raise
 
     except Exception as e:
         logger.error(f"Failed to initialize Cloudant connection: {str(e)}")
+        for file in temp_files:
+            file.close()
+            os.unlink(file.name)
         raise
-    finally:
-        for file_path in temp_files:
-            try:
-                os.unlink(file_path)
-                logger.debug(f"Temporary file deleted: {file_path}")
-            except Exception as e:
-                logger.warning(f"Failed to delete temporary file {file_path}: {str(e)}")
 
 
 async def connect_to_redis():
@@ -341,6 +336,13 @@ def submit_batch(batch):
     logger.info(f"Submitted batch to validator: {result}")
 
 
+def cleanup_cloudant_connection(temp_files):
+    for file in temp_files:
+        file.close()
+        os.unlink(file.name)
+        logger.debug(f"Temporary file deleted: {file.name}")
+
+
 async def main():
     logger.info("Starting Resource Registration Client")
     node_id = os.getenv('NODE_ID', 'unrecognized_node')
@@ -354,8 +356,9 @@ async def main():
     context = create_context('secp256k1')
     signer = CryptoFactory(context).new_signer(private_key)
 
-    client = connect_to_cloudant()
+    client, temp_files = connect_to_cloudant()
     if not client:
+        cleanup_cloudant_connection(temp_files)
         logger.error("Couldn't connect to Cloudant. Exiting.")
         sys.exit(1)
 
@@ -386,6 +389,7 @@ async def main():
             else:
                 logger.warning("Failed to get resource data")
         except Exception as e:
+            cleanup_cloudant_connection(temp_files)
             logger.error(f"Error in main loop: {str(e)}")
         await asyncio.sleep(UPDATE_INTERVAL)
 
