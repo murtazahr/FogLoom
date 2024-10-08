@@ -6,10 +6,9 @@ import ssl
 import sys
 import tempfile
 import time
-
-import couchdb
 import psutil
 import requests
+import couchdb
 from coredis import RedisCluster
 from coredis.exceptions import RedisError
 from sawtooth_sdk.messaging.stream import Stream
