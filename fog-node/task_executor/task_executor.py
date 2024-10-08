@@ -669,7 +669,7 @@ class TaskExecutor:
 
 async def main():
     logger.info("Starting main application")
-    executor = TaskExecutor()
+    '''executor = TaskExecutor()
     await executor.initialize()
 
     logger.info(f"TaskExecutor initialized and running. Listening for Redis stream messages on node: {CURRENT_NODE}")
@@ -681,7 +681,7 @@ async def main():
     except asyncio.CancelledError:
         logger.info("Received cancellation signal. Shutting down...")
     finally:
-        await executor.cleanup()
+        await executor.cleanup()'''
 
     logger.info("Main application shutdown complete")
 
