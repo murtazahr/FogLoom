@@ -105,19 +105,18 @@ def connect_to_cloudant():
         client = CloudantV1(authenticator=authenticator)
         client.set_service_url(CLOUDANT_URL)
 
-        # Set up SSL context
-        ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        ssl_verify = True
+        cert_files = None
 
         if CLOUDANT_SSL_CA:
             ca_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
             ca_file.write(CLOUDANT_SSL_CA)
             ca_file.flush()
             temp_files.append(ca_file.name)
-            ssl_context.load_verify_locations(cafile=ca_file.name)
+            ssl_verify = ca_file.name
         else:
             logger.warning("CLOUDANT_SSL_CA is empty or not set")
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            ssl_verify = False
 
         if CLOUDANT_SSL_CERT and CLOUDANT_SSL_KEY:
             cert_file = tempfile.NamedTemporaryFile(delete=False, mode='w+', suffix='.crt')
@@ -127,12 +126,15 @@ def connect_to_cloudant():
             cert_file.flush()
             key_file.flush()
             temp_files.extend([cert_file.name, key_file.name])
-            ssl_context.load_cert_chain(certfile=cert_file.name, keyfile=key_file.name)
+            cert_files = (cert_file.name, key_file.name)
         else:
             logger.warning("CLOUDANT_SSL_CERT or CLOUDANT_SSL_KEY is empty or not set")
 
-        # Set the SSL context for the client
-        client.set_http_config({'ssl_context': ssl_context})
+        # Set the SSL configuration for the client
+        client.set_http_config({
+            'verify': ssl_verify,
+            'cert': cert_files
+        })
 
         # Test the connection
         try:
