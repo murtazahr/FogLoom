@@ -7,7 +7,6 @@ import sys
 import tempfile
 import time
 import psutil
-import requests
 import asyncio
 from ibmcloudant.cloudant_v1 import CloudantV1
 from ibm_cloud_sdk_core.authenticators import BasicAuthenticator
@@ -362,36 +361,38 @@ async def main():
         logger.error("Couldn't connect to Cloudant. Exiting.")
         sys.exit(1)
 
-    redis_cluster = await connect_to_redis()
-    if not redis_cluster:
-        logger.error("Couldn't connect to Redis cluster. Exiting.")
-        sys.exit(1)
+    try:
+        redis_cluster = await connect_to_redis()
+        if not redis_cluster:
+            logger.error("Couldn't connect to Redis cluster. Exiting.")
+            sys.exit(1)
 
-    updates = []
-    while True:
-        try:
-            resource_data = get_resource_data()
-            if resource_data:
-                logger.debug(f"Resource data: {json.dumps(resource_data, indent=2)}")
-                update_info = store_resource_data(client, node_id, resource_data)
-                if update_info:
-                    updates.append(update_info)
+        updates = []
+        while True:
+            try:
+                resource_data = get_resource_data()
+                if resource_data:
+                    logger.debug(f"Resource data: {json.dumps(resource_data, indent=2)}")
+                    update_info = store_resource_data(client, node_id, resource_data)
+                    if update_info:
+                        updates.append(update_info)
 
-                    # Update Redis with the latest resource data
-                    await update_redis(redis_cluster, node_id, resource_data)
+                        # Update Redis with the latest resource data
+                        await update_redis(redis_cluster, node_id, resource_data)
 
-                    if len(updates) >= BLOCKCHAIN_BATCH_SIZE:
-                        transaction = create_transaction(node_id, updates, signer)
-                        batch = create_batch([transaction], signer)
-                        submit_batch(batch)
-                        logger.info(f"Logged {len(updates)} resource updates in blockchain for node {node_id}")
-                        updates = []
-            else:
-                logger.warning("Failed to get resource data")
-        except Exception as e:
-            cleanup_cloudant_connection(temp_files)
-            logger.error(f"Error in main loop: {str(e)}")
-        await asyncio.sleep(UPDATE_INTERVAL)
+                        if len(updates) >= BLOCKCHAIN_BATCH_SIZE:
+                            transaction = create_transaction(node_id, updates, signer)
+                            batch = create_batch([transaction], signer)
+                            submit_batch(batch)
+                            logger.info(f"Logged {len(updates)} resource updates in blockchain for node {node_id}")
+                            updates = []
+                else:
+                    logger.warning("Failed to get resource data")
+            except Exception as e:
+                logger.error(f"Error in main loop: {str(e)}")
+            await asyncio.sleep(UPDATE_INTERVAL)
+    finally:
+        cleanup_cloudant_connection(temp_files)
 
 
 if __name__ == '__main__':

@@ -8,16 +8,22 @@ import tempfile
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 
-import couchdb
+from ibmcloudant.cloudant_v1 import CloudantV1
+from ibm_cloud_sdk_core.authenticators import BasicAuthenticator
 from coredis import RedisCluster
 from coredis.exceptions import RedisError
 from sawtooth_sdk.processor.core import TransactionProcessor
 from sawtooth_sdk.processor.exceptions import InvalidTransaction
 from sawtooth_sdk.processor.handler import TransactionHandler
 
-# CouchDB configuration
-COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
-COUCHDB_DATA_DB = 'task_data'
+# Cloudant configuration
+CLOUDANT_URL = f"https://{os.getenv('COUCHDB_HOST', 'cloudant-host:6984')}"
+CLOUDANT_USERNAME = os.getenv('COUCHDB_USER')
+CLOUDANT_PASSWORD = os.getenv('COUCHDB_PASSWORD')
+CLOUDANT_DB = 'task_data'
+CLOUDANT_SSL_CA = os.getenv('COUCHDB_SSL_CA')
+CLOUDANT_SSL_CERT = os.getenv('COUCHDB_SSL_CERT')
+CLOUDANT_SSL_KEY = os.getenv('COUCHDB_SSL_KEY')
 
 # Redis configuration
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis-cluster')
@@ -39,12 +45,58 @@ logger = logging.getLogger(__name__)
 
 class IoTDataTransactionHandler(TransactionHandler):
     def __init__(self):
-        self.couch = couchdb.Server(COUCHDB_URL)
-        self.data_db = self.couch[COUCHDB_DATA_DB]
+        self.cloudant_client = None
         self.redis = None
         self.loop = asyncio.get_event_loop()
         self.executor = ThreadPoolExecutor()
+        self.cloudant_certs = []
+        self._initialize_cloudant()
         self._initialize_redis()
+
+    def _initialize_cloudant(self):
+        logger.info("Starting Cloudant initialization")
+        try:
+            authenticator = BasicAuthenticator(CLOUDANT_USERNAME, CLOUDANT_PASSWORD)
+            self.cloudant_client = CloudantV1(authenticator=authenticator)
+            self.cloudant_client.set_service_url(CLOUDANT_URL)
+
+            cert_files = None
+
+            if CLOUDANT_SSL_CA:
+                ca_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.crt', delete=False)
+                ca_file.write(CLOUDANT_SSL_CA)
+                ca_file.flush()
+                self.cloudant_certs.append(ca_file)
+                ssl_verify = ca_file.name
+            else:
+                logger.warning("CLOUDANT_SSL_CA is empty or not set")
+                ssl_verify = False
+
+            if CLOUDANT_SSL_CERT and CLOUDANT_SSL_KEY:
+                cert_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.crt', delete=False)
+                key_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.key', delete=False)
+                cert_file.write(CLOUDANT_SSL_CERT)
+                key_file.write(CLOUDANT_SSL_KEY)
+                cert_file.flush()
+                key_file.flush()
+                self.cloudant_certs.extend([cert_file, key_file])
+                cert_files = (cert_file.name, key_file.name)
+            else:
+                logger.warning("CLOUDANT_SSL_CERT or CLOUDANT_SSL_KEY is empty or not set")
+
+            # Set the SSL configuration for the client
+            self.cloudant_client.set_http_config({
+                'verify': ssl_verify,
+                'cert': cert_files
+            })
+
+            self.cloudant_client.get_database_information(db=CLOUDANT_DB).get_result()
+            logger.info(f"Successfully connected to database '{CLOUDANT_DB}'.")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize Cloudant connection: {str(e)}")
+            self.cleanup_temp_files()
+            raise
 
     def _initialize_redis(self):
         logger.info("Starting Redis initialization")
@@ -165,13 +217,13 @@ class IoTDataTransactionHandler(TransactionHandler):
         dependency_graph = self._get_dependency_graph(context, workflow_id)
         data_id = self._generate_data_id(workflow_id, schedule_id, dependency_graph["start"], 'input')
 
-        tasks = [self._store_data_in_redis(data_id, iot_data, iot_data_hash, workflow_id, schedule_id, persist_data)]
+        tasks = [self._store_data_in_redis(data_id, iot_data, workflow_id, schedule_id, persist_data)]
         if persist_data:
-            tasks.append(self._store_data_in_couchdb(data_id, iot_data, iot_data_hash, workflow_id, schedule_id))
+            tasks.append(self._store_data_in_cloudant(data_id, iot_data, iot_data_hash, workflow_id, schedule_id))
 
         await asyncio.gather(*tasks)
 
-    async def _store_data_in_redis(self, data_id, data, data_hash, workflow_id, schedule_id, persist_data):
+    async def _store_data_in_redis(self, data_id, data, workflow_id, schedule_id, persist_data):
         try:
             data_json = json.dumps({
                 'data': data,
@@ -188,20 +240,19 @@ class IoTDataTransactionHandler(TransactionHandler):
             logger.error(f"Failed to store IoT data in Redis: {str(e)}")
             raise
 
-    async def _store_data_in_couchdb(self, data_id, data, data_hash, workflow_id, schedule_id):
+    async def _store_data_in_cloudant(self, data_id, data, data_hash, workflow_id, schedule_id):
         try:
-            self.data_db.save({
+            doc = {
                 '_id': data_id,
                 'data': data,
                 'data_hash': data_hash,
                 'workflow_id': workflow_id,
                 'schedule_id': schedule_id
-            })
-            logger.info(f"Successfully stored IoT data in CouchDB for ID: {data_id}")
-        except couchdb.http.ResourceConflict:
-            logger.info(f"Data for ID: {data_id} already exists in CouchDB. Skipping storage.")
+            }
+            self.cloudant_client.post_document(db=CLOUDANT_DB, document=doc).get_result()
+            logger.info(f"Successfully stored IoT data in Cloudant for ID: {data_id}")
         except Exception as e:
-            logger.error(f"Unexpected error while storing data in CouchDB for ID {data_id}: {str(e)}")
+            logger.error(f"Unexpected error while storing data in Cloudant for ID {data_id}: {str(e)}")
             raise
 
     def _validate_workflow_id(self, context, workflow_id):
@@ -227,6 +278,13 @@ class IoTDataTransactionHandler(TransactionHandler):
         else:
             raise InvalidTransaction(f"No workflow data found for workflow ID: {workflow_id}")
 
+    def cleanup_temp_files(self):
+        for file in self.cloudant_certs:
+            file.close()
+            os.unlink(file.name)
+        self.cloudant_certs = []
+        logger.info("Temporary SSL files cleaned up")
+
     @staticmethod
     def _generate_data_id(workflow_id, schedule_id, app_id, data_type):
         return f"{workflow_id}_{schedule_id}_{app_id}_{data_type}"
@@ -248,7 +306,10 @@ def main():
     processor = TransactionProcessor(url=os.getenv('VALIDATOR_URL', 'tcp://validator:4004'))
     handler = IoTDataTransactionHandler()
     processor.add_handler(handler)
-    processor.start()
+    try:
+        processor.start()
+    finally:
+        handler.cleanup_temp_files()
 
 
 if __name__ == '__main__':

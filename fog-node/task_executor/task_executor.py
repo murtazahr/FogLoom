@@ -8,12 +8,13 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-import couchdb
 import docker
 from cachetools import TTLCache
 from docker import errors
 from coredis import RedisCluster
 from coredis.exceptions import RedisError
+from ibmcloudant.cloudant_v1 import CloudantV1
+from ibm_cloud_sdk_core.authenticators import BasicAuthenticator
 
 from helper.blockchain_task_status_updater import status_update_transactor
 from helper.response_manager import ResponseManager
@@ -25,9 +26,14 @@ logger = logging.getLogger(__name__)
 
 CURRENT_NODE = os.getenv('NODE_ID')
 
-# CouchDB configuration
-COUCHDB_URL = f"http://{os.getenv('COUCHDB_USER')}:{os.getenv('COUCHDB_PASSWORD')}@{os.getenv('COUCHDB_HOST', 'couch-db-0:5984')}"
-COUCHDB_DATA_DB = 'task_data'
+# Cloudant configuration
+CLOUDANT_URL = f"https://{os.getenv('COUCHDB_HOST', 'cloudant-host:6984')}"
+CLOUDANT_USERNAME = os.getenv('COUCHDB_USER')
+CLOUDANT_PASSWORD = os.getenv('COUCHDB_PASSWORD')
+CLOUDANT_DB = 'task_data'
+CLOUDANT_SSL_CA = os.getenv('COUCHDB_SSL_CA')
+CLOUDANT_SSL_CERT = os.getenv('COUCHDB_SSL_CERT')
+CLOUDANT_SSL_KEY = os.getenv('COUCHDB_SSL_KEY')
 
 # Redis configuration
 REDIS_HOST = os.getenv('REDIS_HOST', 'redis-cluster')
@@ -48,10 +54,62 @@ class TaskExecutor:
         self.process_tasks_task = None
         self.processed_changes = TTLCache(maxsize=1000, ttl=300)  # Cache for 5 minutes
         self.task_status = {}
-        self.couch = couchdb.Server(COUCHDB_URL)
-        self.data_db = self.couch[COUCHDB_DATA_DB]
+        self.cloudant_client = None
+        self.cloudant_certs = None
         self.redis = None
         self.channel_name = 'schedule'
+        self.connect_to_cloudant()
+
+    def connect_to_cloudant(self):
+        logger.info("Starting Cloudant initialization")
+        temp_files = []
+        try:
+            authenticator = BasicAuthenticator(CLOUDANT_USERNAME, CLOUDANT_PASSWORD)
+            self.cloudant_client = CloudantV1(authenticator=authenticator)
+            self.cloudant_client.set_service_url(CLOUDANT_URL)
+
+            cert_files = None
+
+            if CLOUDANT_SSL_CA:
+                ca_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.crt', delete=False)
+                ca_file.write(CLOUDANT_SSL_CA)
+                ca_file.flush()
+                temp_files.append(ca_file)
+                ssl_verify = ca_file.name
+            else:
+                logger.warning("CLOUDANT_SSL_CA is empty or not set")
+                ssl_verify = False
+
+            if CLOUDANT_SSL_CERT and CLOUDANT_SSL_KEY:
+                cert_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.crt', delete=False)
+                key_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.key', delete=False)
+                cert_file.write(CLOUDANT_SSL_CERT)
+                key_file.write(CLOUDANT_SSL_KEY)
+                cert_file.flush()
+                key_file.flush()
+                temp_files.extend([cert_file, key_file])
+                cert_files = (cert_file.name, key_file.name)
+            else:
+                logger.warning("CLOUDANT_SSL_CERT or CLOUDANT_SSL_KEY is empty or not set")
+
+            # Set the SSL configuration for the client
+            self.cloudant_client.set_http_config({
+                'verify': ssl_verify,
+                'cert': cert_files
+            })
+
+            # Test the connection
+            self.cloudant_client.get_database_information(db=CLOUDANT_DB).get_result()
+            logger.info(f"Successfully connected to database '{CLOUDANT_DB}'.")
+
+            self.cloudant_certs = temp_files
+
+        except Exception as e:
+            logger.error(f"Failed to initialize Cloudant connection: {str(e)}")
+            for file in temp_files:
+                file.close()
+                os.unlink(file.name)
+            raise
 
     async def connect_to_redis(self):
         logger.info("Starting Redis initialization")
@@ -167,7 +225,8 @@ class TaskExecutor:
                     logger.debug(f"Skipping already processed schedule with unchanged status: {schedule_id}")
                     return
                 else:
-                    logger.info(f"Re-processing schedule {schedule_id} due to status change: {prev_status} -> {current_status}")
+                    logger.info(
+                        f"Re-processing schedule {schedule_id} due to status change: {prev_status} -> {current_status}")
 
             # Process the schedule based on its status
             if current_status == 'ACTIVE':
@@ -326,7 +385,8 @@ class TaskExecutor:
                         workflow_id,
                         schedule_id,
                         "FAILED")
-                    disconnect_response_manager = self.loop.run_in_executor(self.thread_pool, response_manager.disconnect)
+                    disconnect_response_manager = self.loop.run_in_executor(self.thread_pool,
+                                                                            response_manager.disconnect)
 
                     await asyncio.gather(update_local_status, update_blockchain_status, disconnect_response_manager)
                 finally:
@@ -387,7 +447,8 @@ class TaskExecutor:
                 raise
         else:
             try:
-                input_data, persistence_flag = await self.fetch_dependency_outputs(workflow_id, schedule_id, app_id, schedule)
+                input_data, persistence_flag = await self.fetch_dependency_outputs(workflow_id, schedule_id, app_id,
+                                                                                   schedule)
             except Exception as e:
                 logger.error(f"Error fetching dependency outputs for task {app_id}: {str(e)}", exc_info=True)
                 raise
@@ -411,8 +472,8 @@ class TaskExecutor:
             logger.info(f"Task output stored: {output_key}")
 
             if persistence_flag:
-                persistence_task = self.loop.create_task(self.persist_to_couchdb(data_id, output_data['data'],
-                                                                                 workflow_id, schedule_id))
+                persistence_task = self.loop.create_task(self.persist_to_cloudant(data_id, output_data['data'],
+                                                                                  workflow_id, schedule_id))
                 persistence_task.add_done_callback(
                     lambda t: logger.error(f"Error in persistence task: {t.exception()}") if t.exception() else None
                 )
@@ -424,20 +485,19 @@ class TaskExecutor:
 
         return output_data
 
-    async def persist_to_couchdb(self, data_id, data, workflow_id, schedule_id):
+    async def persist_to_cloudant(self, data_id, data, workflow_id, schedule_id):
         try:
-            self.data_db.save({
+            doc = {
                 '_id': data_id,
                 'data': data,
                 'data_hash': self._calculate_hash(data),
                 'workflow_id': workflow_id,
                 'schedule_id': schedule_id
-            })
-            logger.info(f"Successfully stored IoT data in CouchDB for ID: {data_id}")
-        except couchdb.http.ResourceConflict:
-            logger.info(f"Data for ID: {data_id} already exists in CouchDB. Skipping storage.")
+            }
+            self.cloudant_client.post_document(db=CLOUDANT_DB, document=doc).get_result()
+            logger.info(f"Successfully stored IoT data in Cloudant for ID: {data_id}")
         except Exception as e:
-            logger.error(f"Unexpected error while storing data in CouchDB for ID {data_id}: {str(e)}")
+            logger.error(f"Unexpected error while storing data in Cloudant for ID {data_id}: {str(e)}")
             raise
 
     @staticmethod
@@ -654,22 +714,28 @@ class TaskExecutor:
             await self.redis.close()
             logger.info("Redis connection closed")
 
-        # Close the Docker client (unchanged)
+        # Close the Docker client
         if self.docker_client:
             self.docker_client.close()
 
-        # Shutdown the thread pool (unchanged)
+        # Shutdown the thread pool
         self.thread_pool.shutdown()
 
-        # Clear the task status (unchanged)
+        # Clear the task status
         self.task_status.clear()
+
+        # Clean up temporary files
+        for file in self.cloudant_certs:
+            file.close()
+            os.unlink(file.name)
+        logger.info("Temporary SSL files cleaned up")
 
         logger.info("TaskExecutor cleanup complete")
 
 
 async def main():
     logger.info("Starting main application")
-    '''executor = TaskExecutor()
+    executor = TaskExecutor()
     await executor.initialize()
 
     logger.info(f"TaskExecutor initialized and running. Listening for Redis stream messages on node: {CURRENT_NODE}")
@@ -681,7 +747,7 @@ async def main():
     except asyncio.CancelledError:
         logger.info("Received cancellation signal. Shutting down...")
     finally:
-        await executor.cleanup()'''
+        await executor.cleanup()
 
     logger.info("Main application shutdown complete")
 
