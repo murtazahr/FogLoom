@@ -431,6 +431,21 @@ items:"
                     secretKeyRef:
                       name: couchdb-secrets
                       key: COUCHDB_PASSWORD
+                - name: COUCHDB_SSL_CERT
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-certs
+                      key: node${i}_crt
+                - name: COUCHDB_SSL_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-certs
+                      key: node${i}_key
+                - name: COUCHDB_SSL_CA
+                  valueFrom:
+                    secretKeyRef:
+                      name: couchdb-certs
+                      key: ca.crt
                 - name: REDIS_PASSWORD
                   valueFrom:
                     secretKeyRef:
